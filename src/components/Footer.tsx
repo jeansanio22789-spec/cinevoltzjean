@@ -14,7 +14,7 @@ const Footer = () => {
           <div className="flex flex-col gap-2">
             <a href="#" className="hover:text-foreground transition-colors">Imprensa</a>
             <a href="#" className="hover:text-foreground transition-colors">Relações com investidores</a>
-            <a href="#" className="hover:text-foreground transition-colors">Carreiras</a>
+            <Link to="/carreiras" className="hover:text-foreground transition-colors">Trabalhe Conosco</Link>
           </div>
           <div className="flex flex-col gap-2">
             <a href="#" className="hover:text-foreground transition-colors">Formas de assistir</a>
