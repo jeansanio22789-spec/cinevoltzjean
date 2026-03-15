@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const Footer = () => {
   return (
     <footer className="px-4 md:px-12 py-12 mt-8 border-t border-border">
