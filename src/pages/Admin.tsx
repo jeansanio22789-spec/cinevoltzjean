@@ -61,6 +61,13 @@ type Tab = "dashboard" | "content" | "users";
 const Admin = () => {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
+  const { signOut, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   const maxRevenue = Math.max(...revenueData.map((d) => d.value));
 
