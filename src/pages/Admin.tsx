@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Film, Users, TrendingUp, DollarSign,
-  Eye, Plus, Pencil, Trash2, Search, ArrowLeft,
+  Eye, Plus, Pencil, Trash2, Search, ArrowLeft, LogOut,
   BarChart3, UserCheck, UserX, Crown
 } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
