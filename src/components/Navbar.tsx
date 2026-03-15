@@ -97,6 +97,13 @@ const Navbar = () => {
             >
               Assinar Agora
             </Link>
+            <Link
+              to="/admin"
+              className="inline-flex items-center justify-center px-4 py-2 border border-border text-sm font-medium rounded"
+              onClick={() => setMobileOpen(false)}
+            >
+              Painel Admin
+            </Link>
           </div>
         </div>
       )}
