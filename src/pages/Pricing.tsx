@@ -1,4 +1,5 @@
 import { Check, CreditCard, Smartphone, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
