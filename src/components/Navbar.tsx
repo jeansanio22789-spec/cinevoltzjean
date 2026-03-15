@@ -59,6 +59,12 @@ const Navbar = () => {
         >
           Assinar
         </Link>
+        <Link
+          to="/admin"
+          className="hidden md:inline-flex items-center px-3 py-1.5 border border-border text-sm font-medium rounded hover:bg-muted transition-colors"
+        >
+          Painel Admin
+        </Link>
         <button className="text-muted-foreground hover:text-foreground transition-colors">
           <User className="w-5 h-5" />
         </button>
