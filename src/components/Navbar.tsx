@@ -7,6 +7,7 @@ const navLinks = [
   { label: "Filmes", path: "/" },
   { label: "Séries", path: "/" },
   { label: "Minha Lista", path: "/" },
+  { label: "Trabalhe Conosco", path: "/carreiras" },
 ];
 
 const Navbar = () => {
@@ -58,6 +59,12 @@ const Navbar = () => {
         >
           Assinar
         </Link>
+        <Link
+          to="/admin"
+          className="hidden md:inline-flex items-center px-3 py-1.5 border border-border text-sm font-medium rounded hover:bg-muted transition-colors"
+        >
+          Painel Admin
+        </Link>
         <button className="text-muted-foreground hover:text-foreground transition-colors">
           <User className="w-5 h-5" />
         </button>
@@ -89,6 +96,13 @@ const Navbar = () => {
               onClick={() => setMobileOpen(false)}
             >
               Assinar Agora
+            </Link>
+            <Link
+              to="/admin"
+              className="inline-flex items-center justify-center px-4 py-2 border border-border text-sm font-medium rounded"
+              onClick={() => setMobileOpen(false)}
+            >
+              Painel Admin
             </Link>
           </div>
         </div>
