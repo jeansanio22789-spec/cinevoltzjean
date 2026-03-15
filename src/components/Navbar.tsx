@@ -65,9 +65,9 @@ const Navbar = () => {
         >
           Painel Admin
         </Link>
-        <button className="text-muted-foreground hover:text-foreground transition-colors">
+        <Link to="/login" className="text-muted-foreground hover:text-foreground transition-colors">
           <User className="w-5 h-5" />
-        </button>
+        </Link>
         <button
           className="md:hidden text-muted-foreground hover:text-foreground"
           onClick={() => setMobileOpen(!mobileOpen)}
