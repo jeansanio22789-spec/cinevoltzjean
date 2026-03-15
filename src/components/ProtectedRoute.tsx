@@ -1,6 +1,8 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
+const ADMIN_EMAIL = "jeansanio22789@gmail.com";
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
@@ -12,8 +14,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  if (!user || user.email !== ADMIN_EMAIL) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
