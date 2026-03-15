@@ -1,4 +1,4 @@
-import { LayoutDashboard, Film, Users } from "lucide-react";
+import { LayoutDashboard, Film, Users, Upload, DollarSign, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -11,17 +11,20 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-type Tab = "dashboard" | "content" | "users";
+export type AdminTab = "dashboard" | "content" | "users" | "videos" | "billing" | "settings";
 
 const menuItems = [
-  { title: "Dashboard", tab: "dashboard" as Tab, icon: LayoutDashboard },
-  { title: "Conteúdo", tab: "content" as Tab, icon: Film },
-  { title: "Usuários", tab: "users" as Tab, icon: Users },
+  { title: "Dashboard", tab: "dashboard" as AdminTab, icon: LayoutDashboard },
+  { title: "Conteúdo", tab: "content" as AdminTab, icon: Film },
+  { title: "Envio de Vídeos", tab: "videos" as AdminTab, icon: Upload },
+  { title: "Faturamento", tab: "billing" as AdminTab, icon: DollarSign },
+  { title: "Usuários", tab: "users" as AdminTab, icon: Users },
+  { title: "Configurações", tab: "settings" as AdminTab, icon: Settings },
 ];
 
 interface AdminSidebarProps {
-  activeTab: Tab;
-  setActiveTab: (tab: Tab) => void;
+  activeTab: AdminTab;
+  setActiveTab: (tab: AdminTab) => void;
 }
 
 const AdminSidebar = ({ activeTab, setActiveTab }: AdminSidebarProps) => {

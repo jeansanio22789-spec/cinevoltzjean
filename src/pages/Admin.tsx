@@ -4,10 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard, Film, Users, TrendingUp, DollarSign,
   Eye, Plus, Pencil, Trash2, Search, ArrowLeft, LogOut,
-  BarChart3, UserCheck, UserX, Crown
+  BarChart3, UserCheck, UserX, Crown, Settings, Globe, Bell, Shield
 } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import AdminSidebar from "@/components/AdminSidebar";
+import AdminSidebar, { type AdminTab } from "@/components/AdminSidebar";
+import AdminVideos from "@/components/admin/AdminVideos";
+import AdminBilling from "@/components/admin/AdminBilling";
 
 // Mock data
 const stats = [
@@ -42,24 +44,14 @@ const mockUsers = [
 ];
 
 const revenueData = [
-  { month: "Jan", value: 62 },
-  { month: "Fev", value: 65 },
-  { month: "Mar", value: 68 },
-  { month: "Abr", value: 64 },
-  { month: "Mai", value: 70 },
-  { month: "Jun", value: 73 },
-  { month: "Jul", value: 75 },
-  { month: "Ago", value: 72 },
-  { month: "Set", value: 74 },
-  { month: "Out", value: 76 },
-  { month: "Nov", value: 78 },
-  { month: "Dez", value: 78 },
+  { month: "Jan", value: 62 }, { month: "Fev", value: 65 }, { month: "Mar", value: 68 },
+  { month: "Abr", value: 64 }, { month: "Mai", value: 70 }, { month: "Jun", value: 73 },
+  { month: "Jul", value: 75 }, { month: "Ago", value: 72 }, { month: "Set", value: 74 },
+  { month: "Out", value: 76 }, { month: "Nov", value: 78 }, { month: "Dez", value: 78 },
 ];
 
-type Tab = "dashboard" | "content" | "users";
-
 const Admin = () => {
-  const [activeTab, setActiveTab] = useState<Tab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
@@ -77,32 +69,28 @@ const Admin = () => {
         <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Header */}
           <header className="h-14 flex items-center justify-between border-b border-border px-4 md:px-6 shrink-0">
             <div className="flex items-center gap-3">
               <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
               <h1 className="text-lg font-bold hidden sm:block">Painel Administrativo</h1>
             </div>
             <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground hidden md:block">{user?.email}</span>
               <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-4 h-4" />
-                Voltar ao site
+                <span className="hidden sm:inline">Voltar ao site</span>
               </Link>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
-              >
+              <button onClick={handleSignOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors">
                 <LogOut className="w-4 h-4" />
-                Sair
+                <span className="hidden sm:inline">Sair</span>
               </button>
             </div>
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-6">
-            {/* Dashboard Tab */}
+            {/* Dashboard */}
             {activeTab === "dashboard" && (
               <div className="space-y-6">
-                {/* Stats */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {stats.map((stat) => (
                     <div key={stat.label} className="bg-card border border-border rounded-lg p-5">
@@ -117,7 +105,6 @@ const Admin = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {/* Revenue Chart */}
                   <div className="lg:col-span-2 bg-card border border-border rounded-lg p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <BarChart3 className="w-4 h-4 text-primary" />
@@ -137,7 +124,6 @@ const Admin = () => {
                     </div>
                   </div>
 
-                  {/* Top Movies */}
                   <div className="bg-card border border-border rounded-lg p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <Crown className="w-4 h-4 text-yellow-400" />
@@ -160,7 +146,7 @@ const Admin = () => {
               </div>
             )}
 
-            {/* Content Tab */}
+            {/* Content */}
             {activeTab === "content" && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -169,18 +155,10 @@ const Admin = () => {
                     <Plus className="w-4 h-4" /> Adicionar Conteúdo
                   </button>
                 </div>
-
                 <div className="relative max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Buscar conteúdo..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
+                  <input type="text" placeholder="Buscar conteúdo..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
-
                 <div className="bg-card border border-border rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -194,44 +172,36 @@ const Admin = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockContent
-                        .filter((c) => c.title.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map((item) => (
-                          <tr key={item.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                            <td className="p-3 font-medium">{item.title}</td>
-                            <td className="p-3 text-muted-foreground hidden sm:table-cell">{item.type}</td>
-                            <td className="p-3 text-muted-foreground hidden md:table-cell">{item.genre}</td>
-                            <td className="p-3">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                item.status === "Publicado"
-                                  ? "bg-accent/20 text-accent"
-                                  : item.status === "Rascunho"
-                                  ? "bg-muted text-muted-foreground"
-                                  : "bg-yellow-500/20 text-yellow-400"
-                              }`}>
-                                {item.status}
-                              </span>
-                            </td>
-                            <td className="p-3 text-muted-foreground hidden sm:table-cell">{item.views}</td>
-                            <td className="p-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button className="p-1.5 hover:bg-muted rounded transition-colors">
-                                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                                </button>
-                                <button className="p-1.5 hover:bg-destructive/20 rounded transition-colors">
-                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                      {mockContent.filter((c) => c.title.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
+                        <tr key={item.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                          <td className="p-3 font-medium">{item.title}</td>
+                          <td className="p-3 text-muted-foreground hidden sm:table-cell">{item.type}</td>
+                          <td className="p-3 text-muted-foreground hidden md:table-cell">{item.genre}</td>
+                          <td className="p-3">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.status === "Publicado" ? "bg-accent/20 text-accent" : item.status === "Rascunho" ? "bg-muted text-muted-foreground" : "bg-yellow-500/20 text-yellow-400"}`}>{item.status}</span>
+                          </td>
+                          <td className="p-3 text-muted-foreground hidden sm:table-cell">{item.views}</td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button className="p-1.5 hover:bg-muted rounded transition-colors"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                              <button className="p-1.5 hover:bg-destructive/20 rounded transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
             )}
 
-            {/* Users Tab */}
+            {/* Videos */}
+            {activeTab === "videos" && <AdminVideos />}
+
+            {/* Billing */}
+            {activeTab === "billing" && <AdminBilling />}
+
+            {/* Users */}
             {activeTab === "users" && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -241,18 +211,10 @@ const Admin = () => {
                     <span className="flex items-center gap-1 text-muted-foreground"><UserX className="w-4 h-4" /> 180K inativos</span>
                   </div>
                 </div>
-
                 <div className="relative max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Buscar usuário..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
+                  <input type="text" placeholder="Buscar usuário..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
                 </div>
-
                 <div className="bg-card border border-border rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -266,36 +228,99 @@ const Admin = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockUsers
-                        .filter((u) => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map((user) => (
-                          <tr key={user.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                            <td className="p-3 font-medium">{user.name}</td>
-                            <td className="p-3 text-muted-foreground hidden sm:table-cell">{user.email}</td>
-                            <td className="p-3">
-                              <span className={`text-xs font-semibold ${
-                                user.plan === "Premium" ? "text-yellow-400" : user.plan === "Padrão" ? "text-primary" : "text-muted-foreground"
-                              }`}>
-                                {user.plan}
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                user.status === "Ativo" ? "bg-accent/20 text-accent" : "bg-destructive/20 text-destructive"
-                              }`}>
-                                {user.status}
-                              </span>
-                            </td>
-                            <td className="p-3 text-muted-foreground hidden md:table-cell">{user.since}</td>
-                            <td className="p-3 text-right">
-                              <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                                Gerenciar
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                      {mockUsers.filter((u) => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase())).map((u) => (
+                        <tr key={u.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                          <td className="p-3 font-medium">{u.name}</td>
+                          <td className="p-3 text-muted-foreground hidden sm:table-cell">{u.email}</td>
+                          <td className="p-3"><span className={`text-xs font-semibold ${u.plan === "Premium" ? "text-yellow-400" : u.plan === "Padrão" ? "text-primary" : "text-muted-foreground"}`}>{u.plan}</span></td>
+                          <td className="p-3"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.status === "Ativo" ? "bg-accent/20 text-accent" : "bg-destructive/20 text-destructive"}`}>{u.status}</span></td>
+                          <td className="p-3 text-muted-foreground hidden md:table-cell">{u.since}</td>
+                          <td className="p-3 text-right"><button className="text-xs text-muted-foreground hover:text-foreground transition-colors">Gerenciar</button></td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* Settings */}
+            {activeTab === "settings" && (
+              <div className="space-y-6 max-w-2xl">
+                <div>
+                  <h2 className="text-xl font-bold">Configurações</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Configurações gerais da plataforma</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-card border border-border rounded-lg p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Globe className="w-5 h-5 text-primary" />
+                      <h3 className="font-bold">Plataforma</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Nome da Plataforma</p>
+                          <p className="text-xs text-muted-foreground">Nome exibido para os usuários</p>
+                        </div>
+                        <input className="px-3 py-1.5 bg-background border border-border rounded text-sm w-40" defaultValue="StreamFlix" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Modo Manutenção</p>
+                          <p className="text-xs text-muted-foreground">Desativa o site temporariamente</p>
+                        </div>
+                        <button className="px-3 py-1.5 bg-muted text-sm rounded font-medium">Desativado</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-card border border-border rounded-lg p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Bell className="w-5 h-5 text-yellow-400" />
+                      <h3 className="font-bold">Notificações</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Alertas por Email</p>
+                          <p className="text-xs text-muted-foreground">Novos assinantes e cancelamentos</p>
+                        </div>
+                        <button className="px-3 py-1.5 bg-accent/20 text-accent text-sm rounded font-medium">Ativado</button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Relatórios Semanais</p>
+                          <p className="text-xs text-muted-foreground">Resumo de métricas por email</p>
+                        </div>
+                        <button className="px-3 py-1.5 bg-accent/20 text-accent text-sm rounded font-medium">Ativado</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-card border border-border rounded-lg p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Shield className="w-5 h-5 text-accent" />
+                      <h3 className="font-bold">Segurança</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Autenticação 2FA</p>
+                          <p className="text-xs text-muted-foreground">Camada extra de segurança</p>
+                        </div>
+                        <button className="px-3 py-1.5 bg-muted text-sm rounded font-medium">Configurar</button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Sessões Ativas</p>
+                          <p className="text-xs text-muted-foreground">Gerencie dispositivos conectados</p>
+                        </div>
+                        <button className="px-3 py-1.5 bg-muted text-sm rounded font-medium">Ver Sessões</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
