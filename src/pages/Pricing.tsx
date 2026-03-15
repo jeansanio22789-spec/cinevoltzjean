@@ -1,4 +1,5 @@
 import { Check, CreditCard, Smartphone, QrCode } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -125,12 +126,23 @@ const Pricing = () => {
               </div>
             ))}
           </div>
-          <div className="mt-8 bg-card border border-border rounded-lg p-6 text-left max-w-md mx-auto">
-            <div className="flex items-center gap-3 mb-3">
+          <div className="mt-8 bg-card border border-border rounded-lg p-6 max-w-md mx-auto">
+            <div className="flex items-center gap-3 mb-4 justify-center">
               <QrCode className="w-6 h-6 text-primary" />
               <h3 className="font-bold">Pagar via PIX</h3>
             </div>
-            <p className="text-sm text-muted-foreground mb-2">Chave PIX (E-mail):</p>
+            <div className="flex justify-center mb-4">
+              <div className="bg-white p-3 rounded-lg">
+                <QRCodeSVG
+                  value="jeansanio22789@gmail.com"
+                  size={160}
+                  level="H"
+                  fgColor="#000000"
+                  bgColor="#ffffff"
+                />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2 text-center">Chave PIX (E-mail):</p>
             <div className="flex items-center gap-2 bg-background border border-border rounded px-3 py-2">
               <code className="text-sm font-mono text-foreground flex-1 select-all">jeansanio22789@gmail.com</code>
               <button
@@ -142,7 +154,7 @@ const Pricing = () => {
                 Copiar
               </button>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Após o pagamento, envie o comprovante para ativar seu plano.</p>
+            <p className="text-xs text-muted-foreground mt-3 text-center">Escaneie o QR Code ou copie a chave para pagar. Envie o comprovante para ativar seu plano.</p>
           </div>
           <p className="text-xs text-muted-foreground mt-6">
             Pagamento 100% seguro via PIX, cartão ou carteiras digitais.
