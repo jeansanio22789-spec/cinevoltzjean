@@ -7,6 +7,7 @@ const navLinks = [
   { label: "Filmes", path: "/" },
   { label: "Séries", path: "/" },
   { label: "Minha Lista", path: "/" },
+  { label: "Trabalhe Conosco", path: "/carreiras" },
 ];
 
 const Navbar = () => {
