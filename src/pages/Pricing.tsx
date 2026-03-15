@@ -125,8 +125,27 @@ const Pricing = () => {
               </div>
             ))}
           </div>
+          <div className="mt-8 bg-card border border-border rounded-lg p-6 text-left max-w-md mx-auto">
+            <div className="flex items-center gap-3 mb-3">
+              <QrCode className="w-6 h-6 text-primary" />
+              <h3 className="font-bold">Pagar via PIX</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">Chave PIX (E-mail):</p>
+            <div className="flex items-center gap-2 bg-background border border-border rounded px-3 py-2">
+              <code className="text-sm font-mono text-foreground flex-1 select-all">jeansanio22789@gmail.com</code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText("jeansanio22789@gmail.com");
+                }}
+                className="text-xs bg-primary text-primary-foreground px-3 py-1 rounded font-medium hover:bg-primary/90 transition-colors"
+              >
+                Copiar
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Após o pagamento, envie o comprovante para ativar seu plano.</p>
+          </div>
           <p className="text-xs text-muted-foreground mt-6">
-            Também aceitamos PayPal, Boleto Bancário e carteiras digitais. Pagamento 100% seguro.
+            Pagamento 100% seguro via PIX, cartão ou carteiras digitais.
           </p>
         </div>
       </div>
