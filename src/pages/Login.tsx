@@ -1,27 +1,40 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, LogIn } from "lucide-react";
+import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 
 const Login = () => {
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
-    const { error } = await signIn(email, password);
-    if (error) {
-      setError("Email ou senha inválidos.");
+    if (isSignUp) {
+      const { error } = await signUp(email, password);
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccess("Conta criada! Verifique seu email ou faça login.");
+        setIsSignUp(false);
+      }
     } else {
-      navigate("/admin");
+      const { error } = await signIn(email, password);
+      if (error) {
+        setError("Email ou senha inválidos.");
+      } else {
+        navigate("/admin");
+      }
     }
     setLoading(false);
   };
@@ -31,7 +44,9 @@ const Login = () => {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <p className="text-primary font-black text-3xl tracking-tight mb-2">STREAMFLIX</p>
-          <p className="text-muted-foreground text-sm">Acesse o painel administrativo</p>
+          <p className="text-muted-foreground text-sm">
+            {isSignUp ? "Crie sua conta de administrador" : "Acesse o painel administrativo"}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-4">
@@ -69,17 +84,24 @@ const Login = () => {
             </div>
           </div>
 
-          {error && (
-            <p className="text-destructive text-xs font-medium">{error}</p>
-          )}
+          {error && <p className="text-destructive text-xs font-medium">{error}</p>}
+          {success && <p className="text-accent text-xs font-medium">{success}</p>}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            <LogIn className="w-4 h-4" />
-            {loading ? "Entrando..." : "Entrar"}
+            {isSignUp ? <UserPlus className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
+            {loading ? "Aguarde..." : isSignUp ? "Criar Conta" : "Entrar"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccess(""); }}
+            className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isSignUp ? "Já tem conta? Faça login" : "Não tem conta? Cadastre-se"}
           </button>
         </form>
       </div>
