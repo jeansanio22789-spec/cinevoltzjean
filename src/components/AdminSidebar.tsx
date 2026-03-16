@@ -11,10 +11,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-export type AdminTab = "dashboard" | "content" | "users" | "videos" | "billing" | "settings";
+export type AdminTab = "dashboard" | "content" | "movies" | "users" | "videos" | "billing" | "settings";
 
 const menuItems = [
   { title: "Dashboard", tab: "dashboard" as AdminTab, icon: LayoutDashboard },
+  { title: "Filmes", tab: "movies" as AdminTab, icon: Film },
   { title: "Conteúdo", tab: "content" as AdminTab, icon: Film },
   { title: "Envio de Vídeos", tab: "videos" as AdminTab, icon: Upload },
   { title: "Faturamento", tab: "billing" as AdminTab, icon: DollarSign },
