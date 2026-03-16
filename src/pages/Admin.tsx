@@ -10,6 +10,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AdminSidebar, { type AdminTab } from "@/components/AdminSidebar";
 import AdminVideos from "@/components/admin/AdminVideos";
 import AdminBilling from "@/components/admin/AdminBilling";
+import AdminMovies from "@/components/admin/AdminMovies";
 
 // Mock data
 const stats = [
