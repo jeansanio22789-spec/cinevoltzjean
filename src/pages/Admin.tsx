@@ -196,6 +196,9 @@ const Admin = () => {
               </div>
             )}
 
+            {/* Movies */}
+            {activeTab === "movies" && <AdminMovies />}
+
             {/* Videos */}
             {activeTab === "videos" && <AdminVideos />}
 
