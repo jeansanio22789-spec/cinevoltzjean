@@ -27,6 +27,7 @@ const App = () => (
             <Route path="/planos" element={<Pricing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/carreiras" element={<Careers />} />
+            <Route path="/ao-vivo" element={<Live />} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
