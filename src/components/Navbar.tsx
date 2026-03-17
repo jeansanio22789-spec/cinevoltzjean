@@ -5,6 +5,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const navLinks = [
   { label: "Início", path: "/" },
+  { label: "Ao Vivo", path: "/ao-vivo" },
   { label: "Filmes", path: "/" },
   { label: "Séries", path: "/" },
   { label: "Minha Lista", path: "/" },
