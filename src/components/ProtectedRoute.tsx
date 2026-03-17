@@ -1,18 +1,18 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { useEffect, useState } from "react";
-import { Fingerprint, ShieldCheck } from "lucide-react";
-
-const ADMIN_EMAIL = "jeansanio22789@gmail.com";
+import { Fingerprint, ShieldCheck, Loader2 } from "lucide-react";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { isAdmin, loading: roleLoading } = useIsAdmin();
   const { isAuthenticated, isNative, authenticate, checkAvailability, loading: bioLoading } = useBiometricAuth();
   const [bioChecked, setBioChecked] = useState(false);
 
   useEffect(() => {
-    if (user && user.email === ADMIN_EMAIL && !bioChecked) {
+    if (user && isAdmin && !bioChecked) {
       checkAvailability().then((available) => {
         if (available) {
           authenticate().then(() => setBioChecked(true));
@@ -21,17 +21,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         }
       });
     }
-  }, [user, bioChecked, checkAvailability, authenticate]);
+  }, [user, isAdmin, bioChecked, checkAvailability, authenticate]);
 
-  if (loading) {
+  if (authLoading || roleLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground text-sm">Carregando...</div>
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdmin) {
     return <Navigate to="/" replace />;
   }
 
