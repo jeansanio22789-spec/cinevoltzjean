@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Search, Bell, User, Menu, X } from "lucide-react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 const navLinks = [
   { label: "Início", path: "/" },
@@ -13,6 +14,7 @@ const navLinks = [
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isAdmin } = useIsAdmin();
   const location = useLocation();
 
   useEffect(() => {
@@ -27,12 +29,10 @@ const Navbar = () => {
         scrolled ? "navbar-solid" : "navbar-transparent"
       }`}
     >
-      {/* Logo */}
       <Link to="/" className="text-primary font-black text-2xl md:text-3xl tracking-tight mr-8">
         STREAMFLIX
       </Link>
 
-      {/* Desktop Nav */}
       <div className="hidden md:flex items-center gap-6 flex-1">
         {navLinks.map((link) => (
           <Link
@@ -45,7 +45,6 @@ const Navbar = () => {
         ))}
       </div>
 
-      {/* Right actions */}
       <div className="flex items-center gap-4">
         <button className="text-muted-foreground hover:text-foreground transition-colors">
           <Search className="w-5 h-5" />
@@ -59,12 +58,14 @@ const Navbar = () => {
         >
           Assinar
         </Link>
-        <Link
-          to="/admin"
-          className="hidden md:inline-flex items-center px-3 py-1.5 border border-border text-sm font-medium rounded hover:bg-muted transition-colors"
-        >
-          Painel Admin
-        </Link>
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className="hidden md:inline-flex items-center px-3 py-1.5 border border-border text-sm font-medium rounded hover:bg-muted transition-colors"
+          >
+            Painel Admin
+          </Link>
+        )}
         <Link to="/login" className="text-muted-foreground hover:text-foreground transition-colors">
           <User className="w-5 h-5" />
         </Link>
@@ -76,7 +77,6 @@ const Navbar = () => {
         </button>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
         <div className="absolute top-full left-0 right-0 bg-background/95 backdrop-blur-lg border-b border-border md:hidden">
           <div className="flex flex-col p-4 gap-3">
@@ -97,13 +97,15 @@ const Navbar = () => {
             >
               Assinar Agora
             </Link>
-            <Link
-              to="/admin"
-              className="inline-flex items-center justify-center px-4 py-2 border border-border text-sm font-medium rounded"
-              onClick={() => setMobileOpen(false)}
-            >
-              Painel Admin
-            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="inline-flex items-center justify-center px-4 py-2 border border-border text-sm font-medium rounded"
+                onClick={() => setMobileOpen(false)}
+              >
+                Painel Admin
+              </Link>
+            )}
           </div>
         </div>
       )}
