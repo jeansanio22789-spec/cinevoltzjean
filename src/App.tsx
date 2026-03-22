@@ -12,7 +12,7 @@ import Careers from "./pages/Careers.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Live from "./pages/Live.tsx";
-import SecurityPopup from "./components/SecurityPopup";
+
 
 const queryClient = new QueryClient();
 
