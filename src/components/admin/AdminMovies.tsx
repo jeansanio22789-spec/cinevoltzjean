@@ -22,7 +22,8 @@ const AdminMovies = () => {
   const [editing, setEditing] = useState<Movie | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
-
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     title: "",
     video_url: "",
