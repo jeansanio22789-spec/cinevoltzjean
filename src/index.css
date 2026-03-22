@@ -53,21 +53,6 @@
     --gradient-hero-left: linear-gradient(to right, hsl(0 0% 6%) 0%, transparent 50%);
     --shadow-card: 0 8px 32px -8px hsl(0 0% 0% / 0.6);
 
-    /* Security popup tokens */
-    --security-overlay: 0 0% 0%;
-    --security-popup-start: 155 80% 7%;
-    --security-popup-end: 156 76% 5%;
-    --security-border: 157 100% 50%;
-    --security-text: 146 100% 86%;
-    --security-title: 157 100% 51%;
-    --security-warning-bg: 157 100% 50%;
-    --security-warning-border: 157 100% 50%;
-    --security-risk: 0 100% 80%;
-    --security-btn-bg: 157 100% 50%;
-    --security-btn-hover: 157 100% 40%;
-    --security-btn-text: 158 100% 8%;
-    --security-discount: 152 100% 75%;
-    --security-link: 157 100% 50%;
   }
 }
 
