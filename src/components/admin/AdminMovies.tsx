@@ -246,13 +246,59 @@ const AdminMovies = () => {
               </div>
 
               <div>
-                <label className="text-sm font-medium mb-1.5 block">URL da Thumbnail</label>
+                <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                  <Image className="w-3.5 h-3.5" /> Capa do Filme
+                </label>
                 <input
-                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder="https://... (imagem de capa)"
-                  value={form.thumbnail_url}
-                  onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value })}
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploading(true);
+                    const ext = file.name.split(".").pop();
+                    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                    const { error } = await supabase.storage.from("thumbnails").upload(path, file);
+                    if (error) {
+                      toast.error("Erro ao enviar imagem");
+                    } else {
+                      const { data: urlData } = supabase.storage.from("thumbnails").getPublicUrl(path);
+                      setForm({ ...form, thumbnail_url: urlData.publicUrl });
+                      toast.success("Imagem enviada!");
+                    }
+                    setUploading(false);
+                  }}
                 />
+                {form.thumbnail_url ? (
+                  <div className="relative rounded-lg overflow-hidden border border-border">
+                    <img src={form.thumbnail_url} alt="Capa" className="w-full h-40 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, thumbnail_url: "" })}
+                      className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm p-1 rounded-full hover:bg-destructive/80 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full h-40 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <>
+                        <Upload className="w-6 h-6" />
+                        <span className="text-sm">Clique para enviar a capa</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               <div>
