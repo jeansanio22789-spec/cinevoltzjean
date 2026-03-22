@@ -1,11 +1,11 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
 import MovieCard from "./MovieCard";
-import type { Movie } from "@/data/movies";
+import type { DbMovie } from "@/hooks/useMovies";
 
 interface ContentRailProps {
   title: string;
-  movies: Movie[];
+  movies: DbMovie[];
 }
 
 const ContentRail = ({ title, movies }: ContentRailProps) => {
@@ -22,7 +22,6 @@ const ContentRail = ({ title, movies }: ContentRailProps) => {
       <h2 className="text-lg md:text-xl font-bold mb-3">{title}</h2>
 
       <div className="group relative">
-        {/* Scroll buttons */}
         <button
           onClick={() => scroll("left")}
           className="absolute left-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-r from-background to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
