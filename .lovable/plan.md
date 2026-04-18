@@ -1,15 +1,11 @@
 
+User wants step-by-step guidance to register movies manually via admin panel by pasting a URL (likely from Telegram) and have it appear automatically on the home page.
 
-## Plano: Remover o Popup de Segurança
+Current flow already supports this — the admin panel exists at `/admin`, the `useMovies` hook fetches published movies, and the home page shows them automatically. No code changes needed, just guidance.
 
-### O que será feito
-Remover completamente o componente `SecurityPopup` e suas referências para que a aplicação funcione normalmente sem o overlay bloqueante.
-
-### Alterações
-
-1. **Deletar** `src/components/SecurityPopup.tsx`
-
-2. **Editar** `src/App.tsx` — remover o import e o uso de `<SecurityPopup />`
-
-3. **Editar** `src/index.css` — remover os CSS variables `--security-*` que não são mais necessários
-
+Key flow to explain:
+1. Login → /admin
+2. Click "Filmes" in sidebar
+3. "Novo Filme" → fill title, paste video URL, upload cover
+4. Set status = "Publicado"
+5. Save → appears on home automatically
