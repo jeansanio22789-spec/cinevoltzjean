@@ -540,6 +540,7 @@ const HlsPlayer = ({
 
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
+      engineRef.current = "hls.js";
       const { isSamsungTV, isSamsungBrowser } = detectSamsungTV();
       // Samsung Tizen / SamsungBrowser: CPU/decoder fracos → buffer grande,
       // sem low-latency, sem aceleração e retries mais espaçados.
