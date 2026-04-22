@@ -131,6 +131,7 @@ export type Database = {
         Row: {
           category: string | null
           created_at: string
+          fallback_url: string | null
           id: string
           is_active: boolean
           logo_url: string | null
@@ -142,6 +143,7 @@ export type Database = {
         Insert: {
           category?: string | null
           created_at?: string
+          fallback_url?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
@@ -153,6 +155,7 @@ export type Database = {
         Update: {
           category?: string | null
           created_at?: string
+          fallback_url?: string | null
           id?: string
           is_active?: boolean
           logo_url?: string | null
