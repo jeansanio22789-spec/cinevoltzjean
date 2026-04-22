@@ -1,7 +1,7 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv, Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Radio, Tv, Search, X, Monitor, Minimize2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Channel {
