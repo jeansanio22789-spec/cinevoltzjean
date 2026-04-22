@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
+import { logAudit } from "@/lib/auditLog";
 
 const Login = () => {
   const { signIn, signUp } = useAuth();
@@ -35,6 +36,12 @@ const Login = () => {
       if (error) {
         setError("Email ou senha inválidos.");
       } else {
+        await logAudit({
+          action: "login",
+          resource_type: "auth",
+          description: `Usuário ${email} entrou na plataforma`,
+          metadata: { email },
+        });
         navigate(redirect);
       }
     }
