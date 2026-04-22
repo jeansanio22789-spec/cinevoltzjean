@@ -155,6 +155,17 @@ const Live = () => {
   const viewerKey = selected?.id || (fallbackUrl ? "fallback" : null);
   const viewersHere = useLiveViewers(viewerKey, true);
 
+  // Painel de status (debug do sinal)
+  const [showDebug, setShowDebug] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date>(new Date());
+  useEffect(() => {
+    setLastSyncedAt(new Date());
+  }, [playUrl, selected?.id]);
+
+  // Extrai o identificador LVW-XXXX da URL para visualização rápida
+  const lvwMatch = playUrl.match(/LVW-?\d+/i);
+  const lvwId = lvwMatch ? lvwMatch[0].toUpperCase() : null;
+
   // Espectadores em todos os outros canais (apenas observa, não conta nele)
   const otherIds = useMemo(
     () => channels.map((c) => c.id).filter((id) => id !== selected?.id),
