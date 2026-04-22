@@ -291,7 +291,8 @@ const Live = () => {
               }
               autoPlay
               tvMode={tvMode}
-              aggressiveNetwork
+              aggressiveNetwork={!satelliteMode}
+              satelliteMode={satelliteMode}
               onError={handlePlayerError}
             />
           ) : (
