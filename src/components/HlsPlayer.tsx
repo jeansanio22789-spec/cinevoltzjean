@@ -358,22 +358,45 @@ const HlsPlayer = ({
     const MAX_LATENCY = 6;      // se passar disso, pula pra borda
 
     const interval = setInterval(() => {
-      // 🔄 SINCRONIZAÇÃO DE LATÊNCIA — mantém todos no mesmo ponto
+      // 🔄 SINCRONIZAÇÃO POR HORA REAL — todos os aparelhos no MESMO segundo
       if (!v.paused && !v.ended && v.readyState >= 2 && v.buffered.length > 0) {
         const liveEdge = v.buffered.end(v.buffered.length - 1);
-        const latency = liveEdge - v.currentTime;
+        const anchor = pdtAnchorRef.current;
 
-        // Muito atrás da borda → pula direto pra perto do live (sem delay entre aparelhos)
-        if (latency > MAX_LATENCY) {
-          try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
-        }
-        // Levemente atrás → acelera suavemente (até 1.3x) para alcançar
-        else if (latency > TARGET_LATENCY + 1.5) {
-          v.playbackRate = 1.3;
-        }
-        // Perto da borda → velocidade normal
-        else if (latency <= TARGET_LATENCY + 0.5 && v.playbackRate !== 1) {
-          v.playbackRate = 1;
+        // Se o stream tem PROGRAM-DATE-TIME, ancoramos pela hora do servidor
+        if (anchor) {
+          // Tempo absoluto da borda viva (ms epoch)
+          const liveEdgePdt = anchor.pdt + (liveEdge - anchor.mediaTime) * 1000;
+          // Alvo: ficar TARGET_LATENCY segundos atrás do "agora real" do servidor
+          const targetPdt = serverNow() - TARGET_LATENCY * 1000;
+          // Se o alvo ultrapassa o que o stream tem, usa a borda viva como teto
+          const cappedTargetPdt = Math.min(targetPdt, liveEdgePdt - 0.3 * 1000);
+          // Converte de volta pra mediaTime (currentTime do <video>)
+          const targetMediaTime = anchor.mediaTime + (cappedTargetPdt - anchor.pdt) / 1000;
+          const drift = targetMediaTime - v.currentTime; // positivo = estamos atrás
+
+          if (drift > 4) {
+            // Muito fora de sincronia → pula direto
+            try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
+          } else if (drift > 0.6) {
+            // Levemente atrás → acelera suavemente até alcançar
+            v.playbackRate = 1.3;
+          } else if (drift < -1.5) {
+            // À frente da hora real (raro) → desacelera
+            v.playbackRate = 0.95;
+          } else if (Math.abs(drift) < 0.4 && v.playbackRate !== 1) {
+            v.playbackRate = 1;
+          }
+        } else {
+          // Fallback (stream sem PDT): sincroniza pela borda do buffer
+          const latency = liveEdge - v.currentTime;
+          if (latency > MAX_LATENCY) {
+            try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
+          } else if (latency > TARGET_LATENCY + 1.5) {
+            v.playbackRate = 1.3;
+          } else if (latency <= TARGET_LATENCY + 0.5 && v.playbackRate !== 1) {
+            v.playbackRate = 1;
+          }
         }
       }
 
