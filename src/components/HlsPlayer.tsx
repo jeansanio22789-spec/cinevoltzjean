@@ -32,6 +32,12 @@ interface HlsPlayerProps {
    */
   aggressiveNetwork?: boolean;
   /**
+   * Modo SAT: canal via satélite + rede móvel/lenta. Buffer EXTRA grande,
+   * qualidade reduzida automaticamente, retries mais espaçados — reduz
+   * travamentos quando o sinal vem de uplink + 4G/3G.
+   */
+  satelliteMode?: boolean;
+  /**
    * Mostra um pequeno HUD com o status da sincronização por hora real
    * (modo PDT/borda) e o drift atual em segundos.
    */
