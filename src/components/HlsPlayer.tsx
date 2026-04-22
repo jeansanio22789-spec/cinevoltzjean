@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
 import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
@@ -41,7 +41,7 @@ interface HlsPlayerProps {
 /**
  * Player HLS nativo. Toca .m3u8 direto, sem YouTube/iframe.
  */
-const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({ 
+const HlsPlayer = ({
   src,
   fallbackSrc,
   poster,
@@ -52,7 +52,7 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
   lowQuality = false,
   aggressiveNetwork = false,
   showSyncIndicator = false,
-}, ref) => {
+}: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [loading, setLoading] = useState(true);
@@ -840,8 +840,6 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
       )}
     </div>
   );
-});
-
-HlsPlayer.displayName = "HlsPlayer";
+};
 
 export default HlsPlayer;
