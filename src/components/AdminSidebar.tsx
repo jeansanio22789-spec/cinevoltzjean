@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2,
+  LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
 } from "lucide-react";
 import {
   Sidebar,
@@ -20,6 +20,7 @@ export type AdminTab =
   | "users"
   | "videos"
   | "billing"
+  | "audit"
   | "settings";
 
 const sections = [
@@ -43,7 +44,10 @@ const sections = [
   },
   {
     label: "Sistema",
-    items: [{ title: "Configurações", tab: "settings" as AdminTab, icon: Settings }],
+    items: [
+      { title: "Log de Auditoria", tab: "audit" as AdminTab, icon: Shield },
+      { title: "Configurações", tab: "settings" as AdminTab, icon: Settings },
+    ],
   },
 ];
 

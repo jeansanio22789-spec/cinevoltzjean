@@ -10,6 +10,7 @@ import AdminVideos from "@/components/admin/AdminVideos";
 import AdminBilling from "@/components/admin/AdminBilling";
 import AdminUsers from "@/components/admin/AdminUsers";
 import AdminSettings from "@/components/admin/AdminSettings";
+import AdminAuditLog from "@/components/admin/AdminAuditLog";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
@@ -18,6 +19,7 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
   users: { title: "Usuários", subtitle: "Assinantes, planos e permissões" },
+  audit: { title: "Log de Auditoria", subtitle: "Histórico completo de ações na plataforma" },
   settings: { title: "Configurações", subtitle: "Ajustes da plataforma e segurança" },
 };
 
@@ -104,6 +106,7 @@ const Admin = () => {
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "billing" && <AdminBilling />}
             {activeTab === "users" && <AdminUsers />}
+            {activeTab === "audit" && <AdminAuditLog />}
             {activeTab === "settings" && <AdminSettings />}
           </main>
         </div>
