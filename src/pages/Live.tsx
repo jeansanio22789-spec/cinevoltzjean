@@ -270,7 +270,6 @@ const Live = () => {
               autoPlay
               tvMode={tvMode}
               aggressiveNetwork
-              showSyncIndicator
               onError={handlePlayerError}
             />
           ) : (
