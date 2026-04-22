@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
 import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
@@ -41,7 +41,7 @@ interface HlsPlayerProps {
 /**
  * Player HLS nativo. Toca .m3u8 direto, sem YouTube/iframe.
  */
-const HlsPlayer = ({
+const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({ 
   src,
   fallbackSrc,
   poster,
@@ -52,7 +52,7 @@ const HlsPlayer = ({
   lowQuality = false,
   aggressiveNetwork = false,
   showSyncIndicator = false,
-}: HlsPlayerProps) => {
+}, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,8 @@ const HlsPlayer = ({
   const failureCountRef = useRef(0);
   const maxLevelRef = useRef(0);
   const stableFragCountRef = useRef(0);
+  const recoveryTimerRef = useRef<number | null>(null);
+  const lastProgressAtRef = useRef(Date.now());
   // 🕒 Sincronização por hora real:
   //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
   const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
@@ -87,6 +89,74 @@ const HlsPlayer = ({
     const off = onClockSync(() => { /* HUD atualiza no próximo tick */ });
     return () => { off(); };
   }, []);
+
+  const syncPlaybackState = (nextPlaying: boolean) => {
+    setPlaying((prev) => (prev === nextPlaying ? prev : nextPlaying));
+    if (nextPlaying) {
+      setLoading(false);
+      setError(null);
+      lastProgressAtRef.current = Date.now();
+    }
+  };
+
+  const clearScheduledRecovery = () => {
+    if (recoveryTimerRef.current !== null) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+  };
+
+  const recoverPlayback = (reason: string, hard = false) => {
+    const v = videoRef.current;
+    if (!v) return false;
+
+    console.warn(`[HlsPlayer] Forçando retomada (${reason})${hard ? " [hard]" : ""}`);
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (v.buffered.length > 0) {
+        const liveEdge = v.buffered.end(v.buffered.length - 1);
+        const targetLatency = lowQuality ? 1.2 : 2.2;
+        const targetTime = Math.max(0, liveEdge - targetLatency);
+        if (hard || liveEdge - v.currentTime > targetLatency + 1) {
+          v.currentTime = targetTime;
+        }
+      }
+    } catch {
+      /* noop */
+    }
+
+    const hls = hlsRef.current as (Hls & { startLoad?: (startPosition?: number) => void; recoverMediaError?: () => void }) | null;
+    if (hls?.startLoad) {
+      try { hls.startLoad(-1); } catch {
+        try { hls.startLoad(); } catch { /* noop */ }
+      }
+    }
+    if (hard && hls?.recoverMediaError) {
+      try { hls.recoverMediaError(); } catch { /* noop */ }
+    }
+
+    if ((autoPlay || tvMode) && v.paused) {
+      const playAttempt = v.play();
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt.then(() => syncPlaybackState(true)).catch(() => { /* noop */ });
+      }
+    } else if (!v.paused) {
+      syncPlaybackState(true);
+    }
+
+    return true;
+  };
+
+  const scheduleRecovery = (reason: string, delay = 180, hard = false) => {
+    if (recoveryTimerRef.current !== null && !hard) return;
+    clearScheduledRecovery();
+    recoveryTimerRef.current = window.setTimeout(() => {
+      recoveryTimerRef.current = null;
+      recoverPlayback(reason, hard);
+    }, delay);
+  };
 
   // Handler manual: força sync do relógio + realinha o vídeo na hora
   const handleForceSync = () => {
