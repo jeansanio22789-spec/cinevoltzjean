@@ -44,6 +44,31 @@ interface HlsPlayerProps {
   showSyncIndicator?: boolean;
   /** Notifica o componente pai quando o player troca para estado de erro/recuperação */
   onError?: (msg: string | null) => void;
+  /**
+   * Callback periódico (≈1s) com estatísticas técnicas do player.
+   * Usado pelo painel de diagnóstico em /ao-vivo.
+   */
+  onStats?: (stats: {
+    engine: "hls.js" | "native" | "idle";
+    readyState: number;
+    networkState: number;
+    paused: boolean;
+    currentTime: number;
+    bufferAhead: number;
+    buffered: number;
+    bandwidth: number;
+    currentLevel: number;
+    autoLevelCap: number;
+    levelHeight: number | null;
+    levelBitrate: number | null;
+    liveLatency: number | null;
+    droppedFrames: number;
+    lastError: string | null;
+    lastErrorAt: number | null;
+    errorCount: number;
+    activeSrc: string;
+    usingFallback: boolean;
+  }) => void;
 }
 
 /**
@@ -95,6 +120,7 @@ const HlsPlayer = ({
   satelliteMode = false,
   showSyncIndicator = false,
   onError,
+  onStats,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -109,6 +135,10 @@ const HlsPlayer = ({
   const stableFragCountRef = useRef(0);
   const recoveryTimerRef = useRef<number | null>(null);
   const lastProgressAtRef = useRef(Date.now());
+  // 📊 Telemetria para o painel de diagnóstico
+  const lastErrorRef = useRef<{ msg: string; at: number } | null>(null);
+  const errorCountRef = useRef(0);
+  const engineRef = useRef<"hls.js" | "native" | "idle">("idle");
   // 🕒 Sincronização por hora real:
   //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
   const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
@@ -407,6 +437,7 @@ const HlsPlayer = ({
 
     // Safari/iOS → HLS nativo. Em Android/WebView preferimos hls.js, que é mais estável.
     if (shouldUseNativeHls(video)) {
+      engineRef.current = "native";
       let safariRetries = 0;
       let destroyed = false;
       let retryTimer: number | null = null;
@@ -471,6 +502,9 @@ const HlsPlayer = ({
         // Ignora erros enquanto o vídeo já está reproduzindo OK (eventos espúrios do Safari)
         if (hasRecentProgress || (!video.paused && video.currentTime > 0.1 && bufferAhead > 0.2)) return;
         safariRetries += 1;
+        // 📊 Telemetria
+        lastErrorRef.current = { msg: `native/error_${safariRetries}`, at: Date.now() };
+        errorCountRef.current += 1;
         if (retryTimer) window.clearTimeout(retryTimer);
         if (safariRetries < maxSafariRetries) {
           setError(`Reconectando sinal ao vivo... (${safariRetries}/${maxSafariRetries - 1})`);
@@ -509,6 +543,7 @@ const HlsPlayer = ({
 
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
+      engineRef.current = "hls.js";
       const { isSamsungTV, isSamsungBrowser } = detectSamsungTV();
       // Samsung Tizen / SamsungBrowser: CPU/decoder fracos → buffer grande,
       // sem low-latency, sem aceleração e retries mais espaçados.
@@ -597,6 +632,10 @@ const HlsPlayer = ({
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
         console.warn("[HlsPlayer]", data.type, data.details, data.fatal ? "FATAL" : "");
+        // 📊 Telemetria: registra TODA falha (fatal ou não) para o painel
+        lastErrorRef.current = { msg: `${data.type}/${data.details}`, at: Date.now() };
+        if (data.fatal) errorCountRef.current += 1;
+
 
         // Erros não-fatais: apenas log, hls.js auto-recupera
         if (!data.fatal) {
@@ -833,6 +872,89 @@ const HlsPlayer = ({
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSrc, fallbackSrc, showSyncIndicator]);
+
+  // 📊 Reporter de telemetria — emite snapshot a cada 1s para o painel de diagnóstico
+  useEffect(() => {
+    if (!onStats) return;
+    const interval = setInterval(() => {
+      const v = videoRef.current;
+      if (!v) {
+        onStats({
+          engine: "idle", readyState: 0, networkState: 0, paused: true,
+          currentTime: 0, bufferAhead: 0, buffered: 0, bandwidth: 0,
+          currentLevel: -1, autoLevelCap: -1, levelHeight: null, levelBitrate: null,
+          liveLatency: null, droppedFrames: 0,
+          lastError: lastErrorRef.current?.msg || null,
+          lastErrorAt: lastErrorRef.current?.at || null,
+          errorCount: errorCountRef.current,
+          activeSrc, usingFallback,
+        });
+        return;
+      }
+      let bufferAhead = 0;
+      let buffered = 0;
+      try {
+        if (v.buffered.length > 0) {
+          const end = v.buffered.end(v.buffered.length - 1);
+          const start = v.buffered.start(0);
+          bufferAhead = Math.max(0, end - v.currentTime);
+          buffered = Math.max(0, end - start);
+        }
+      } catch { /* noop */ }
+
+      let droppedFrames = 0;
+      try {
+        const q = (v as any).getVideoPlaybackQuality?.();
+        if (q) droppedFrames = q.droppedVideoFrames || 0;
+        else droppedFrames = (v as any).webkitDroppedFrameCount || 0;
+      } catch { /* noop */ }
+
+      const hls = hlsRef.current as any;
+      const isHlsJs = engineRef.current === "hls.js" && hls && typeof hls.loadLevel === "number";
+
+      let bandwidth = 0;
+      let currentLevel = -1;
+      let autoLevelCap = -1;
+      let levelHeight: number | null = null;
+      let levelBitrate: number | null = null;
+      let liveLatency: number | null = null;
+
+      if (isHlsJs) {
+        bandwidth = hls.bandwidthEstimate || 0;
+        currentLevel = typeof hls.currentLevel === "number" ? hls.currentLevel : -1;
+        autoLevelCap = typeof hls.autoLevelCapping === "number" ? hls.autoLevelCapping : -1;
+        const lvl = hls.levels?.[hls.currentLevel >= 0 ? hls.currentLevel : hls.loadLevel];
+        if (lvl) {
+          levelHeight = lvl.height || null;
+          levelBitrate = lvl.bitrate || null;
+        }
+        if (typeof hls.latency === "number" && hls.latency > 0) liveLatency = hls.latency;
+      }
+
+      onStats({
+        engine: engineRef.current,
+        readyState: v.readyState,
+        networkState: v.networkState,
+        paused: v.paused,
+        currentTime: v.currentTime,
+        bufferAhead,
+        buffered,
+        bandwidth,
+        currentLevel,
+        autoLevelCap,
+        levelHeight,
+        levelBitrate,
+        liveLatency,
+        droppedFrames,
+        lastError: lastErrorRef.current?.msg || null,
+        lastErrorAt: lastErrorRef.current?.at || null,
+        errorCount: errorCountRef.current,
+        activeSrc,
+        usingFallback,
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [onStats, activeSrc, usingFallback]);
 
   const handlePlay = () => {
     const v = videoRef.current;

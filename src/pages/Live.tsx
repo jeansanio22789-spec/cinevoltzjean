@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite, Wifi, Signal } from "lucide-react";
+import LiveDiagnostics, { type LivePlayerStats } from "@/components/LiveDiagnostics";
+import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite, Wifi, Signal, Activity } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveViewers, useLiveViewersMulti } from "@/hooks/useLiveViewers";
@@ -165,6 +166,10 @@ const Live = () => {
   const [errorSince, setErrorSince] = useState<Date | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
 
+  // 🩺 Modo diagnóstico — painel técnico em tempo real
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [playerStats, setPlayerStats] = useState<LivePlayerStats | null>(null);
+
   // Reseta o erro quando troca de canal/url
   useEffect(() => {
     setPlayerError(null);
@@ -307,6 +312,19 @@ const Live = () => {
             {satScanning ? "Buscando..." : "Buscar SAT"}
           </button>
           <button
+            onClick={() => setDiagOpen((v) => !v)}
+            className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full border transition-colors ${
+              diagOpen
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border hover:border-primary/60 hover:text-primary"
+            }`}
+            aria-label={diagOpen ? "Fechar diagnóstico" : "Abrir diagnóstico"}
+            title="Painel técnico (buffer, banda, qualidade, erros)"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            {diagOpen ? "Fechar diag" : "Diagnóstico"}
+          </button>
+          <button
             onClick={toggleTvMode}
             className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
             aria-label={tvMode ? "Sair do modo TV" : "Ativar modo TV"}
@@ -350,6 +368,11 @@ const Live = () => {
               aggressiveNetwork={!satelliteMode}
               satelliteMode={satelliteMode}
               onError={handlePlayerError}
+              onStats={diagOpen ? (s) => setPlayerStats({
+                ...s,
+                signalKind: signalSource.kind,
+                signalLabel: signalSource.label,
+              }) : undefined}
             />
           ) : (
             <iframe
@@ -371,6 +394,19 @@ const Live = () => {
             </button>
           )}
         </div>
+
+        {/* 🩺 Painel de diagnóstico técnico em tempo real */}
+        {diagOpen && hasContent && isHls(playUrl) && (
+          <LiveDiagnostics
+            stats={playerStats}
+            onClose={() => setDiagOpen(false)}
+          />
+        )}
+        {diagOpen && hasContent && !isHls(playUrl) && (
+          <div className="mt-3 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+            ⚠️ Diagnóstico técnico só disponível para streams HLS (.m3u8). Este canal usa iframe externo.
+          </div>
+        )}
 
         {/* 🔴 Painel de erro detalhado do player */}
         {playerError && hasContent && (
