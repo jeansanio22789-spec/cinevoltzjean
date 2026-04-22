@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv, Search, X, Monitor, Minimize2, Users } from "lucide-react";
+import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveViewers, useLiveViewersMulti } from "@/hooks/useLiveViewers";
