@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
+import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw, Cast } from "lucide-react";
 import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
 
 interface HlsPlayerProps {
@@ -74,6 +74,51 @@ const HlsPlayer = ({
     mode: "pdt" | "edge" | "idle";
     drift: number; // segundos: + = atrasado, - = à frente
   }>({ mode: "idle", drift: 0 });
+
+  // 📺 Espelhamento (AirPlay / Chromecast)
+  const [airplayAvailable, setAirplayAvailable] = useState(false);
+  const [castAvailable, setCastAvailable] = useState(false);
+
+  // Detecta suporte a AirPlay (Safari/iOS)
+  useEffect(() => {
+    const v = videoRef.current as any;
+    if (!v) return;
+    if (typeof window !== "undefined" && (window as any).WebKitPlaybackTargetAvailabilityEvent) {
+      const onAvail = (e: any) => setAirplayAvailable(e.availability === "available");
+      v.addEventListener("webkitplaybacktargetavailabilitychanged", onAvail);
+      return () => v.removeEventListener("webkitplaybacktargetavailabilitychanged", onAvail);
+    }
+  }, []);
+
+  // Inicializa Google Cast (Chromecast)
+  useEffect(() => {
+    const w = window as any;
+    const init = () => {
+      try {
+        const ctx = w.cast?.framework?.CastContext.getInstance();
+        if (!ctx) return;
+        ctx.setOptions({
+          receiverApplicationId: w.chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID || "CC1AD845",
+          autoJoinPolicy: w.chrome?.cast?.AutoJoinPolicy?.ORIGIN_SCOPED,
+        });
+        setCastAvailable(true);
+      } catch {
+        // ignora
+      }
+    };
+    if (w.cast?.framework) {
+      init();
+    } else {
+      w.__onGCastApiAvailable = (available: boolean) => { if (available) init(); };
+    }
+  }, []);
+
+  const startAirplay = () => {
+    const v = videoRef.current as any;
+    if (v?.webkitShowPlaybackTargetPicker) {
+      try { v.webkitShowPlaybackTargetPicker(); } catch {}
+    }
+  };
 
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
@@ -673,6 +718,24 @@ const HlsPlayer = ({
     }
   };
 
+  const startCast = () => {
+    const w = window as any;
+    try {
+      const ctx = w.cast?.framework?.CastContext.getInstance();
+      if (!ctx) return;
+      ctx.requestSession().then(() => {
+        const session = ctx.getCurrentSession();
+        if (!session) return;
+        const mediaInfo = new w.chrome.cast.media.MediaInfo(activeSrc, "application/x-mpegURL");
+        mediaInfo.streamType = w.chrome.cast.media.StreamType.LIVE;
+        const request = new w.chrome.cast.media.LoadRequest(mediaInfo);
+        session.loadMedia(request).catch(() => {});
+      }).catch(() => {});
+    } catch {
+      // ignora
+    }
+  };
+
   return (
     <div
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
@@ -689,8 +752,10 @@ const HlsPlayer = ({
         muted={muted}
         playsInline
         controls={nativeControls}
-        controlsList="nodownload noremoteplayback noplaybackrate"
-        disablePictureInPicture
+        controlsList="nodownload noplaybackrate"
+        // Habilita AirPlay (iOS/Safari/Apple TV)
+        {...({ "x-webkit-airplay": "allow" } as any)}
+        // Não bloqueia controles remotos (Chromecast/AirPlay/Miracast)
         onContextMenu={(e) => e.preventDefault()}
         onPlay={() => { setPlaying(true); setLoading(false); }}
         onPlaying={() => { setPlaying(true); setLoading(false); }}
@@ -828,6 +893,16 @@ const HlsPlayer = ({
           <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-white/80 bg-destructive px-2 py-0.5 rounded-full">
             ● AO VIVO
           </span>
+          {(airplayAvailable || castAvailable) && (
+            <button
+              onClick={airplayAvailable ? startAirplay : startCast}
+              className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+              aria-label={airplayAvailable ? "Espelhar via AirPlay" : "Espelhar via Chromecast"}
+              title={airplayAvailable ? "AirPlay" : "Chromecast"}
+            >
+              <Cast className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={goFullscreen}
             className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
