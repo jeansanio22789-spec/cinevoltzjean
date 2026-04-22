@@ -82,6 +82,11 @@ const HlsPlayer = ({
   const [airplayAvailable, setAirplayAvailable] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
 
+  // Notifica o componente pai sempre que o estado de erro mudar
+  useEffect(() => {
+    onError?.(error);
+  }, [error, onError]);
+
   // Detecta suporte a AirPlay (Safari/iOS)
   useEffect(() => {
     const v = videoRef.current as any;
