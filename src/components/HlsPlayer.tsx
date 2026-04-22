@@ -169,7 +169,13 @@ const HlsPlayer = ({
   };
 
   return (
-    <div className={`relative w-full h-full bg-black overflow-hidden ${className}`}>
+    <div
+      className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
+      onContextMenu={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+      style={{ WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none" }}
+    >
       <video
         ref={videoRef}
         poster={poster}
@@ -177,11 +183,14 @@ const HlsPlayer = ({
         muted={muted}
         playsInline
         controls={nativeControls}
+        controlsList="nodownload noremoteplayback noplaybackrate"
+        disablePictureInPicture
+        onContextMenu={(e) => e.preventDefault()}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onWaiting={() => setLoading(true)}
         onPlaying={() => setLoading(false)}
-        className="w-full h-full object-contain bg-black"
+        className="w-full h-full object-contain bg-black pointer-events-none"
       />
 
       {/* Tap-to-play (autoplay bloqueado pelo navegador) */}
