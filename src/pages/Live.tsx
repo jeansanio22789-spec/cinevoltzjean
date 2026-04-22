@@ -182,6 +182,9 @@ const Live = () => {
     return m ? m[0].toUpperCase() : null;
   }, [playUrl]);
 
+  // 🛰️ Detecta origem do sinal (Satélite / IPTV / CDN / Web) pela URL ativa
+  const signalSource = useMemo(() => detectSignalSource(playUrl), [playUrl]);
+
   const copyDiagnostics = useCallback(() => {
     const lines = [
       `Canal: ${playTitle}`,
