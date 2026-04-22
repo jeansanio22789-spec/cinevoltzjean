@@ -1,5 +1,6 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
+  ShoppingBag, Link2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -20,6 +21,8 @@ export type AdminTab =
   | "users"
   | "videos"
   | "billing"
+  | "purchases"
+  | "links"
   | "audit"
   | "settings";
 
@@ -39,6 +42,8 @@ const sections = [
     label: "Negócio",
     items: [
       { title: "Faturamento", tab: "billing" as AdminTab, icon: DollarSign },
+      { title: "Compras (PIX)", tab: "purchases" as AdminTab, icon: ShoppingBag },
+      { title: "Links de Acesso", tab: "links" as AdminTab, icon: Link2 },
       { title: "Usuários", tab: "users" as AdminTab, icon: Users },
     ],
   },

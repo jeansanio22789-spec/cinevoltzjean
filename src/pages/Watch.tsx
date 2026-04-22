@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,12 +20,16 @@ interface WatchMovie {
 
 const Watch = () => {
   const { id } = useParams<{ id: string }>();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [movie, setMovie] = useState<WatchMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [tokenAccess, setTokenAccess] = useState(false);
+
+  const token = params.get("token");
 
   useEffect(() => {
     if (!id) return;
@@ -41,31 +45,42 @@ const Watch = () => {
     load();
   }, [id]);
 
+  // Resgata token mágico (sem precisar de login)
+  useEffect(() => {
+    if (!token || !id) return;
+    const redeem = async () => {
+      const { data } = await supabase.rpc("redeem_access_token", {
+        _token: token,
+        _movie_id: id,
+      });
+      if ((data as any)?.ok) {
+        setTokenAccess(true);
+        await supabase.rpc("consume_access_token", { _token: token });
+      }
+    };
+    redeem();
+  }, [token, id]);
+
   useEffect(() => {
     if (authLoading) return;
+    if (tokenAccess) {
+      setHasAccess(true);
+      setCheckingAccess(false);
+      return;
+    }
     if (!user) {
       setHasAccess(false);
       setCheckingAccess(false);
       return;
     }
 
-    const checkPlan = async () => {
-      // Acesso liberado se houver pelo menos uma transação aprovada
-      const { data: tx } = await supabase
-        .from("transactions")
-        .select("id, status")
-        .eq("user_id", user.id)
-        .eq("status", "Aprovado")
-        .limit(1);
-
-      // Ou se for admin
-      const { data: isAdmin } = await supabase.rpc("is_admin");
-
-      setHasAccess((tx && tx.length > 0) || !!isAdmin);
+    const checkAccess = async () => {
+      const { data } = await supabase.rpc("has_active_access", { _user_id: user.id });
+      setHasAccess(!!data);
       setCheckingAccess(false);
     };
-    checkPlan();
-  }, [user, authLoading]);
+    checkAccess();
+  }, [user, authLoading, tokenAccess]);
 
   const isLoading = loading || authLoading || checkingAccess;
 
@@ -91,15 +106,14 @@ const Watch = () => {
     );
   }
 
-  // Sem login → manda pra login com retorno
-  if (!user) {
+  if (!user && !tokenAccess) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center gap-5">
         <Lock className="w-12 h-12 text-primary" />
         <div>
           <h1 className="text-2xl font-bold mb-2">{movie.title}</h1>
           <p className="text-muted-foreground text-sm max-w-md">
-            Faça login para assistir a este conteúdo.
+            Faça login ou utilize um link de acesso válido para assistir.
           </p>
         </div>
         <button
@@ -112,7 +126,6 @@ const Watch = () => {
     );
   }
 
-  // Sem plano ativo → vai pra planos
   if (!hasAccess) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center gap-5">
@@ -143,7 +156,6 @@ const Watch = () => {
 
   return (
     <div className="min-h-screen bg-black">
-      {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
         <button
           onClick={() => navigate(-1)}
@@ -157,7 +169,6 @@ const Watch = () => {
         <div className="w-16" />
       </div>
 
-      {/* Player */}
       <div className="w-full h-screen flex items-center justify-center">
         {!source || source.kind === "unknown" ? (
           <div className="text-center px-6 text-white">

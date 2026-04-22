@@ -11,6 +11,8 @@ import AdminBilling from "@/components/admin/AdminBilling";
 import AdminUsers from "@/components/admin/AdminUsers";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminAuditLog from "@/components/admin/AdminAuditLog";
+import AdminPurchases from "@/components/admin/AdminPurchases";
+import AdminAccessLinks from "@/components/admin/AdminAccessLinks";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
@@ -18,6 +20,8 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   content: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
+  purchases: { title: "Compras PIX", subtitle: "Pagamentos Mercado Pago e liberação automática" },
+  links: { title: "Links de Acesso", subtitle: "Gere links mágicos para clientes assistirem sem login" },
   users: { title: "Usuários", subtitle: "Assinantes, planos e permissões" },
   audit: { title: "Log de Auditoria", subtitle: "Histórico completo de ações na plataforma" },
   settings: { title: "Configurações", subtitle: "Ajustes da plataforma e segurança" },
@@ -105,6 +109,8 @@ const Admin = () => {
             {activeTab === "content" && <AdminMovies />}
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "billing" && <AdminBilling />}
+            {activeTab === "purchases" && <AdminPurchases />}
+            {activeTab === "links" && <AdminAccessLinks />}
             {activeTab === "users" && <AdminUsers />}
             {activeTab === "audit" && <AdminAuditLog />}
             {activeTab === "settings" && <AdminSettings />}
