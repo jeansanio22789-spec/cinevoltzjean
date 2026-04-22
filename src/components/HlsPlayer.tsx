@@ -466,7 +466,7 @@ const HlsPlayer = ({
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSrc, fallbackSrc]);
+  }, [activeSrc, fallbackSrc, showSyncIndicator]);
 
   const handlePlay = () => {
     const v = videoRef.current;
