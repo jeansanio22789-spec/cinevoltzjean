@@ -340,10 +340,11 @@ const HlsPlayer = ({
         if (!video.paused && video.currentTime > 0) syncPlaybackState(true);
       };
 
-      const tryLoad = () => {
+      const tryLoad = (forceReload = false) => {
         if (destroyed) return;
-        // ⚠️ NÃO usa cache-buster: muda URL → reseta o player → loop infinito.
-        if (video.src !== activeSrc) {
+        if (forceReload || video.src !== activeSrc) {
+          reloadNativeStream(video, activeSrc);
+        } else if (!video.src) {
           video.src = activeSrc;
           try { video.load(); } catch { /* noop */ }
         }
@@ -384,15 +385,12 @@ const HlsPlayer = ({
         safariRetries += 1;
         if (retryTimer) window.clearTimeout(retryTimer);
         if (safariRetries < maxSafariRetries) {
-          // Mostra status pra usuário não pensar que travou
+          setError(`Reconectando sinal ao vivo... (${safariRetries}/${maxSafariRetries - 1})`);
           setLoading(true);
-          retryTimer = window.setTimeout(tryLoad, 600 * safariRetries);
-          scheduleRecovery(`safari retry ${safariRetries}`, 250 * safariRetries, safariRetries > 1);
+          retryTimer = window.setTimeout(() => tryLoad(true), 900 * safariRetries);
         } else if (!tryFallback("safari error after retries")) {
-          if (!recoverPlayback("safari exhausted retries", true)) {
-            setError("Canal indisponível no momento");
-            setLoading(false);
-          }
+          setError("Canal indisponível no momento");
+          setLoading(false);
         }
       };
       video.addEventListener("loadedmetadata", onLoaded);
