@@ -16,8 +16,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const MP_TOKEN = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
-    if (!MP_TOKEN) throw new Error("MERCADO_PAGO_ACCESS_TOKEN ausente");
+    const MP_TOKEN_RAW = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
+    if (!MP_TOKEN_RAW) throw new Error("MERCADO_PAGO_ACCESS_TOKEN ausente");
+    // Remove espaços, quebras de linha e aspas que podem ter sido coladas junto
+    const MP_TOKEN = MP_TOKEN_RAW.trim().replace(/^["']|["']$/g, "");
+    console.log("MP token diag:", {
+      length: MP_TOKEN.length,
+      prefix: MP_TOKEN.substring(0, 8),
+      hasSpaces: /\s/.test(MP_TOKEN_RAW),
+      startsWithAppUsr: MP_TOKEN.startsWith("APP_USR-"),
+      startsWithTest: MP_TOKEN.startsWith("TEST-"),
+    });
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
