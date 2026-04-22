@@ -243,6 +243,15 @@ const Live = () => {
               {signalSource.label}
             </span>
           )}
+          {satelliteMode && (
+            <span
+              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border bg-accent/15 text-accent border-accent/40 animate-pulse"
+              title={`Modo SAT ativo — buffer otimizado para rede ${network.isMobile ? "móvel" : "lenta"} (${network.effectiveType !== "unknown" ? network.effectiveType.toUpperCase() : "rede instável"})`}
+            >
+              <Signal className="w-3 h-3" />
+              MODO SAT
+            </span>
+          )}
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
           {viewersHere > 0 && (
             <span
