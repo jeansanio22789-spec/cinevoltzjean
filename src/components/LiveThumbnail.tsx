@@ -37,9 +37,8 @@ const LiveThumbnail = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Esconde no admin, login e na própria página ao vivo
+  // Esconde apenas no login e na própria página ao vivo (admin agora vê)
   const hide =
-    location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/login") ||
     location.pathname.startsWith("/ao-vivo");
 
