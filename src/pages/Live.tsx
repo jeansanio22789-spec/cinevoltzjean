@@ -292,6 +292,7 @@ const Live = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {list.map((ch) => {
                     const active = ch.id === selectedId;
+                    const channelViewers = active ? viewersHere : (viewersByChannel[ch.id] || 0);
                     return (
                       <button
                         key={ch.id}
@@ -315,8 +316,14 @@ const Live = () => {
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                        <div className="absolute bottom-0 left-0 right-0 p-2">
-                          <p className="text-[11px] font-bold text-white truncate">{ch.name}</p>
+                        <div className="absolute bottom-0 left-0 right-0 p-2 flex items-end justify-between gap-1">
+                          <p className="text-[11px] font-bold text-white truncate flex-1">{ch.name}</p>
+                          {channelViewers > 0 && (
+                            <span className="flex items-center gap-0.5 text-[9px] font-bold text-white bg-black/70 backdrop-blur px-1.5 py-0.5 rounded-full">
+                              <Users className="w-2.5 h-2.5" />
+                              {channelViewers > 999 ? `${(channelViewers / 1000).toFixed(1)}k` : channelViewers}
+                            </span>
+                          )}
                         </div>
                         {active && (
                           <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
