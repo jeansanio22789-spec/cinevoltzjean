@@ -437,6 +437,7 @@ const HlsPlayer = ({
 
     // Safari/iOS → HLS nativo. Em Android/WebView preferimos hls.js, que é mais estável.
     if (shouldUseNativeHls(video)) {
+      engineRef.current = "native";
       let safariRetries = 0;
       let destroyed = false;
       let retryTimer: number | null = null;
