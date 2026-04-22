@@ -44,6 +44,31 @@ interface HlsPlayerProps {
   showSyncIndicator?: boolean;
   /** Notifica o componente pai quando o player troca para estado de erro/recuperação */
   onError?: (msg: string | null) => void;
+  /**
+   * Callback periódico (≈1s) com estatísticas técnicas do player.
+   * Usado pelo painel de diagnóstico em /ao-vivo.
+   */
+  onStats?: (stats: {
+    engine: "hls.js" | "native" | "idle";
+    readyState: number;
+    networkState: number;
+    paused: boolean;
+    currentTime: number;
+    bufferAhead: number;
+    buffered: number;
+    bandwidth: number;
+    currentLevel: number;
+    autoLevelCap: number;
+    levelHeight: number | null;
+    levelBitrate: number | null;
+    liveLatency: number | null;
+    droppedFrames: number;
+    lastError: string | null;
+    lastErrorAt: number | null;
+    errorCount: number;
+    activeSrc: string;
+    usingFallback: boolean;
+  }) => void;
 }
 
 /**
