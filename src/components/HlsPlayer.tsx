@@ -40,6 +40,20 @@ interface HlsPlayerProps {
   onError?: (msg: string | null) => void;
 }
 
+const shouldUseNativeHls = (video: HTMLVideoElement) => {
+  if (!video.canPlayType("application/vnd.apple.mpegurl")) return false;
+  if (typeof navigator === "undefined") return true;
+
+  const ua = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
+  const isSafariDesktop = /Mac/.test(platform) && /Safari/i.test(ua) && !/Chrome|CriOS|Chromium|Edg|OPR|Android/i.test(ua);
+
+  return isIOS || isSafariDesktop;
+};
+
 /**
  * Player HLS nativo. Toca .m3u8 direto, sem YouTube/iframe.
  */
@@ -317,8 +331,8 @@ const HlsPlayer = ({
       hlsRef.current = null;
     }
 
-    // Safari (iOS/macOS) → HLS nativo, com auto-retry silencioso e ESTÁVEL
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    // Safari/iOS → HLS nativo. Em Android/WebView preferimos hls.js, que é mais estável.
+    if (shouldUseNativeHls(video)) {
       let safariRetries = 0;
       let destroyed = false;
       let retryTimer: number | null = null;
