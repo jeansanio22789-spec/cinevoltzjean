@@ -183,6 +183,44 @@ const HlsPlayer = ({
     return () => { off(); };
   }, []);
 
+  // 🌐 Reconexão automática quando a rede volta (offline → online)
+  // Quando o navegador detecta que voltou a ter internet (Wi-Fi ou 4G),
+  // tenta retomar o stream imediatamente em vez de esperar o usuário tocar.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onOnline = () => {
+      console.log("[HlsPlayer] Rede voltou — tentando retomar stream");
+      const v = videoRef.current;
+      const hls = hlsRef.current as (Hls & { startLoad?: () => void }) | null;
+      setError(null);
+      setLoading(true);
+      failureCountRef.current = 0;
+      try {
+        if (hls && typeof hls.startLoad === "function") {
+          hls.startLoad();
+        } else if (v) {
+          reloadNativeStream(v, activeSrc);
+        }
+        if (v && v.paused) {
+          v.muted = true;
+          v.play().catch(() => {});
+        }
+      } catch { /* noop */ }
+    };
+    const onOffline = () => {
+      console.log("[HlsPlayer] Rede caiu — aguardando voltar");
+      setError("Sem conexão — aguardando rede voltar...");
+      setLoading(false);
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSrc]);
+
   const syncPlaybackState = (nextPlaying: boolean) => {
     setPlaying((prev) => (prev === nextPlaying ? prev : nextPlaying));
     if (nextPlaying) {
