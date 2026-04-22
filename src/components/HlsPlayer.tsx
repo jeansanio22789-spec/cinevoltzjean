@@ -120,6 +120,7 @@ const HlsPlayer = ({
   satelliteMode = false,
   showSyncIndicator = false,
   onError,
+  onStats,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -134,6 +135,10 @@ const HlsPlayer = ({
   const stableFragCountRef = useRef(0);
   const recoveryTimerRef = useRef<number | null>(null);
   const lastProgressAtRef = useRef(Date.now());
+  // 📊 Telemetria para o painel de diagnóstico
+  const lastErrorRef = useRef<{ msg: string; at: number } | null>(null);
+  const errorCountRef = useRef(0);
+  const engineRef = useRef<"hls.js" | "native" | "idle">("idle");
   // 🕒 Sincronização por hora real:
   //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
   const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
