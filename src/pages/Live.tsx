@@ -38,47 +38,49 @@ const Live = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [chanRes, settingsRes] = await Promise.all([
-        supabase
-          .from("live_channels")
-          .select("*")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true })
-          .order("name", { ascending: true }),
-        supabase
-          .from("platform_settings")
-          .select("key, value")
-          .in("key", ["live_stream_url", "live_stream_title"]),
-      ]);
+  const load = useCallback(async () => {
+    const [chanRes, settingsRes] = await Promise.all([
+      supabase
+        .from("live_channels")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("platform_settings")
+        .select("key, value")
+        .in("key", ["live_stream_url", "live_stream_title"]),
+    ]);
 
-      const list = (chanRes.data || []) as Channel[];
-      // Atualização ESTÁVEL: só substitui se algo realmente mudou (preserva referências
-      // dos canais inalterados → não força remount do <HlsPlayer>).
-      setChannels((prev) => {
-        if (prev.length !== list.length) return list;
-        const same = prev.every((p, i) => {
-          const n = list[i];
-          return n && p.id === n.id &&
-            p.stream_url === n.stream_url &&
-            p.fallback_url === n.fallback_url &&
-            p.name === n.name &&
-            p.logo_url === n.logo_url &&
-            p.category === n.category &&
-            p.sort_order === n.sort_order &&
-            p.is_active === n.is_active;
-        });
-        return same ? prev : list;
+    const list = (chanRes.data || []) as Channel[];
+    setChannels((prev) => {
+      if (prev.length !== list.length) return list;
+      const same = prev.every((p, i) => {
+        const n = list[i];
+        return n && p.id === n.id &&
+          p.stream_url === n.stream_url &&
+          p.fallback_url === n.fallback_url &&
+          p.name === n.name &&
+          p.logo_url === n.logo_url &&
+          p.category === n.category &&
+          p.sort_order === n.sort_order &&
+          p.is_active === n.is_active;
       });
-      setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
+      return same ? prev : list;
+    });
+    setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
 
-      const map: Record<string, string> = {};
-      (settingsRes.data || []).forEach((s: any) => { map[s.key] = s.value; });
-      setFallbackUrl((prev) => (prev === (map.live_stream_url || "") ? prev : (map.live_stream_url || "")));
-      if (map.live_stream_title) {
-        setFallbackTitle((prev) => (prev === map.live_stream_title ? prev : map.live_stream_title));
-      }
-      setLoaded(true);
-    };
+    const map: Record<string, string> = {};
+    (settingsRes.data || []).forEach((s: any) => { map[s.key] = s.value; });
+    setFallbackUrl((prev) => (prev === (map.live_stream_url || "") ? prev : (map.live_stream_url || "")));
+    if (map.live_stream_title) {
+      setFallbackTitle((prev) => (prev === map.live_stream_title ? prev : map.live_stream_title));
+    }
+    setLoaded(true);
+    return list;
+  }, []);
+
+  useEffect(() => {
     load();
 
     const channel = supabase
@@ -87,7 +89,7 @@ const Live = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "platform_settings" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [load]);
 
   const selected = useMemo(
     () => channels.find((c) => c.id === selectedId) || null,
