@@ -312,6 +312,19 @@ const Live = () => {
             {satScanning ? "Buscando..." : "Buscar SAT"}
           </button>
           <button
+            onClick={() => setDiagOpen((v) => !v)}
+            className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full border transition-colors ${
+              diagOpen
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-card border-border hover:border-primary/60 hover:text-primary"
+            }`}
+            aria-label={diagOpen ? "Fechar diagnóstico" : "Abrir diagnóstico"}
+            title="Painel técnico (buffer, banda, qualidade, erros)"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            {diagOpen ? "Fechar diag" : "Diagnóstico"}
+          </button>
+          <button
             onClick={toggleTvMode}
             className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
             aria-label={tvMode ? "Sair do modo TV" : "Ativar modo TV"}
