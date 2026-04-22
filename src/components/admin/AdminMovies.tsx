@@ -101,7 +101,7 @@ const AdminMovies = () => {
           resource_type: "movie",
           resource_id: editing.id,
           description: `Filme "${form.title}" foi ${form.status === "published" ? "publicado/atualizado" : "atualizado"}`,
-          changes: { before: editing as Record<string, unknown>, after: form },
+          changes: { before: editing as unknown as Record<string, unknown>, after: form },
         });
       }
     } else {
