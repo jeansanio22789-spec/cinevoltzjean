@@ -7,8 +7,6 @@ const YT_VIDEO_ID = "ABVQXgr2LW4";
 const Live = () => {
   const [loadError, setLoadError] = useState(false);
 
-  // Player nocookie com parâmetros que removem botões externos do YouTube
-  // e impedem que o vídeo "saia" do app.
   const streamUrl = useMemo(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const params = new URLSearchParams({
@@ -20,8 +18,8 @@ const Live = () => {
       rel: "0",
       fs: "1",
       iv_load_policy: "3",
-      disablekb: "1",
       showinfo: "0",
+      enablejsapi: "1",
       origin,
     });
     return `https://www.youtube-nocookie.com/embed/${YT_VIDEO_ID}?${params.toString()}`;
@@ -50,29 +48,21 @@ const Live = () => {
               </p>
             </div>
           ) : (
-            <>
-              <iframe
-                src={streamUrl}
-                className="w-full h-full border-0"
-                allowFullScreen
-                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-presentation"
-                title="SBT ao Vivo"
-                onError={() => setLoadError(true)}
-              />
-              {/* Bloqueia o clique no logo "YouTube" no canto inferior direito
-                  que abriria o vídeo fora do app */}
-              <div
-                className="absolute bottom-0 right-0 w-24 h-10 z-10 cursor-default"
-                aria-hidden="true"
-              />
-            </>
+            <iframe
+              src={streamUrl}
+              className="w-full h-full border-0"
+              allowFullScreen
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
+              referrerPolicy="strict-origin-when-cross-origin"
+              loading="eager"
+              title="SBT ao Vivo"
+              onError={() => setLoadError(true)}
+            />
           )}
         </div>
 
         <p className="text-[11px] text-muted-foreground text-center mt-3">
-          Para assistir em tela cheia, toque no botão de tela cheia do player.
+          Toque no ▶ para iniciar com som. Use o botão de tela cheia do player.
         </p>
       </div>
     </div>
