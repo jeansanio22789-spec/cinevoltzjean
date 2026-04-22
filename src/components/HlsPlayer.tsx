@@ -69,17 +69,19 @@ const HlsPlayer = ({
       });
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
+        console.error("[HlsPlayer]", data.type, data.details, data);
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              setError("Erro de rede — não foi possível baixar a transmissão.");
+              setError(`Erro de rede: ${data.details}`);
+              hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
-              setError("Erro de mídia — tentando recuperar...");
+              setError("Erro de mídia — recuperando...");
               break;
             default:
-              setError("Erro fatal ao carregar a transmissão.");
+              setError(`Erro: ${data.details}`);
               break;
           }
           setLoading(false);
