@@ -76,11 +76,11 @@ const HlsPlayer = ({
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
 
-  // Força ressincronização do relógio sempre que trocar de stream — todos os aparelhos
-  // recalibram contra o horário do servidor antes de ancorar a borda viva.
+  // Força ressincronização do relógio quando o src PRINCIPAL muda (troca de canal),
+  // não a cada fallback interno.
   useEffect(() => {
     void forceSyncServerClock();
-  }, [src, activeSrc]);
+  }, [src]);
 
   // Após cada re-sync do relógio, o watchdog (1s) reavalia drift naturalmente.
   useEffect(() => {
@@ -164,31 +164,53 @@ const HlsPlayer = ({
       hlsRef.current = null;
     }
 
-    // Safari (iOS/macOS) → HLS nativo, com auto-retry silencioso
+    // Safari (iOS/macOS) → HLS nativo, com auto-retry silencioso e ESTÁVEL
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       let safariRetries = 0;
+      let destroyed = false;
+      let retryTimer: number | null = null;
       const maxSafariRetries = 5;
+
       const tryLoad = () => {
-        // cache-buster para forçar re-fetch da playlist
-        const sep = activeSrc.includes("?") ? "&" : "?";
-        video.src = safariRetries === 0 ? activeSrc : `${activeSrc}${sep}_t=${Date.now()}`;
-        try { video.load(); } catch { /* noop */ }
+        if (destroyed) return;
+        // ⚠️ NÃO usa cache-buster: muda URL → reseta o player → loop infinito.
+        // O navegador já respeita os headers de cache do .m3u8 (no-cache na maioria dos casos).
+        if (video.src !== activeSrc) {
+          video.src = activeSrc;
+          try { video.load(); } catch { /* noop */ }
+        }
       };
-      const onLoaded = () => { setLoading(false); setError(null); safariRetries = 0; };
+      const onLoaded = () => {
+        if (destroyed) return;
+        setLoading(false);
+        setError(null);
+        safariRetries = 0;
+      };
       const onErr = () => {
+        if (destroyed) return;
+        // Ignora erros enquanto o vídeo já está reproduzindo OK (eventos espúrios do Safari)
+        if (!video.paused && video.readyState >= 3 && video.currentTime > 0) return;
         safariRetries += 1;
+        if (retryTimer) window.clearTimeout(retryTimer);
         if (safariRetries < maxSafariRetries) {
-          // Reconexão silenciosa em background — não mostra erro ainda
-          setTimeout(tryLoad, 600 * safariRetries);
+          retryTimer = window.setTimeout(tryLoad, 800 * safariRetries);
         } else if (!tryFallback("safari error after retries")) {
           setError("Reconectando…");
           setLoading(true);
-          // Continua tentando em background mesmo após mostrar mensagem
-          setTimeout(() => { safariRetries = 0; tryLoad(); }, 3000);
+          retryTimer = window.setTimeout(() => { safariRetries = 0; tryLoad(); }, 4000);
         }
       };
       video.addEventListener("loadedmetadata", onLoaded);
       video.addEventListener("error", onErr);
+      // Cleanup específico para Safari path
+      hlsRef.current = {
+        destroy: () => {
+          destroyed = true;
+          if (retryTimer) window.clearTimeout(retryTimer);
+          video.removeEventListener("loadedmetadata", onLoaded);
+          video.removeEventListener("error", onErr);
+        },
+      } as any;
       tryLoad();
       return;
     }

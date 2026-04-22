@@ -24,9 +24,12 @@ const LiveThumbnail = () => {
         .in("key", ["live_thumbnail_enabled", "live_stream_url", "live_stream_title"]);
       const map: Record<string, string> = {};
       (data || []).forEach((s: any) => { map[s.key] = s.value; });
-      setEnabled(map.live_thumbnail_enabled !== "false");
-      if (map.live_stream_url) setStreamUrl(map.live_stream_url);
-      if (map.live_stream_title) setTitle(map.live_stream_title);
+      const newEnabled = map.live_thumbnail_enabled !== "false";
+      const newUrl = map.live_stream_url || "";
+      const newTitle = map.live_stream_title || "AO VIVO";
+      setEnabled((prev) => (prev === newEnabled ? prev : newEnabled));
+      setStreamUrl((prev) => (prev === newUrl ? prev : newUrl));
+      setTitle((prev) => (prev === newTitle ? prev : newTitle));
     };
     load();
 
