@@ -331,6 +331,12 @@ const Live = () => {
                       {lvwId || "—"}
                     </dd>
                   </div>
+                  <div className="flex gap-1.5 items-baseline">
+                    <dt className="text-muted-foreground">Origem:</dt>
+                    <dd className="text-foreground/90 truncate" title={signalSource.fullLabel}>
+                      {signalSource.fullLabel}
+                    </dd>
+                  </div>
                   <div className="flex gap-1.5 items-baseline sm:col-span-2 min-w-0">
                     <dt className="text-muted-foreground shrink-0">URL:</dt>
                     <dd className="text-foreground/80 truncate" title={playUrl}>{playUrl}</dd>
