@@ -152,31 +152,38 @@ const HlsPlayer = ({
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
       const hls = new Hls({
-        // Latência baixa, mas com colchão maior para resistir a microcortes
-        lowLatencyMode: !lowQuality,
-        backBufferLength: lowQuality ? 5 : aggressiveNetwork ? 90 : 45,
-        maxBufferLength: lowQuality ? 10 : aggressiveNetwork ? 90 : 45,
-        maxMaxBufferLength: lowQuality ? 20 : aggressiveNetwork ? 180 : 90,
-        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : aggressiveNetwork ? 180 * 1000 * 1000 : 90 * 1000 * 1000,
-        maxBufferHole: 1.0, // tolera buracos maiores no stream
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.2,
-        nudgeMaxRetry: 20, // mais tentativas de pular adiante
+        // ⚡ Baixa latência REAL: todos os aparelhos ficam no mesmo segundo
+        lowLatencyMode: true,
+        backBufferLength: lowQuality ? 5 : 10, // pouco histórico = menos delay
+        maxBufferLength: lowQuality ? 6 : 8,   // buffer enxuto
+        maxMaxBufferLength: lowQuality ? 12 : 16,
+        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : 30 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 1,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 20,
         startFragPrefetch: !lowQuality,
-        maxStarvationDelay: aggressiveNetwork ? 20 : 10, // espera mais antes de desistir
+        maxStarvationDelay: 4, // não espera muito — pula pra borda viva
 
-        // ABR: thumbnail começa baixo, player principal começa automático
+        // ABR
         startLevel: lowQuality ? 0 : -1,
         abrEwmaDefaultEstimate: aggressiveNetwork ? 5_000_000 : 1_000_000,
         abrBandWidthFactor: 0.9,
         abrBandWidthUpFactor: 0.7,
-        liveSyncOnStallIncrease: aggressiveNetwork ? 1.5 : 1,
-        maxLiveSyncPlaybackRate: aggressiveNetwork ? 1.5 : 1.2,
+
+        // 🔑 Sincronização live: fica colado na borda
+        liveSyncDuration: 2,                  // alvo: 2s atrás da borda
+        liveMaxLatencyDuration: 6,            // > 6s = pula pra frente
+        liveSyncDurationCount: 2,             // 2 segmentos atrás (ignorado se liveSyncDuration setado)
+        liveMaxLatencyDurationCount: 6,
+        liveDurationInfinity: true,
+        liveSyncOnStallIncrease: 1,
+        maxLiveSyncPlaybackRate: 1.5,         // acelera até 1.5x para alcançar a borda
         preserveManualLevelOnError: false,
         fpsDroppedMonitoringPeriod: 3000,
         fpsDroppedMonitoringThreshold: 0.15,
 
-        // Retentativas MUITO agressivas (servidor JMV-Stream oscila)
+        // Retentativas (servidor JMV-Stream oscila)
         fragLoadingMaxRetry: 20,
         fragLoadingRetryDelay: 200,
         fragLoadingMaxRetryTimeout: 60000,
@@ -186,11 +193,6 @@ const HlsPlayer = ({
         levelLoadingMaxRetry: 20,
         levelLoadingRetryDelay: 200,
         levelLoadingMaxRetryTimeout: 60000,
-
-        // Live: mais distância da edge = mais buffer pra resistir
-        liveSyncDurationCount: aggressiveNetwork ? 6 : 4,
-        liveMaxLatencyDurationCount: 20,
-        liveDurationInfinity: true,
 
         enableWorker: true,
         capLevelToPlayerSize: !tvMode,
