@@ -253,6 +253,52 @@ const HlsPlayer = ({
     return () => v.removeEventListener("pause", onPause);
   }, [tvMode, src]);
 
+  // Watchdog: detecta stall silencioso (vídeo "tocando" mas currentTime não avança)
+  // e força recuperação ou fallback se persistir.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let lastTime = v.currentTime;
+    let stuckCount = 0;
+    const interval = setInterval(() => {
+      if (v.paused || v.ended || v.readyState < 2) {
+        lastTime = v.currentTime;
+        stuckCount = 0;
+        return;
+      }
+      const advanced = v.currentTime - lastTime > 0.05;
+      if (advanced) {
+        lastTime = v.currentTime;
+        stuckCount = 0;
+      } else {
+        stuckCount += 1;
+        // 3s travado: tenta cutucar
+        if (stuckCount === 3) {
+          try {
+            if (v.buffered.length > 0) {
+              const end = v.buffered.end(v.buffered.length - 1);
+              if (end > v.currentTime + 0.2) v.currentTime = v.currentTime + 0.1;
+            }
+            v.play().catch(() => {});
+          } catch { /* noop */ }
+        }
+        // 6s travado: força reload do hls
+        if (stuckCount === 6) {
+          try { hlsRef.current?.startLoad(); } catch { /* noop */ }
+        }
+        // 10s travado: reseta o player ou cai pro fallback
+        if (stuckCount >= 10) {
+          stuckCount = 0;
+          if (!tryFallback("watchdog stall")) {
+            setupPlayer();
+          }
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSrc, fallbackSrc]);
+
   const handlePlay = () => {
     const v = videoRef.current;
     if (!v) return;
