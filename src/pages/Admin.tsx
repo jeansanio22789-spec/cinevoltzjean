@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AdminSidebar, { type AdminTab } from "@/components/AdminSidebar";
 import AdminDashboard from "@/components/admin/AdminDashboard";
 import AdminMovies from "@/components/admin/AdminMovies";
+import AdminChannels from "@/components/admin/AdminChannels";
 import AdminVideos from "@/components/admin/AdminVideos";
 import AdminBilling from "@/components/admin/AdminBilling";
 import AdminUsers from "@/components/admin/AdminUsers";
@@ -18,6 +19,7 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
   movies: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   content: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
+  channels: { title: "Canais Ao Vivo", subtitle: "Cadastre emissoras com nome, logo e stream" },
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
   purchases: { title: "Compras PIX", subtitle: "Pagamentos Mercado Pago e liberação automática" },
@@ -107,6 +109,7 @@ const Admin = () => {
             {activeTab === "dashboard" && <AdminDashboard />}
             {activeTab === "movies" && <AdminMovies />}
             {activeTab === "content" && <AdminMovies />}
+            {activeTab === "channels" && <AdminChannels />}
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "billing" && <AdminBilling />}
             {activeTab === "purchases" && <AdminPurchases />}
