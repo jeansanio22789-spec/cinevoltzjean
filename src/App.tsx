@@ -42,6 +42,7 @@ const App = () => (
               <Route path="/assistir/:id" element={<Watch />} />
               <Route path="/externo" element={<ExternalView />} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="/teste-canais" element={<ProtectedRoute><TestChannels /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <LiveThumbnail />
