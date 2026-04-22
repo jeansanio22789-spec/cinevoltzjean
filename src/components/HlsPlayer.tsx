@@ -159,13 +159,44 @@ const HlsPlayer = ({
     }
   };
 
+  const reloadNativeStream = (video: HTMLVideoElement, url: string) => {
+    lastProgressAtRef.current = Date.now();
+    try { video.pause(); } catch { /* noop */ }
+    try {
+      video.removeAttribute("src");
+      video.load();
+    } catch {
+      /* noop */
+    }
+    try {
+      video.src = url;
+      video.load();
+    } catch {
+      /* noop */
+    }
+    if (autoPlay || tvMode) {
+      const playAttempt = video.play();
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt.then(() => syncPlaybackState(true)).catch(() => { /* noop */ });
+      }
+    }
+  };
+
   const recoverPlayback = (reason: string, hard = false) => {
     const v = videoRef.current;
     if (!v) return false;
 
     console.warn(`[HlsPlayer] Forçando retomada (${reason})${hard ? " [hard]" : ""}`);
-    setError(null);
+    setError(hard ? "Reconectando sinal ao vivo..." : null);
     setLoading(true);
+
+    const hls = hlsRef.current as (Hls & { startLoad?: (startPosition?: number) => void; recoverMediaError?: () => void }) | null;
+    const isNativePath = !hls || typeof hls.startLoad !== "function";
+
+    if (isNativePath) {
+      reloadNativeStream(v, activeSrc);
+      return true;
+    }
 
     try {
       if (v.buffered.length > 0) {
@@ -180,14 +211,11 @@ const HlsPlayer = ({
       /* noop */
     }
 
-    const hls = hlsRef.current as (Hls & { startLoad?: (startPosition?: number) => void; recoverMediaError?: () => void }) | null;
-    if (hls?.startLoad) {
-      try { hls.startLoad(-1); } catch {
-        try { hls.startLoad(); } catch { /* noop */ }
-      }
+    try { hls.startLoad?.(-1); } catch {
+      try { hls.startLoad?.(); } catch { /* noop */ }
     }
-    if (hard && hls?.recoverMediaError) {
-      try { hls.recoverMediaError(); } catch { /* noop */ }
+    if (hard) {
+      try { hls.recoverMediaError?.(); } catch { /* noop */ }
     }
 
     if ((autoPlay || tvMode) && v.paused) {
