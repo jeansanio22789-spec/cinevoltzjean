@@ -219,7 +219,7 @@ const Live = () => {
             </div>
           ) : isHls(playUrl) ? (
             <HlsPlayer
-              key={`${playUrl}-${tvMode}`}
+              key={selected?.id || "fallback"}
               src={playUrl}
               fallbackSrc={
                 // Só usa o fallback do PRÓPRIO canal (ou o link único antigo das settings).
