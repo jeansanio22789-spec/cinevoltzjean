@@ -166,6 +166,10 @@ const Live = () => {
   const [errorSince, setErrorSince] = useState<Date | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
 
+  // 🩺 Modo diagnóstico — painel técnico em tempo real
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [playerStats, setPlayerStats] = useState<LivePlayerStats | null>(null);
+
   // Reseta o erro quando troca de canal/url
   useEffect(() => {
     setPlayerError(null);
