@@ -718,6 +718,24 @@ const HlsPlayer = ({
     }
   };
 
+  const startCast = () => {
+    const w = window as any;
+    try {
+      const ctx = w.cast?.framework?.CastContext.getInstance();
+      if (!ctx) return;
+      ctx.requestSession().then(() => {
+        const session = ctx.getCurrentSession();
+        if (!session) return;
+        const mediaInfo = new w.chrome.cast.media.MediaInfo(activeSrc, "application/x-mpegURL");
+        mediaInfo.streamType = w.chrome.cast.media.StreamType.LIVE;
+        const request = new w.chrome.cast.media.LoadRequest(mediaInfo);
+        session.loadMedia(request).catch(() => {});
+      }).catch(() => {});
+    } catch {
+      // ignora
+    }
+  };
+
   return (
     <div
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
