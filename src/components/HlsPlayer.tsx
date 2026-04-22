@@ -91,19 +91,40 @@ const HlsPlayer = ({
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
       const hls = new Hls({
+        // Latência baixa, mas com colchão para não travar em quedas momentâneas
         lowLatencyMode: true,
-        backBufferLength: 10,
-        maxBufferLength: 15,
-        maxMaxBufferLength: 30,
+        backBufferLength: 30,           // mantém 30s atrás (permite seek leve sem refetch)
+        maxBufferLength: 30,            // tenta manter 30s à frente (resiliência a microcortes)
+        maxMaxBufferLength: 60,         // teto absoluto: 60s
+        maxBufferSize: 60 * 1000 * 1000, // 60MB de buffer máximo
+        maxBufferHole: 0.5,             // tolera buracos pequenos sem travar
+        highBufferWatchdogPeriod: 1,    // checa stall a cada 1s
+        nudgeOffset: 0.1,               // pequeno nudge para sair de stall
+        nudgeMaxRetry: 10,              // tenta sair do stall até 10x
+
+        // ABR: começa em qualidade média (subir é mais seguro do que cair)
         startLevel: -1,
         abrEwmaDefaultEstimate: 1_000_000,
-        fragLoadingMaxRetry: 6,
-        manifestLoadingMaxRetry: 6,
-        levelLoadingMaxRetry: 6,
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 5,
+        abrBandWidthFactor: 0.9,        // usa 90% da banda estimada (margem de segurança)
+        abrBandWidthUpFactor: 0.7,      // só sobe qualidade se sobrar 30% de banda
+
+        // Retentativas agressivas em rede ruim
+        fragLoadingMaxRetry: 8,
+        fragLoadingRetryDelay: 500,
+        fragLoadingMaxRetryTimeout: 30000,
+        manifestLoadingMaxRetry: 8,
+        manifestLoadingRetryDelay: 500,
+        levelLoadingMaxRetry: 8,
+        levelLoadingRetryDelay: 500,
+
+        // Live: alvo de 3 segments do edge (estável sem ficar muito atrás)
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+        liveDurationInfinity: true,
+
         enableWorker: true,
         capLevelToPlayerSize: !tvMode,
+        testBandwidth: true,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -119,35 +140,62 @@ const HlsPlayer = ({
         }
       });
 
+      // Quando volta a ter dados após buffering, limpa o erro silenciosamente
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        if (failureCountRef.current > 0) failureCountRef.current = Math.max(0, failureCountRef.current - 1);
+      });
+
       hls.on(Hls.Events.ERROR, (_evt, data) => {
-        console.error("[HlsPlayer]", data.type, data.details, data);
-        if (data.fatal) {
-          failureCountRef.current += 1;
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              if (
-                data.details === "manifestLoadError" ||
-                data.details === "manifestLoadTimeOut" ||
-                data.details === "manifestParsingError" ||
-                failureCountRef.current >= 2
-              ) {
-                if (tryFallback(data.details)) return;
-              }
-              setError(`Reconectando...`);
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              if (failureCountRef.current >= 2 && tryFallback("media error")) return;
-              hls.recoverMediaError();
-              setError("Recuperando...");
-              break;
-            default:
-              if (tryFallback(data.details)) return;
-              setError(`Stream indisponível.`);
-              break;
+        console.warn("[HlsPlayer]", data.type, data.details, data.fatal ? "FATAL" : "");
+
+        // Erros não-fatais: apenas log, hls.js auto-recupera
+        if (!data.fatal) {
+          // bufferStalledError → cutuca o vídeo um pouco à frente
+          if (data.details === "bufferStalledError") {
+            const v = videoRef.current;
+            if (v && v.buffered.length > 0) {
+              try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
+            }
           }
-          setLoading(false);
+          return;
         }
+
+        failureCountRef.current += 1;
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            if (
+              data.details === "manifestLoadError" ||
+              data.details === "manifestLoadTimeOut" ||
+              data.details === "manifestParsingError" ||
+              failureCountRef.current >= 3
+            ) {
+              if (tryFallback(data.details)) return;
+            }
+            setError("Reconectando...");
+            try { hls.startLoad(); } catch { /* noop */ }
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            if (failureCountRef.current >= 2) {
+              if (tryFallback("media error")) return;
+              // Última tentativa: troca de codecs
+              try { hls.swapAudioCodec(); hls.recoverMediaError(); } catch { /* noop */ }
+            } else {
+              try { hls.recoverMediaError(); } catch { /* noop */ }
+            }
+            setError("Recuperando...");
+            break;
+          default:
+            if (tryFallback(data.details)) return;
+            // Última cartada: destrói e recria
+            try {
+              hls.destroy();
+              hlsRef.current = null;
+              setTimeout(() => setupPlayer(), 1000);
+            } catch { /* noop */ }
+            setError("Reiniciando...");
+            break;
+        }
+        setLoading(false);
       });
     } else {
       setError("Seu navegador não suporta este tipo de transmissão.");
@@ -204,6 +252,52 @@ const HlsPlayer = ({
     v.addEventListener("pause", onPause);
     return () => v.removeEventListener("pause", onPause);
   }, [tvMode, src]);
+
+  // Watchdog: detecta stall silencioso (vídeo "tocando" mas currentTime não avança)
+  // e força recuperação ou fallback se persistir.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let lastTime = v.currentTime;
+    let stuckCount = 0;
+    const interval = setInterval(() => {
+      if (v.paused || v.ended || v.readyState < 2) {
+        lastTime = v.currentTime;
+        stuckCount = 0;
+        return;
+      }
+      const advanced = v.currentTime - lastTime > 0.05;
+      if (advanced) {
+        lastTime = v.currentTime;
+        stuckCount = 0;
+      } else {
+        stuckCount += 1;
+        // 3s travado: tenta cutucar
+        if (stuckCount === 3) {
+          try {
+            if (v.buffered.length > 0) {
+              const end = v.buffered.end(v.buffered.length - 1);
+              if (end > v.currentTime + 0.2) v.currentTime = v.currentTime + 0.1;
+            }
+            v.play().catch(() => {});
+          } catch { /* noop */ }
+        }
+        // 6s travado: força reload do hls
+        if (stuckCount === 6) {
+          try { hlsRef.current?.startLoad(); } catch { /* noop */ }
+        }
+        // 10s travado: reseta o player ou cai pro fallback
+        if (stuckCount >= 10) {
+          stuckCount = 0;
+          if (!tryFallback("watchdog stall")) {
+            setupPlayer();
+          }
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSrc, fallbackSrc]);
 
   const handlePlay = () => {
     const v = videoRef.current;
