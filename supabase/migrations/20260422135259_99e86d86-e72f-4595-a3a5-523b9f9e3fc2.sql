@@ -1,0 +1,1 @@
+UPDATE public.live_channels SET stream_url = 'https://cdn.live.br1.jmvstream.com/w/LVW-9359/LVW9359_XSyReL0QVf/playlist.m3u8', updated_at = now() WHERE id = 'c5a13342-efbf-453f-8a33-25a8d85c4cd8';
