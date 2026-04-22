@@ -47,6 +47,19 @@ const plans = [
     ],
     highlight: false,
   },
+  {
+    name: "Série",
+    price: "R$ 10,00",
+    priceValue: "10.00",
+    period: "/série",
+    features: [
+      "Acesso a 1 série completa",
+      "Pagamento único via PIX",
+      "Assista quando quiser",
+      "Qualidade Full HD",
+    ],
+    highlight: false,
+  },
 ];
 
 const paymentMethods = [
