@@ -31,6 +31,9 @@ const Live = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [tvMode, setTvMode] = useState(false);
+  const [forceSatMode, setForceSatMode] = useState(false);
+  const [satScanning, setSatScanning] = useState(false);
+  const [satScanMsg, setSatScanMsg] = useState<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
