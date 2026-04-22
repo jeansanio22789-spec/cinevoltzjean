@@ -585,6 +585,47 @@ const HlsPlayer = ({
         </div>
       )}
 
+      {/* 🕒 Indicador de sincronização por hora real */}
+      {showSyncIndicator && !error && (
+        <div
+          className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm text-[10px] font-bold text-white px-2 py-1 rounded-full pointer-events-none border border-white/10"
+          title={
+            syncInfo.mode === "pdt"
+              ? "Sincronização por hora real (PDT) ativa"
+              : syncInfo.mode === "edge"
+              ? "Sincronização pela borda do buffer (stream sem PDT)"
+              : "Aguardando dados do stream"
+          }
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              syncInfo.mode === "pdt"
+                ? "bg-emerald-400 animate-pulse"
+                : syncInfo.mode === "edge"
+                ? "bg-amber-400"
+                : "bg-zinc-500"
+            }`}
+          />
+          <span className="uppercase tracking-wider">
+            {syncInfo.mode === "pdt" ? "SYNC HORA" : syncInfo.mode === "edge" ? "SYNC BORDA" : "SYNC ..."}
+          </span>
+          {syncInfo.mode !== "idle" && (
+            <span
+              className={`tabular-nums ${
+                Math.abs(syncInfo.drift) < 0.5
+                  ? "text-emerald-300"
+                  : Math.abs(syncInfo.drift) < 1.5
+                  ? "text-amber-300"
+                  : "text-red-300"
+              }`}
+            >
+              {syncInfo.drift > 0 ? "+" : ""}
+              {syncInfo.drift.toFixed(1)}s
+            </span>
+          )}
+        </div>
+      )}
+
       {/* HUD mínimo do modo TV: só badge AO VIVO discreto + mudo invisível por hover */}
       {tvMode && !error && (
         <>
