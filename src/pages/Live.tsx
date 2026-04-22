@@ -36,8 +36,6 @@ const Live = () => {
   const [satScanMsg, setSatScanMsg] = useState<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const load = async () => {
   const load = useCallback(async () => {
     const [chanRes, settingsRes] = await Promise.all([
       supabase
