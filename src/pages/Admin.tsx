@@ -109,6 +109,8 @@ const Admin = () => {
             {activeTab === "content" && <AdminMovies />}
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "billing" && <AdminBilling />}
+            {activeTab === "purchases" && <AdminPurchases />}
+            {activeTab === "links" && <AdminAccessLinks />}
             {activeTab === "users" && <AdminUsers />}
             {activeTab === "audit" && <AdminAuditLog />}
             {activeTab === "settings" && <AdminSettings />}
