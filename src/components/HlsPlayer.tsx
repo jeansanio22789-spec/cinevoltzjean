@@ -169,19 +169,29 @@ const HlsPlayer = ({
       let safariRetries = 0;
       let destroyed = false;
       let retryTimer: number | null = null;
-      const maxSafariRetries = 5;
+      let watchdogTimer: number | null = null;
+      const maxSafariRetries = 3; // antes de mostrar erro / cair no fallback
 
       const tryLoad = () => {
         if (destroyed) return;
         // ⚠️ NÃO usa cache-buster: muda URL → reseta o player → loop infinito.
-        // O navegador já respeita os headers de cache do .m3u8 (no-cache na maioria dos casos).
         if (video.src !== activeSrc) {
           video.src = activeSrc;
           try { video.load(); } catch { /* noop */ }
         }
+        // Watchdog: se em 6s não carregou nada, força um retry / fallback
+        if (watchdogTimer) window.clearTimeout(watchdogTimer);
+        watchdogTimer = window.setTimeout(() => {
+          if (destroyed) return;
+          if (video.readyState < 2) {
+            console.warn("[HlsPlayer] Safari watchdog: stream não respondeu em 6s");
+            onErr();
+          }
+        }, 6000);
       };
       const onLoaded = () => {
         if (destroyed) return;
+        if (watchdogTimer) { window.clearTimeout(watchdogTimer); watchdogTimer = null; }
         setLoading(false);
         setError(null);
         safariRetries = 0;
@@ -193,11 +203,13 @@ const HlsPlayer = ({
         safariRetries += 1;
         if (retryTimer) window.clearTimeout(retryTimer);
         if (safariRetries < maxSafariRetries) {
-          retryTimer = window.setTimeout(tryLoad, 800 * safariRetries);
-        } else if (!tryFallback("safari error after retries")) {
-          setError("Reconectando…");
+          // Mostra status pra usuário não pensar que travou
           setLoading(true);
-          retryTimer = window.setTimeout(() => { safariRetries = 0; tryLoad(); }, 4000);
+          retryTimer = window.setTimeout(tryLoad, 600 * safariRetries);
+        } else if (!tryFallback("safari error after retries")) {
+          // Sem fallback — mostra erro pro usuário poder pular de canal
+          setError("Canal indisponível no momento");
+          setLoading(false);
         }
       };
       video.addEventListener("loadedmetadata", onLoaded);
@@ -207,6 +219,7 @@ const HlsPlayer = ({
         destroy: () => {
           destroyed = true;
           if (retryTimer) window.clearTimeout(retryTimer);
+          if (watchdogTimer) window.clearTimeout(watchdogTimer);
           video.removeEventListener("loadedmetadata", onLoaded);
           video.removeEventListener("error", onErr);
         },
@@ -322,6 +335,9 @@ const HlsPlayer = ({
               failureCountRef.current >= 3
             ) {
               if (tryFallback(data.details)) return;
+              setError("Canal indisponível no momento");
+              setLoading(false);
+              return;
             }
             setError("Reconectando...");
             try { hls.startLoad(); } catch { /* noop */ }
@@ -330,7 +346,6 @@ const HlsPlayer = ({
             stepDownQuality("media error");
             if (failureCountRef.current >= 2) {
               if (tryFallback("media error")) return;
-              // Última tentativa: troca de codecs
               try { hls.swapAudioCodec(); hls.recoverMediaError(); } catch { /* noop */ }
             } else {
               try { hls.recoverMediaError(); } catch { /* noop */ }
@@ -339,16 +354,10 @@ const HlsPlayer = ({
             break;
           default:
             if (tryFallback(data.details)) return;
-            // Última cartada: destrói e recria
-            try {
-              hls.destroy();
-              hlsRef.current = null;
-              setTimeout(() => setupPlayer(), 1000);
-            } catch { /* noop */ }
-            setError("Reiniciando...");
+            setError("Canal indisponível no momento");
+            setLoading(false);
             break;
         }
-        setLoading(false);
       });
     } else {
       setError("Seu navegador não suporta este tipo de transmissão.");
