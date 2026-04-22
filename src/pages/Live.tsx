@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv, Search, X, Monitor, Minimize2, Users } from "lucide-react";
+import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveViewers, useLiveViewersMulti } from "@/hooks/useLiveViewers";
@@ -155,6 +155,45 @@ const Live = () => {
   const viewerKey = selected?.id || (fallbackUrl ? "fallback" : null);
   const viewersHere = useLiveViewers(viewerKey, true);
 
+  // 🔴 Erro detalhado vindo do player (ex: "Canal indisponível no momento")
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [errorSince, setErrorSince] = useState<Date | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+
+  // Reseta o erro quando troca de canal/url
+  useEffect(() => {
+    setPlayerError(null);
+    setErrorSince(null);
+  }, [playUrl]);
+
+  const handlePlayerError = useCallback((msg: string | null) => {
+    setPlayerError(msg);
+    if (msg) {
+      setErrorSince((prev) => prev || new Date());
+    } else {
+      setErrorSince(null);
+    }
+  }, []);
+
+  // Extrai identificador LVW-XXXX da URL ativa
+  const lvwId = useMemo(() => {
+    const m = (playUrl || "").match(/LVW-?\d+/i);
+    return m ? m[0].toUpperCase() : null;
+  }, [playUrl]);
+
+  const copyDiagnostics = useCallback(() => {
+    const lines = [
+      `Canal: ${playTitle}`,
+      `ID canal: ${selected?.id || "fallback"}`,
+      `Sinal: ${lvwId || "—"}`,
+      `URL ativa: ${playUrl}`,
+      `Erro: ${playerError || "—"}`,
+      `Desde: ${errorSince?.toLocaleString("pt-BR") || "—"}`,
+      `User-Agent: ${navigator.userAgent}`,
+    ].join("\n");
+    navigator.clipboard?.writeText(lines).catch(() => {});
+  }, [playTitle, selected?.id, lvwId, playUrl, playerError, errorSince]);
+
   // Espectadores em todos os outros canais (apenas observa, não conta nele)
   const otherIds = useMemo(
     () => channels.map((c) => c.id).filter((id) => id !== selected?.id),
@@ -220,7 +259,7 @@ const Live = () => {
             </div>
           ) : isHls(playUrl) ? (
             <HlsPlayer
-              key={selected?.id || "fallback"}
+              key={`${selected?.id || "fallback"}-${retryNonce}`}
               src={playUrl}
               fallbackSrc={
                 // Só usa o fallback do PRÓPRIO canal (ou o link único antigo das settings).
@@ -232,6 +271,7 @@ const Live = () => {
               tvMode={tvMode}
               aggressiveNetwork
               showSyncIndicator
+              onError={handlePlayerError}
             />
           ) : (
             <iframe
@@ -254,6 +294,74 @@ const Live = () => {
           )}
         </div>
 
+        {/* 🔴 Painel de erro detalhado do player */}
+        {playerError && hasContent && (
+          <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 w-9 h-9 rounded-full bg-destructive/15 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-destructive" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-destructive mb-1">
+                  Falha na transmissão
+                </h3>
+                <p className="text-xs text-foreground/80 mb-3">
+                  {playerError}
+                </p>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
+                  <div className="flex gap-1.5 items-baseline">
+                    <dt className="text-muted-foreground">Canal:</dt>
+                    <dd className="text-foreground/90 truncate">{playTitle}</dd>
+                  </div>
+                  <div className="flex gap-1.5 items-baseline">
+                    <dt className="text-muted-foreground">Sinal:</dt>
+                    <dd className={lvwId ? "text-accent font-bold" : "text-muted-foreground"}>
+                      {lvwId || "—"}
+                    </dd>
+                  </div>
+                  <div className="flex gap-1.5 items-baseline sm:col-span-2 min-w-0">
+                    <dt className="text-muted-foreground shrink-0">URL:</dt>
+                    <dd className="text-foreground/80 truncate" title={playUrl}>{playUrl}</dd>
+                  </div>
+                  <div className="flex gap-1.5 items-baseline">
+                    <dt className="text-muted-foreground">ID canal:</dt>
+                    <dd className="text-foreground/80 truncate">{selected?.id || "fallback"}</dd>
+                  </div>
+                  {errorSince && (
+                    <div className="flex gap-1.5 items-baseline">
+                      <dt className="text-muted-foreground">Falha desde:</dt>
+                      <dd className="text-foreground/80">{errorSince.toLocaleTimeString("pt-BR")}</dd>
+                    </div>
+                  )}
+                </dl>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button
+                    onClick={() => setRetryNonce((n) => n + 1)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Recarregar player
+                  </button>
+                  <button
+                    onClick={copyDiagnostics}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-card border border-border text-xs font-semibold hover:border-primary/60 transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5" /> Copiar diagnóstico
+                  </button>
+                  {playUrl && (
+                    <a
+                      href={playUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-card border border-border text-xs font-semibold hover:border-primary/60 transition-colors"
+                    >
+                      Abrir URL bruta
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Busca + filtros de categoria */}
         {channels.length > 0 && (
           <div className="mt-8 space-y-4">

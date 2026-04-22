@@ -36,6 +36,8 @@ interface HlsPlayerProps {
    * (modo PDT/borda) e o drift atual em segundos.
    */
   showSyncIndicator?: boolean;
+  /** Notifica o componente pai quando o player troca para estado de erro/recuperação */
+  onError?: (msg: string | null) => void;
 }
 
 /**
@@ -52,6 +54,7 @@ const HlsPlayer = ({
   lowQuality = false,
   aggressiveNetwork = false,
   showSyncIndicator = false,
+  onError,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -78,6 +81,11 @@ const HlsPlayer = ({
   // 📺 Espelhamento (AirPlay / Chromecast)
   const [airplayAvailable, setAirplayAvailable] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
+
+  // Notifica o componente pai sempre que o estado de erro mudar
+  useEffect(() => {
+    onError?.(error);
+  }, [error, onError]);
 
   // Detecta suporte a AirPlay (Safari/iOS)
   useEffect(() => {
