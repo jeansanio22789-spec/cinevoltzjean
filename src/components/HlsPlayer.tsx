@@ -75,6 +75,51 @@ const HlsPlayer = ({
     drift: number; // segundos: + = atrasado, - = à frente
   }>({ mode: "idle", drift: 0 });
 
+  // 📺 Espelhamento (AirPlay / Chromecast)
+  const [airplayAvailable, setAirplayAvailable] = useState(false);
+  const [castAvailable, setCastAvailable] = useState(false);
+
+  // Detecta suporte a AirPlay (Safari/iOS)
+  useEffect(() => {
+    const v = videoRef.current as any;
+    if (!v) return;
+    if (typeof window !== "undefined" && (window as any).WebKitPlaybackTargetAvailabilityEvent) {
+      const onAvail = (e: any) => setAirplayAvailable(e.availability === "available");
+      v.addEventListener("webkitplaybacktargetavailabilitychanged", onAvail);
+      return () => v.removeEventListener("webkitplaybacktargetavailabilitychanged", onAvail);
+    }
+  }, []);
+
+  // Inicializa Google Cast (Chromecast)
+  useEffect(() => {
+    const w = window as any;
+    const init = () => {
+      try {
+        const ctx = w.cast?.framework?.CastContext.getInstance();
+        if (!ctx) return;
+        ctx.setOptions({
+          receiverApplicationId: w.chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID || "CC1AD845",
+          autoJoinPolicy: w.chrome?.cast?.AutoJoinPolicy?.ORIGIN_SCOPED,
+        });
+        setCastAvailable(true);
+      } catch {
+        // ignora
+      }
+    };
+    if (w.cast?.framework) {
+      init();
+    } else {
+      w.__onGCastApiAvailable = (available: boolean) => { if (available) init(); };
+    }
+  }, []);
+
+  const startAirplay = () => {
+    const v = videoRef.current as any;
+    if (v?.webkitShowPlaybackTargetPicker) {
+      try { v.webkitShowPlaybackTargetPicker(); } catch {}
+    }
+  };
+
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
 
