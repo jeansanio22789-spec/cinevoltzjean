@@ -146,13 +146,63 @@ const Live = () => {
           )}
         </div>
 
+        {/* Busca + filtros de categoria */}
+        {channels.length > 0 && (
+          <div className="mt-8 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Buscar entre ${channels.length} canais ao vivo...`}
+                  className="w-full pl-10 pr-9 py-2.5 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <span className="text-xs text-muted-foreground hidden sm:inline whitespace-nowrap">
+                {filtered.length} de {channels.length}
+              </span>
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-thin">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                    activeCategory === cat
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card border border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
+                  }`}
+                >
+                  {cat === "all" ? `Todos (${channels.length})` : cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Lista de canais agrupada */}
         {channels.length > 0 && (
-          <div className="mt-8 space-y-6">
+          <div className="mt-6 space-y-6">
+            {filtered.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhum canal encontrado para "{search}".
+              </p>
+            )}
             {Object.entries(grouped).map(([category, list]) => (
               <section key={category}>
                 <h2 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3 font-bold">
-                  {category}
+                  {category} <span className="text-muted-foreground/50 normal-case tracking-normal">· {list.length}</span>
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {list.map((ch) => {
