@@ -47,12 +47,25 @@ const HlsPlayer = ({
   const [usingFallback, setUsingFallback] = useState(false);
   const failureCountRef = useRef(0);
 
+  // Tenta o fallback se houver — retorna true se o switch ocorreu
+  const tryFallback = (reason: string) => {
+    if (fallbackSrc && !usingFallback && fallbackSrc !== src) {
+      console.warn(`[HlsPlayer] Trocando para fallback (${reason}):`, fallbackSrc);
+      setUsingFallback(true);
+      setActiveSrc(fallbackSrc);
+      setError(null);
+      return true;
+    }
+    return false;
+  };
+
   const setupPlayer = () => {
     const video = videoRef.current;
-    if (!video || !src) return;
+    if (!video || !activeSrc) return;
 
     setError(null);
     setLoading(true);
+    failureCountRef.current = 0;
 
     // Limpa instância anterior
     if (hlsRef.current) {
@@ -62,8 +75,16 @@ const HlsPlayer = ({
 
     // Safari (iOS/macOS) → HLS nativo
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = src;
-      video.addEventListener("loadedmetadata", () => setLoading(false), { once: true });
+      video.src = activeSrc;
+      const onLoaded = () => setLoading(false);
+      const onErr = () => {
+        if (!tryFallback("safari error")) {
+          setError("Stream indisponível no momento.");
+          setLoading(false);
+        }
+      };
+      video.addEventListener("loadedmetadata", onLoaded, { once: true });
+      video.addEventListener("error", onErr, { once: true });
       return;
     }
 
@@ -82,16 +103,15 @@ const HlsPlayer = ({
         liveSyncDurationCount: 2,
         liveMaxLatencyDurationCount: 5,
         enableWorker: true,
-        // Modo TV: capacidade alta para não cair de qualidade
         capLevelToPlayerSize: !tvMode,
       });
       hlsRef.current = hls;
-      hls.loadSource(src);
+      hls.loadSource(activeSrc);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLoading(false);
-        // Em modo TV: trava na maior qualidade disponível
+        failureCountRef.current = 0;
         if (tvMode && hls.levels && hls.levels.length > 0) {
           const topLevel = hls.levels.length - 1;
           hls.currentLevel = topLevel;
@@ -102,17 +122,28 @@ const HlsPlayer = ({
       hls.on(Hls.Events.ERROR, (_evt, data) => {
         console.error("[HlsPlayer]", data.type, data.details, data);
         if (data.fatal) {
+          failureCountRef.current += 1;
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              setError(`Erro de rede: ${data.details}`);
+              if (
+                data.details === "manifestLoadError" ||
+                data.details === "manifestLoadTimeOut" ||
+                data.details === "manifestParsingError" ||
+                failureCountRef.current >= 2
+              ) {
+                if (tryFallback(data.details)) return;
+              }
+              setError(`Reconectando...`);
               hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
+              if (failureCountRef.current >= 2 && tryFallback("media error")) return;
               hls.recoverMediaError();
-              setError("Erro de mídia — recuperando...");
+              setError("Recuperando...");
               break;
             default:
-              setError(`Erro: ${data.details}`);
+              if (tryFallback(data.details)) return;
+              setError(`Stream indisponível.`);
               break;
           }
           setLoading(false);
@@ -124,6 +155,12 @@ const HlsPlayer = ({
     }
   };
 
+  // Reseta para o stream principal quando o src principal muda
+  useEffect(() => {
+    setUsingFallback(false);
+    setActiveSrc(src);
+  }, [src]);
+
   useEffect(() => {
     setupPlayer();
     return () => {
@@ -133,7 +170,7 @@ const HlsPlayer = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, tvMode]);
+  }, [activeSrc, tvMode]);
 
   // Força tentativa de play (mudo) sempre que possível
   useEffect(() => {
@@ -152,7 +189,7 @@ const HlsPlayer = ({
       else clearInterval(id);
     }, 1500);
     return () => clearInterval(id);
-  }, [src, autoPlay]);
+  }, [activeSrc, autoPlay]);
 
   // Em modo TV: nunca deixa pausado — se o usuário pausar de qualquer jeito, retoma
   useEffect(() => {
