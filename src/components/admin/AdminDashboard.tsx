@@ -157,7 +157,10 @@ const AdminDashboard = () => {
         ))}
       </div>
 
-      {/* Revenue chart + Recent activity */}
+      {/* Live preview do app */}
+      <LivePreview />
+
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 admin-card p-6">
           <div className="flex items-start justify-between mb-6">
