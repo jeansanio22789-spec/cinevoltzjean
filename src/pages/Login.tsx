@@ -66,7 +66,7 @@ const Login = () => {
         <div className="text-center mb-8">
           <p className="text-primary font-black text-3xl tracking-tight mb-2">STREAMFLIX</p>
           <p className="text-muted-foreground text-sm">
-            {isSignUp ? "Crie sua conta de administrador" : "Acesse o painel administrativo"}
+            {isSignUp ? "Crie sua conta gratuita" : "Acesse sua conta"}
           </p>
         </div>
 
