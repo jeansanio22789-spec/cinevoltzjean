@@ -31,6 +31,11 @@ interface HlsPlayerProps {
    * priorização de bitrate alto sem travar a UI.
    */
   aggressiveNetwork?: boolean;
+  /**
+   * Mostra um pequeno HUD com o status da sincronização por hora real
+   * (modo PDT/borda) e o drift atual em segundos.
+   */
+  showSyncIndicator?: boolean;
 }
 
 /**
@@ -46,6 +51,7 @@ const HlsPlayer = ({
   tvMode = false,
   lowQuality = false,
   aggressiveNetwork = false,
+  showSyncIndicator = false,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -61,6 +67,11 @@ const HlsPlayer = ({
   // 🕒 Sincronização por hora real:
   //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
   const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
+  // 📊 Estado da sincronização exposto na UI
+  const [syncInfo, setSyncInfo] = useState<{
+    mode: "pdt" | "edge" | "idle";
+    drift: number; // segundos: + = atrasado, - = à frente
+  }>({ mode: "idle", drift: 0 });
 
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
