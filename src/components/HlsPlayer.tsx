@@ -629,6 +629,10 @@ const HlsPlayer = ({
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
         console.warn("[HlsPlayer]", data.type, data.details, data.fatal ? "FATAL" : "");
+        // 📊 Telemetria: registra TODA falha (fatal ou não) para o painel
+        lastErrorRef.current = { msg: `${data.type}/${data.details}`, at: Date.now() };
+        if (data.fatal) errorCountRef.current += 1;
+
 
         // Erros não-fatais: apenas log, hls.js auto-recupera
         if (!data.fatal) {
