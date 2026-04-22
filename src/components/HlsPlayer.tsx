@@ -502,6 +502,9 @@ const HlsPlayer = ({
         // Ignora erros enquanto o vídeo já está reproduzindo OK (eventos espúrios do Safari)
         if (hasRecentProgress || (!video.paused && video.currentTime > 0.1 && bufferAhead > 0.2)) return;
         safariRetries += 1;
+        // 📊 Telemetria
+        lastErrorRef.current = { msg: `native/error_${safariRetries}`, at: Date.now() };
+        errorCountRef.current += 1;
         if (retryTimer) window.clearTimeout(retryTimer);
         if (safariRetries < maxSafariRetries) {
           setError(`Reconectando sinal ao vivo... (${safariRetries}/${maxSafariRetries - 1})`);
