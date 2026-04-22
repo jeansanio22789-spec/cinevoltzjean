@@ -1,24 +1,14 @@
 import Navbar from "@/components/Navbar";
-import { Radio, Tv, AlertTriangle } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import HlsPlayer from "@/components/HlsPlayer";
+import { Radio, Tv } from "lucide-react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-// ⚠️ Para trocar o vídeo, mude no painel admin (Configurações → live_stream_url)
-// ou edite o fallback abaixo. O vídeo precisa PERMITIR embed (caso contrário, dá erro 150/153).
-const FALLBACK_VIDEO_ID = "jfKfPfyJRdk"; // lofi hip hop — sempre permite embed (placeholder)
-
-const extractYouTubeId = (url: string): string | null => {
-  if (!url) return null;
-  // Aceita ID puro
-  if (/^[\w-]{11}$/.test(url.trim())) return url.trim();
-  const m = url.match(
-    /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/
-  );
-  return m ? m[1] : null;
-};
+// Detecta se a URL é HLS (.m3u8), senão cai pro iframe (compatível com links antigos)
+const isHls = (url: string) => /\.m3u8(\?.*)?$/i.test(url || "");
 
 const Live = () => {
-  const [videoId, setVideoId] = useState<string>(FALLBACK_VIDEO_ID);
+  const [url, setUrl] = useState<string>("");
   const [title, setTitle] = useState("AO VIVO");
   const [loaded, setLoaded] = useState(false);
 
@@ -30,31 +20,23 @@ const Live = () => {
         .in("key", ["live_stream_url", "live_stream_title"]);
       const map: Record<string, string> = {};
       (data || []).forEach((s: any) => { map[s.key] = s.value; });
-      const id = extractYouTubeId(map.live_stream_url || "");
-      if (id) setVideoId(id);
+      setUrl(map.live_stream_url || "");
       if (map.live_stream_title) setTitle(map.live_stream_title);
       setLoaded(true);
     };
     load();
-  }, []);
 
-  const streamUrl = useMemo(() => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const params = new URLSearchParams({
-      autoplay: "1",
-      mute: "1",
-      playsinline: "1",
-      controls: "1",
-      modestbranding: "1",
-      rel: "0",
-      fs: "1",
-      iv_load_policy: "3",
-      showinfo: "0",
-      enablejsapi: "1",
-      origin,
-    });
-    return `https://www.youtube-nocookie.com/embed/${videoId}?${params.toString()}`;
-  }, [videoId]);
+    // Atualiza em tempo real quando o admin trocar o link
+    const channel = supabase
+      .channel("live-page-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "platform_settings" },
+        () => load(),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   if (!loaded) {
     return (
@@ -82,25 +64,31 @@ const Live = () => {
         </div>
 
         <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
-          <iframe
-            key={videoId}
-            src={streamUrl}
-            className="w-full h-full border-0"
-            allowFullScreen
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
-            referrerPolicy="strict-origin-when-cross-origin"
-            loading="eager"
-            title={title}
-          />
+          {!url ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
+              <Tv className="w-12 h-12 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Nenhuma transmissão configurada. Configure o link em <b>Admin → Configurações → live_stream_url</b>.
+              </p>
+            </div>
+          ) : isHls(url) ? (
+            <HlsPlayer src={url} autoPlay />
+          ) : (
+            // Fallback para links de iframe (YouTube, sites etc.)
+            <iframe
+              src={url}
+              className="w-full h-full border-0"
+              allowFullScreen
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
+              referrerPolicy="strict-origin-when-cross-origin"
+              title={title}
+            />
+          )}
         </div>
 
-        <div className="mt-3 flex items-start gap-2 text-[11px] text-muted-foreground bg-muted/30 rounded-lg p-3">
-          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-          <p>
-            Se aparecer <b>"Assistir o vídeo no YouTube"</b> ou <b>Erro 150/153</b>, o canal bloqueou a reprodução fora do YouTube — esse vídeo específico não pode tocar dentro do app.
-            Use no painel admin um link de transmissão que <b>permita incorporação</b>.
-          </p>
-        </div>
+        <p className="text-[11px] text-muted-foreground text-center mt-3">
+          Player nativo HLS — toca direto no app, sem YouTube.
+        </p>
       </div>
     </div>
   );
