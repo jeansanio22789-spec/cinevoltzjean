@@ -217,6 +217,61 @@ const Live = () => {
         </div>
 
 
+
+        {/* Painel de status do sinal (debug) */}
+        {showDebug && hasContent && (
+          <div className="mb-3 rounded-lg border border-border bg-card/60 backdrop-blur px-3 py-2 text-[11px] font-mono">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-accent">
+                Status do sinal
+              </span>
+              <button
+                onClick={() => setShowDebug(false)}
+                className="text-muted-foreground hover:text-foreground text-xs"
+                aria-label="Fechar painel de status"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+              <div>
+                <span className="text-foreground/70">ID canal: </span>
+                <span className="text-primary break-all">{selected?.id || "fallback"}</span>
+              </div>
+              <div>
+                <span className="text-foreground/70">Sinal: </span>
+                <span className={lvwId ? "text-accent font-bold" : "text-muted-foreground"}>
+                  {lvwId || "—"}
+                </span>
+              </div>
+              <div className="sm:col-span-2 truncate" title={playUrl}>
+                <span className="text-foreground/70">URL ativa: </span>
+                <span className="text-foreground/90">{playUrl}</span>
+              </div>
+              <div>
+                <span className="text-foreground/70">Atualização: </span>
+                <span className="text-foreground/90">
+                  {lastSyncedAt.toLocaleTimeString("pt-BR")}
+                </span>
+              </div>
+              <div>
+                <span className="text-foreground/70">Canal atualizado: </span>
+                <span className="text-foreground/90">
+                  {selected ? new Date((selected as any).updated_at || Date.now()).toLocaleTimeString("pt-BR") : "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        {!showDebug && (
+          <button
+            onClick={() => setShowDebug(true)}
+            className="mb-2 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors"
+          >
+            ▸ Mostrar status do sinal
+          </button>
+        )}
+
         <div
           ref={playerWrapRef}
           className={`relative rounded-xl overflow-hidden bg-black ${tvMode ? "fixed inset-0 z-[100] rounded-none" : "aspect-video"}`}
