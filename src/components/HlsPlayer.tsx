@@ -389,6 +389,37 @@ const HlsPlayer = ({
     else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
   };
 
+  // Reconexão instantânea: limpa erro na hora e tenta caminhos progressivamente
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    failureCountRef.current = 0;
+    stableFragCountRef.current = 0;
+    const v = videoRef.current;
+    const hls = hlsRef.current;
+    try {
+      if (hls) {
+        try { hls.stopLoad(); } catch { /* noop */ }
+        try { hls.startLoad(-1); } catch { /* noop */ }
+        try { hls.recoverMediaError(); } catch { /* noop */ }
+      }
+      if (v) {
+        v.muted = true;
+        const p = v.play();
+        if (p && typeof p.then === "function") p.catch(() => {});
+      }
+      setTimeout(() => {
+        const vv = videoRef.current;
+        const stillStuck = !vv || vv.paused || vv.readyState < 2;
+        if (stillStuck) {
+          if (!tryFallback("manual retry")) setupPlayer();
+        }
+      }, 1500);
+    } catch {
+      setupPlayer();
+    }
+  };
+
   return (
     <div
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
