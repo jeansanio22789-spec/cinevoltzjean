@@ -381,13 +381,16 @@ const HlsPlayer = ({
       v.muted = true;
       const p = v.play();
       if (p && typeof p.then === "function") {
-        p.catch(() => { /* autoplay bloqueado — usuário precisa tocar */ });
+        p.then(() => { setPlaying(true); setLoading(false); })
+         .catch(() => { /* autoplay bloqueado — usuário precisa tocar */ });
+      } else {
+        setTimeout(() => { if (!v.paused) setPlaying(true); }, 100);
       }
     };
     tryPlay();
     const id = setInterval(() => {
       if (v.paused) tryPlay();
-      else clearInterval(id);
+      else { setPlaying(true); clearInterval(id); }
     }, 1500);
     return () => clearInterval(id);
   }, [activeSrc, autoPlay]);
