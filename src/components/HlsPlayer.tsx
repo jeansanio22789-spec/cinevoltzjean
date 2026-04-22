@@ -335,6 +335,9 @@ const HlsPlayer = ({
               failureCountRef.current >= 3
             ) {
               if (tryFallback(data.details)) return;
+              setError("Canal indisponível no momento");
+              setLoading(false);
+              return;
             }
             setError("Reconectando...");
             try { hls.startLoad(); } catch { /* noop */ }
@@ -343,7 +346,6 @@ const HlsPlayer = ({
             stepDownQuality("media error");
             if (failureCountRef.current >= 2) {
               if (tryFallback("media error")) return;
-              // Última tentativa: troca de codecs
               try { hls.swapAudioCodec(); hls.recoverMediaError(); } catch { /* noop */ }
             } else {
               try { hls.recoverMediaError(); } catch { /* noop */ }
@@ -352,16 +354,10 @@ const HlsPlayer = ({
             break;
           default:
             if (tryFallback(data.details)) return;
-            // Última cartada: destrói e recria
-            try {
-              hls.destroy();
-              hlsRef.current = null;
-              setTimeout(() => setupPlayer(), 1000);
-            } catch { /* noop */ }
-            setError("Reiniciando...");
+            setError("Canal indisponível no momento");
+            setLoading(false);
             break;
         }
-        setLoading(false);
       });
     } else {
       setError("Seu navegador não suporta este tipo de transmissão.");
