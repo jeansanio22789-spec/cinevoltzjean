@@ -1,4 +1,5 @@
 import { Play, Info } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { DbMovie } from "@/hooks/useMovies";
 
 interface HeroSectionProps {
@@ -6,6 +7,8 @@ interface HeroSectionProps {
 }
 
 const HeroSection = ({ movie }: HeroSectionProps) => {
+  const navigate = useNavigate();
+  const goToPlans = () => navigate("/planos");
   if (!movie) {
     return (
       <section className="relative w-full h-[85vh] min-h-[500px] bg-background flex items-end px-4 md:px-12 pb-16">
