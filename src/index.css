@@ -53,6 +53,17 @@
     --gradient-hero-left: linear-gradient(to right, hsl(0 0% 6%) 0%, transparent 50%);
     --shadow-card: 0 8px 32px -8px hsl(0 0% 0% / 0.6);
 
+    /* Admin Studio tokens */
+    --admin-bg: 0 0% 4%;
+    --admin-panel: 0 0% 9%;
+    --admin-panel-hover: 0 0% 13%;
+    --admin-border: 0 0% 16%;
+    --gradient-admin-header: linear-gradient(135deg, hsl(357 83% 47% / 0.18) 0%, hsl(0 0% 4%) 60%);
+    --gradient-admin-card: linear-gradient(160deg, hsl(0 0% 11%) 0%, hsl(0 0% 7%) 100%);
+    --gradient-primary-glow: linear-gradient(135deg, hsl(357 83% 55%) 0%, hsl(357 83% 40%) 100%);
+    --shadow-admin: 0 10px 40px -10px hsl(357 83% 47% / 0.25);
+    --shadow-admin-card: 0 4px 24px -8px hsl(0 0% 0% / 0.5);
+
   }
 }
 
@@ -125,3 +136,46 @@
 .animate-delay-100 { animation-delay: 0.1s; }
 .animate-delay-200 { animation-delay: 0.2s; }
 .animate-delay-300 { animation-delay: 0.3s; }
+
+/* Admin Studio styling */
+.admin-shell {
+  background: hsl(var(--admin-bg));
+}
+
+.admin-header {
+  background: var(--gradient-admin-header);
+  border-bottom: 1px solid hsl(var(--admin-border));
+  backdrop-filter: blur(8px);
+}
+
+.admin-card {
+  background: var(--gradient-admin-card);
+  border: 1px solid hsl(var(--admin-border));
+  border-radius: 12px;
+  box-shadow: var(--shadow-admin-card);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.admin-card:hover {
+  border-color: hsl(var(--primary) / 0.4);
+}
+
+.admin-kpi {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-kpi::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, hsl(var(--primary) / 0.15), transparent 60%);
+  pointer-events: none;
+}
+
+.admin-sidebar-item-active {
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.15) 0%, transparent 100%);
+  border-left: 3px solid hsl(var(--primary));
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
