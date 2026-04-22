@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const PLAN_DAYS: Record<string, number> = {
-  "Básico": 30, "Padrão": 30, "Premium": 30,
+  "Básico": 30, "Padrão": 30, "Premium": 30, "Série": 30,
 };
 
 Deno.serve(async (req) => {
