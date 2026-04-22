@@ -92,6 +92,7 @@ const HlsPlayer = ({
   tvMode = false,
   lowQuality = false,
   aggressiveNetwork = false,
+  satelliteMode = false,
   showSyncIndicator = false,
   onError,
 }: HlsPlayerProps) => {
