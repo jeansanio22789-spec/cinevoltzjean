@@ -1,0 +1,1 @@
+DELETE FROM public.live_channels WHERE name = 'TV Globo';
