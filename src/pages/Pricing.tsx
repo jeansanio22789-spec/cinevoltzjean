@@ -47,6 +47,19 @@ const plans = [
     ],
     highlight: false,
   },
+  {
+    name: "Série",
+    price: "R$ 10,00",
+    priceValue: "10.00",
+    period: "/série",
+    features: [
+      "Acesso a 1 série completa",
+      "Pagamento único via PIX",
+      "Assista quando quiser",
+      "Qualidade Full HD",
+    ],
+    highlight: false,
+  },
 ];
 
 const paymentMethods = [
@@ -81,7 +94,7 @@ const Pricing = () => {
           </p>
         </div>
 
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-16">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-16">
           {plans.map((plan) => (
             <div
               key={plan.name}
