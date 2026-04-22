@@ -4,6 +4,7 @@ import { Radio, Tv, Search, X, Monitor, Minimize2, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveViewers, useLiveViewersMulti } from "@/hooks/useLiveViewers";
+import LiveClockSignal from "@/components/LiveClockSignal";
 
 interface Channel {
   id: string;
@@ -162,6 +163,7 @@ const Live = () => {
           <span className="flex items-center gap-1.5 bg-destructive text-destructive-foreground text-xs font-bold px-3 py-1 rounded-full animate-pulse">
             <Radio className="w-3.5 h-3.5" /> AO VIVO
           </span>
+          <LiveClockSignal />
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
           {viewersHere > 0 && (
             <span
