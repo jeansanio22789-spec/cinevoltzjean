@@ -57,8 +57,24 @@ const HlsPlayer = ({
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
       const hls = new Hls({
+        // Baixa latência (delay mínimo possível em HLS)
         lowLatencyMode: true,
-        backBufferLength: 30,
+        // Buffer mais agressivo: começa a tocar logo, mantém pouco backbuffer
+        backBufferLength: 10,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
+        // Inicia já com a maior qualidade disponível
+        startLevel: -1,
+        // ABR otimizado pra rede instável
+        abrEwmaDefaultEstimate: 1_000_000,
+        // Recuperação automática de erros
+        fragLoadingMaxRetry: 6,
+        manifestLoadingMaxRetry: 6,
+        levelLoadingMaxRetry: 6,
+        // Sincroniza com o "ao vivo" sempre que possível
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 5,
+        enableWorker: true,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
@@ -66,6 +82,10 @@ const HlsPlayer = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLoading(false);
+        // Pula direto pro ponto mais ao vivo
+        if (video.duration === Infinity || isNaN(video.duration)) {
+          // live stream — sem ação extra
+        }
       });
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
