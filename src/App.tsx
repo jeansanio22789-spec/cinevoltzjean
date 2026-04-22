@@ -14,6 +14,8 @@ import NotFound from "./pages/NotFound.tsx";
 import Live from "./pages/Live.tsx";
 import Account from "./pages/Account.tsx";
 import Watch from "./pages/Watch.tsx";
+import MaintenanceGate from "@/components/MaintenanceGate";
+import LiveThumbnail from "@/components/LiveThumbnail";
 
 
 const queryClient = new QueryClient();
@@ -26,17 +28,20 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/planos" element={<Pricing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/carreiras" element={<Careers />} />
-            <Route path="/ao-vivo" element={<Live />} />
-            <Route path="/minha-conta" element={<Account />} />
-            <Route path="/assistir/:id" element={<Watch />} />
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <MaintenanceGate>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/planos" element={<Pricing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/carreiras" element={<Careers />} />
+              <Route path="/ao-vivo" element={<Live />} />
+              <Route path="/minha-conta" element={<Account />} />
+              <Route path="/assistir/:id" element={<Watch />} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <LiveThumbnail />
+          </MaintenanceGate>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
