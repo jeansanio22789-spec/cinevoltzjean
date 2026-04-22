@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface AuthContextType {
   session: Session | null;
@@ -18,17 +19,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Verifica se o usuário está banido — se sim, faz signOut
+  const enforceBan = async (u: User | null) => {
+    if (!u) return;
+    setTimeout(async () => {
+      const { data } = await supabase.from("profiles").select("status").eq("id", u.id).maybeSingle();
+      if (data?.status === "Banido") {
+        toast.error("Sua conta foi banida. Entre em contato com o suporte.");
+        await supabase.auth.signOut();
+      }
+    }, 0);
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      enforceBan(session?.user ?? null);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      enforceBan(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
