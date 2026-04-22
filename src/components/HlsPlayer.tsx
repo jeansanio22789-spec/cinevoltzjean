@@ -675,6 +675,7 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
 
   return (
     <div
+      ref={ref}
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
       onContextMenu={(e) => e.preventDefault()}
       onCopy={(e) => e.preventDefault()}
@@ -839,6 +840,8 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
       )}
     </div>
   );
-};
+});
+
+HlsPlayer.displayName = "HlsPlayer";
 
 export default HlsPlayer;
