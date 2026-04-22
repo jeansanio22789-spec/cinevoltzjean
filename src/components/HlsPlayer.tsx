@@ -289,6 +289,21 @@ const HlsPlayer = ({
       let watchdogTimer: number | null = null;
       const maxSafariRetries = 3; // antes de mostrar erro / cair no fallback
 
+      const getBufferAhead = () => {
+        try {
+          if (video.buffered.length === 0) return 0;
+          const end = video.buffered.end(video.buffered.length - 1);
+          return Math.max(0, end - video.currentTime);
+        } catch {
+          return 0;
+        }
+      };
+
+      const markSafariProgress = () => {
+        lastProgressAtRef.current = Date.now();
+        if (!video.paused && video.currentTime > 0) syncPlaybackState(true);
+      };
+
       const tryLoad = () => {
         if (destroyed) return;
         // ⚠️ NÃO usa cache-buster: muda URL → reseta o player → loop infinito.
@@ -300,15 +315,19 @@ const HlsPlayer = ({
         if (watchdogTimer) window.clearTimeout(watchdogTimer);
         watchdogTimer = window.setTimeout(() => {
           if (destroyed) return;
-          if (video.readyState < 2) {
+          const bufferAhead = getBufferAhead();
+          const noRecentProgress = Date.now() - lastProgressAtRef.current > 6500;
+          const neverStarted = video.currentTime < 0.1 && video.readyState < 2 && bufferAhead < 0.2;
+          if (neverStarted || (noRecentProgress && bufferAhead < 0.2 && video.readyState < 2)) {
             console.warn("[HlsPlayer] Safari watchdog: stream não respondeu em 6s");
             onErr();
           }
-        }, 6000);
+        }, 6500);
       };
       const onLoaded = () => {
         if (destroyed) return;
         if (watchdogTimer) { window.clearTimeout(watchdogTimer); watchdogTimer = null; }
+        lastProgressAtRef.current = Date.now();
         setLoading(false);
         setError(null);
         safariRetries = 0;
@@ -321,8 +340,10 @@ const HlsPlayer = ({
       };
       const onErr = () => {
         if (destroyed) return;
+        const bufferAhead = getBufferAhead();
+        const hasRecentProgress = Date.now() - lastProgressAtRef.current < 4000;
         // Ignora erros enquanto o vídeo já está reproduzindo OK (eventos espúrios do Safari)
-        if (!video.paused && video.readyState >= 3 && video.currentTime > 0) return;
+        if (hasRecentProgress || (!video.paused && video.currentTime > 0.1 && bufferAhead > 0.2)) return;
         safariRetries += 1;
         if (retryTimer) window.clearTimeout(retryTimer);
         if (safariRetries < maxSafariRetries) {
@@ -338,6 +359,11 @@ const HlsPlayer = ({
         }
       };
       video.addEventListener("loadedmetadata", onLoaded);
+      video.addEventListener("loadeddata", markSafariProgress);
+      video.addEventListener("canplay", markSafariProgress);
+      video.addEventListener("playing", markSafariProgress);
+      video.addEventListener("timeupdate", markSafariProgress);
+      video.addEventListener("progress", markSafariProgress);
       video.addEventListener("error", onErr);
       // Cleanup específico para Safari path
       hlsRef.current = {
@@ -346,6 +372,11 @@ const HlsPlayer = ({
           if (retryTimer) window.clearTimeout(retryTimer);
           if (watchdogTimer) window.clearTimeout(watchdogTimer);
           video.removeEventListener("loadedmetadata", onLoaded);
+          video.removeEventListener("loadeddata", markSafariProgress);
+          video.removeEventListener("canplay", markSafariProgress);
+          video.removeEventListener("playing", markSafariProgress);
+          video.removeEventListener("timeupdate", markSafariProgress);
+          video.removeEventListener("progress", markSafariProgress);
           video.removeEventListener("error", onErr);
         },
       } as any;
@@ -430,6 +461,7 @@ const HlsPlayer = ({
         if (frag && typeof frag.programDateTime === "number" && typeof frag.start === "number") {
           pdtAnchorRef.current = { pdt: frag.programDateTime, mediaTime: frag.start };
         }
+        lastProgressAtRef.current = Date.now();
         setError(null);
         setLoading(false);
         if (!video.paused) syncPlaybackState(true);
@@ -631,16 +663,28 @@ const HlsPlayer = ({
         stuckCount = 0;
         return;
       }
-      const advanced = v.currentTime - lastTime > 0.05;
+      const bufferAhead = (() => {
+        try {
+          if (v.buffered.length === 0) return 0;
+          const end = v.buffered.end(v.buffered.length - 1);
+          return Math.max(0, end - v.currentTime);
+        } catch {
+          return 0;
+        }
+      })();
+      const advanced = v.currentTime - lastTime > 0.02;
       if (advanced) {
         lastTime = v.currentTime;
+        lastProgressAtRef.current = Date.now();
         stuckCount = 0;
       } else {
+        const noRecentProgress = Date.now() - lastProgressAtRef.current > 7000;
+        if (!noRecentProgress) return;
         stuckCount += 1;
         if (stuckCount === 3) {
           stepDownQuality("stall watchdog");
           try {
-            if (v.buffered.length > 0) {
+            if (bufferAhead > 0.15 && v.buffered.length > 0) {
               const end = v.buffered.end(v.buffered.length - 1);
               if (end > v.currentTime + 0.2) v.currentTime = v.currentTime + 0.1;
             }
@@ -650,10 +694,10 @@ const HlsPlayer = ({
         if (stuckCount === 6) {
           try { hlsRef.current?.startLoad(); } catch { /* noop */ }
         }
-        if (stuckCount >= 10) {
+        if (stuckCount >= 12) {
           stuckCount = 0;
           if (!tryFallback("watchdog stall")) {
-            setupPlayer();
+            if (!recoverPlayback("watchdog stall", true)) setupPlayer();
           }
         }
       }
