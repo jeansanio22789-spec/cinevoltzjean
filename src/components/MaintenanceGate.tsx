@@ -47,6 +47,8 @@ const MaintenanceGate = ({ children }: Props) => {
   // Admins, login e admin sempre passam
   const bypass =
     isAdmin ||
+    location.pathname === "/" ||
+    location.pathname.startsWith("/ao-vivo") ||
     location.pathname.startsWith("/admin") ||
     location.pathname.startsWith("/login");
 
