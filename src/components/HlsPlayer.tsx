@@ -40,7 +40,26 @@ interface HlsPlayerProps {
   onError?: (msg: string | null) => void;
 }
 
+/**
+ * Detecta Smart TVs Samsung (Tizen) e navegadores embutidos da Samsung.
+ * Esses aparelhos têm CPU/decoder fracos e rede instável → precisam de
+ * buffer maior, menos retries agressivos e sem low-latency mode.
+ */
+const detectSamsungTV = () => {
+  if (typeof navigator === "undefined") return { isSamsungTV: false, isTizen: false, isSamsungBrowser: false };
+  const ua = navigator.userAgent || "";
+  const isTizen = /Tizen/i.test(ua);
+  const isSamsungTV = isTizen || /SMART-TV|SmartTV|SamsungBrowser.*TV|Maple/i.test(ua);
+  const isSamsungBrowser = /SamsungBrowser/i.test(ua);
+  return { isSamsungTV, isTizen, isSamsungBrowser };
+};
+
 const shouldUseNativeHls = (video: HTMLVideoElement) => {
+  // Samsung Tizen tem HLS nativo MUITO mais estável que hls.js (decoder de hardware).
+  // Sempre que o canPlayType disser que sim, usamos nativo.
+  const { isSamsungTV } = detectSamsungTV();
+  if (isSamsungTV && video.canPlayType("application/vnd.apple.mpegurl")) return true;
+
   if (!video.canPlayType("application/vnd.apple.mpegurl")) return false;
   if (typeof navigator === "undefined") return true;
 
