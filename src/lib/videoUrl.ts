@@ -1,0 +1,59 @@
+/**
+ * Converte qualquer URL de vídeo (YouTube, Vimeo, Google Drive, link direto)
+ * em um formato pronto para reprodução automática (embed ou player HTML5).
+ */
+export type VideoSource =
+  | { kind: "iframe"; url: string }
+  | { kind: "video"; url: string }
+  | { kind: "unknown"; url: string };
+
+export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSource | null => {
+  if (!rawUrl) return null;
+  const url = rawUrl.trim();
+  if (!url) return null;
+
+  // YouTube
+  const yt = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/
+  );
+  if (yt) {
+    return {
+      kind: "iframe",
+      url: `https://www.youtube.com/embed/${yt[1]}?autoplay=1&rel=0&modestbranding=1&playsinline=1`,
+    };
+  }
+
+  // Vimeo
+  const vm = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vm) {
+    return {
+      kind: "iframe",
+      url: `https://player.vimeo.com/video/${vm[1]}?autoplay=1&playsinline=1`,
+    };
+  }
+
+  // Google Drive
+  const gd = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+  if (gd) {
+    return {
+      kind: "iframe",
+      url: `https://drive.google.com/file/d/${gd[1]}/preview`,
+    };
+  }
+
+  // Link direto de vídeo (mp4, webm, mov, m3u8)
+  if (/\.(mp4|webm|mov|m4v|ogg|m3u8)(\?.*)?$/i.test(url)) {
+    return { kind: "video", url };
+  }
+
+  // Storage do Supabase (geralmente .mp4) — tenta como vídeo
+  if (url.includes("supabase.co/storage")) {
+    return { kind: "video", url };
+  }
+
+  return { kind: "unknown", url };
+};
+
+export const buildShareLink = (movieId: string): string => {
+  return `${window.location.origin}/assistir/${movieId}`;
+};

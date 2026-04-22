@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { buildShareLink } from "@/lib/videoUrl";
 
 interface Movie {
   id: string;
@@ -187,19 +188,36 @@ const AdminMovies = () => {
                     {movie.video_url}
                   </p>
                 )}
-                <div className="flex items-center justify-end gap-1 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center justify-between gap-1 mt-3">
                   <button
-                    onClick={(e) => { e.stopPropagation(); openEdit(movie); }}
-                    className="p-1.5 hover:bg-muted rounded transition-colors"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const link = buildShareLink(movie.id);
+                      try {
+                        await navigator.clipboard.writeText(link);
+                        toast.success("Link copiado!", { description: link });
+                      } catch {
+                        toast.error("Não foi possível copiar");
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded transition-colors"
                   >
-                    <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Share2 className="w-3.5 h-3.5" /> Copiar link
                   </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(movie.id); }}
-                    className="p-1.5 hover:bg-destructive/20 rounded transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                  </button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEdit(movie); }}
+                      className="p-1.5 hover:bg-muted rounded transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(movie.id); }}
+                      className="p-1.5 hover:bg-destructive/20 rounded transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
