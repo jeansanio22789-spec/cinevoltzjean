@@ -158,12 +158,12 @@ const HlsPlayer = ({
         maxBufferLength: lowQuality ? 10 : aggressiveNetwork ? 90 : 45,
         maxMaxBufferLength: lowQuality ? 20 : aggressiveNetwork ? 180 : 90,
         maxBufferSize: lowQuality ? 15 * 1000 * 1000 : aggressiveNetwork ? 180 * 1000 * 1000 : 90 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 1,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 10,
+        maxBufferHole: 1.0, // tolera buracos maiores no stream
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 20, // mais tentativas de pular adiante
         startFragPrefetch: !lowQuality,
-        maxStarvationDelay: aggressiveNetwork ? 12 : 6,
+        maxStarvationDelay: aggressiveNetwork ? 20 : 10, // espera mais antes de desistir
 
         // ABR: thumbnail começa baixo, player principal começa automático
         startLevel: lowQuality ? 0 : -1,
@@ -171,23 +171,25 @@ const HlsPlayer = ({
         abrBandWidthFactor: 0.9,
         abrBandWidthUpFactor: 0.7,
         liveSyncOnStallIncrease: aggressiveNetwork ? 1.5 : 1,
-        maxLiveSyncPlaybackRate: aggressiveNetwork ? 1.5 : 1,
+        maxLiveSyncPlaybackRate: aggressiveNetwork ? 1.5 : 1.2,
         preserveManualLevelOnError: false,
         fpsDroppedMonitoringPeriod: 3000,
         fpsDroppedMonitoringThreshold: 0.15,
 
-        // Retentativas agressivas
-        fragLoadingMaxRetry: aggressiveNetwork ? 12 : 8,
-        fragLoadingRetryDelay: 300,
-        fragLoadingMaxRetryTimeout: 30000,
-        manifestLoadingMaxRetry: aggressiveNetwork ? 12 : 8,
-        manifestLoadingRetryDelay: 300,
-        levelLoadingMaxRetry: aggressiveNetwork ? 12 : 8,
-        levelLoadingRetryDelay: 300,
+        // Retentativas MUITO agressivas (servidor JMV-Stream oscila)
+        fragLoadingMaxRetry: 20,
+        fragLoadingRetryDelay: 200,
+        fragLoadingMaxRetryTimeout: 60000,
+        manifestLoadingMaxRetry: 20,
+        manifestLoadingRetryDelay: 200,
+        manifestLoadingMaxRetryTimeout: 60000,
+        levelLoadingMaxRetry: 20,
+        levelLoadingRetryDelay: 200,
+        levelLoadingMaxRetryTimeout: 60000,
 
-        // Live: 4 segments do edge (estável)
-        liveSyncDurationCount: 4,
-        liveMaxLatencyDurationCount: 12,
+        // Live: mais distância da edge = mais buffer pra resistir
+        liveSyncDurationCount: aggressiveNetwork ? 6 : 4,
+        liveMaxLatencyDurationCount: 20,
         liveDurationInfinity: true,
 
         enableWorker: true,
