@@ -259,7 +259,7 @@ const Live = () => {
             </div>
           ) : isHls(playUrl) ? (
             <HlsPlayer
-              key={selected?.id || "fallback"}
+              key={`${selected?.id || "fallback"}-${retryNonce}`}
               src={playUrl}
               fallbackSrc={
                 // Só usa o fallback do PRÓPRIO canal (ou o link único antigo das settings).
@@ -271,6 +271,7 @@ const Live = () => {
               tvMode={tvMode}
               aggressiveNetwork
               showSyncIndicator
+              onError={handlePlayerError}
             />
           ) : (
             <iframe
