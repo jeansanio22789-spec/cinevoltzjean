@@ -193,9 +193,37 @@ const Live = () => {
   // satélite E o usuário está em rede móvel ou conexão lenta.
   const network = useNetworkProfile();
   const satelliteMode = useMemo(
-    () => signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData),
-    [signalSource.kind, network.isMobile, network.isSlow, network.saveData]
+    () =>
+      forceSatMode ||
+      (signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData)),
+    [forceSatMode, signalSource.kind, network.isMobile, network.isSlow, network.saveData]
   );
+
+  // 🛰️ Força varredura de canais SAT: recarrega lista do banco, prioriza
+  // canais marcados como satélite, força reconexão do player e ativa Modo SAT.
+  const forceSatScan = useCallback(async () => {
+    setSatScanning(true);
+    setSatScanMsg("Buscando canais via satélite...");
+    try {
+      const list = await load();
+      const satChannels = (list || []).filter((c) => detectSignalSource(c.stream_url).kind === "satellite");
+      if (satChannels.length > 0) {
+        setSelectedId(satChannels[0].id);
+        setSatScanMsg(`✅ ${satChannels.length} canal(is) SAT encontrado(s) — sintonizando "${satChannels[0].name}"`);
+      } else if ((list || []).length > 0) {
+        setSatScanMsg(`⚠️ Nenhum canal SAT detectado — forçando Modo SAT no canal atual`);
+      } else {
+        setSatScanMsg("❌ Nenhum canal cadastrado. Adicione em Admin → Canais.");
+      }
+      setForceSatMode(true);
+      setRetryNonce((n) => n + 1);
+    } catch (e: any) {
+      setSatScanMsg(`Erro ao buscar: ${e?.message || "falha desconhecida"}`);
+    } finally {
+      setSatScanning(false);
+      setTimeout(() => setSatScanMsg(null), 5000);
+    }
+  }, [load]);
 
   const copyDiagnostics = useCallback(() => {
     const lines = [
