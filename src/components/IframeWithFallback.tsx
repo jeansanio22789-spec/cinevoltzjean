@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Play } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Play } from "lucide-react";
 
 interface Props {
   src: string;
@@ -9,25 +10,28 @@ interface Props {
 
 /**
  * Iframe que detecta automaticamente quando a página externa bloqueia embed
- * (X-Frame-Options / CSP frame-ancestors) e mostra um botão discreto para
- * abrir o player oficial em nova aba — sem mensagens de erro nem aviso de
- * retransmissão.
+ * (X-Frame-Options / CSP frame-ancestors) e mostra um botão para abrir o
+ * conteúdo dentro do app via /externo, sem nova aba e sem aviso de origem.
  */
 const IframeWithFallback = ({ src, title, poster }: Props) => {
   const ref = useRef<HTMLIFrameElement>(null);
+  const navigate = useNavigate();
   const [blocked, setBlocked] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setBlocked(false);
     setLoaded(false);
-    // Se em 4s o iframe não disparar onLoad, presumimos bloqueio
     const t = setTimeout(() => {
       if (!loaded) setBlocked(true);
     }, 4000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
+
+  const openInternal = () => {
+    navigate(`/externo?url=${encodeURIComponent(src)}&title=${encodeURIComponent(title)}`);
+  };
 
   if (blocked) {
     return (
@@ -47,16 +51,13 @@ const IframeWithFallback = ({ src, title, poster }: Props) => {
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
         <div className="relative z-10 flex flex-col items-center gap-4 text-center px-6">
           <h2 className="text-white text-xl font-bold">{title}</h2>
-          <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={openInternal}
             className="flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-bold text-sm hover:bg-primary/90 transition-colors shadow-lg"
           >
             <Play className="w-4 h-4 fill-current" />
             Assistir agora
-            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-          </a>
+          </button>
         </div>
       </div>
     );
