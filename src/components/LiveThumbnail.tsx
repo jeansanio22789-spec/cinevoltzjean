@@ -85,7 +85,7 @@ const LiveThumbnail = () => {
         <div className="relative aspect-video bg-black cursor-pointer" onClick={openLive}>
           {isHls(streamUrl) ? (
             <div className="pointer-events-none w-full h-full">
-              <HlsPlayer src={streamUrl} autoPlay nativeControls={false} />
+              <HlsPlayer src={streamUrl} autoPlay nativeControls={false} lowQuality />
             </div>
           ) : streamUrl ? (
             <iframe
