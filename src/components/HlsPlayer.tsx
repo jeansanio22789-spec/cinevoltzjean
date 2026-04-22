@@ -54,6 +54,7 @@ const HlsPlayer = ({
   lowQuality = false,
   aggressiveNetwork = false,
   showSyncIndicator = false,
+  onError,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
