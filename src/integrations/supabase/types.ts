@@ -127,6 +127,45 @@ export type Database = {
         }
         Relationships: []
       }
+      login_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          device_id: string
+          device_label: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          status: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          device_id: string
+          device_label?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          status?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          device_id?: string
+          device_label?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          status?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       movies: {
         Row: {
           created_at: string
@@ -376,7 +415,12 @@ export type Database = {
         Args: { _status: string; _target: string }
         Returns: boolean
       }
+      check_admin_login_status: { Args: { _request_id: string }; Returns: Json }
       consume_access_token: { Args: { _token: string }; Returns: undefined }
+      decide_admin_login: {
+        Args: { _decision: string; _request_id: string }
+        Returns: Json
+      }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -393,6 +437,10 @@ export type Database = {
       }
       register_admin_device: {
         Args: { _device_id: string; _label: string; _ua: string }
+        Returns: Json
+      }
+      request_admin_login: {
+        Args: { _device_id: string; _device_label: string; _user_agent: string }
         Returns: Json
       }
     }
