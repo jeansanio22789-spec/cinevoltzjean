@@ -120,18 +120,32 @@ const HlsPlayer = ({
       hlsRef.current = null;
     }
 
-    // Safari (iOS/macOS) → HLS nativo
+    // Safari (iOS/macOS) → HLS nativo, com auto-retry silencioso
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = activeSrc;
-      const onLoaded = () => setLoading(false);
+      let safariRetries = 0;
+      const maxSafariRetries = 5;
+      const tryLoad = () => {
+        // cache-buster para forçar re-fetch da playlist
+        const sep = activeSrc.includes("?") ? "&" : "?";
+        video.src = safariRetries === 0 ? activeSrc : `${activeSrc}${sep}_t=${Date.now()}`;
+        try { video.load(); } catch { /* noop */ }
+      };
+      const onLoaded = () => { setLoading(false); setError(null); safariRetries = 0; };
       const onErr = () => {
-        if (!tryFallback("safari error")) {
-          setError("Stream indisponível no momento.");
-          setLoading(false);
+        safariRetries += 1;
+        if (safariRetries < maxSafariRetries) {
+          // Reconexão silenciosa em background — não mostra erro ainda
+          setTimeout(tryLoad, 600 * safariRetries);
+        } else if (!tryFallback("safari error after retries")) {
+          setError("Reconectando…");
+          setLoading(true);
+          // Continua tentando em background mesmo após mostrar mensagem
+          setTimeout(() => { safariRetries = 0; tryLoad(); }, 3000);
         }
       };
-      video.addEventListener("loadedmetadata", onLoaded, { once: true });
-      video.addEventListener("error", onErr, { once: true });
+      video.addEventListener("loadedmetadata", onLoaded);
+      video.addEventListener("error", onErr);
+      tryLoad();
       return;
     }
 
