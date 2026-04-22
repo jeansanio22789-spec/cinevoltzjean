@@ -17,16 +17,18 @@ Deno.serve(async (req) => {
 
   try {
     const MP_TOKEN_RAW = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
-    if (!MP_TOKEN_RAW) throw new Error("MERCADO_PAGO_ACCESS_TOKEN ausente");
-    // Remove espaços, quebras de linha e aspas que podem ter sido coladas junto
+    if (!MP_TOKEN_RAW) throw new Error("Token do Mercado Pago não configurado.");
+
     const MP_TOKEN = MP_TOKEN_RAW.trim().replace(/^["']|["']$/g, "");
-    console.log("MP token diag:", {
-      length: MP_TOKEN.length,
-      prefix: MP_TOKEN.substring(0, 8),
-      hasSpaces: /\s/.test(MP_TOKEN_RAW),
-      startsWithAppUsr: MP_TOKEN.startsWith("APP_USR-"),
-      startsWithTest: MP_TOKEN.startsWith("TEST-"),
-    });
+    const validPrefix = MP_TOKEN.startsWith("APP_USR-") || MP_TOKEN.startsWith("TEST-");
+
+    if (!MP_TOKEN || MP_TOKEN.length < 40 || !validPrefix) {
+      console.error("MP token inválido", {
+        length: MP_TOKEN.length,
+        prefix: MP_TOKEN.substring(0, 8),
+      });
+      throw new Error("O token do Mercado Pago salvo está inválido. Cadastre o Access Token correto em vez de Client Secret ou Public Key.");
+    }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
