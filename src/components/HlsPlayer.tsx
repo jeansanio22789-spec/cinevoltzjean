@@ -36,6 +36,8 @@ interface HlsPlayerProps {
    * (modo PDT/borda) e o drift atual em segundos.
    */
   showSyncIndicator?: boolean;
+  /** Notifica o componente pai quando o player troca para estado de erro/recuperação */
+  onError?: (msg: string | null) => void;
 }
 
 /**
