@@ -32,6 +32,12 @@ interface HlsPlayerProps {
    */
   aggressiveNetwork?: boolean;
   /**
+   * Modo SAT: canal via satélite + rede móvel/lenta. Buffer EXTRA grande,
+   * qualidade reduzida automaticamente, retries mais espaçados — reduz
+   * travamentos quando o sinal vem de uplink + 4G/3G.
+   */
+  satelliteMode?: boolean;
+  /**
    * Mostra um pequeno HUD com o status da sincronização por hora real
    * (modo PDT/borda) e o drift atual em segundos.
    */
@@ -86,6 +92,7 @@ const HlsPlayer = ({
   tvMode = false,
   lowQuality = false,
   aggressiveNetwork = false,
+  satelliteMode = false,
   showSyncIndicator = false,
   onError,
 }: HlsPlayerProps) => {
@@ -328,6 +335,16 @@ const HlsPlayer = ({
       return;
     }
 
+    // 🛰️ Modo SAT: limita à metade inferior das qualidades pra economizar dados
+    // móveis e evitar travamentos (ex.: em 5 níveis, cap = 2)
+    if (satelliteMode) {
+      const satCap = Math.max(0, Math.floor(topLevel / 2));
+      hls.autoLevelCapping = satCap;
+      hls.nextAutoLevel = 0;
+      hls.capLevelToPlayerSize = true;
+      return;
+    }
+
     hls.autoLevelCapping = topLevel;
     hls.nextAutoLevel = (tvMode || aggressiveNetwork) ? topLevel : Math.min(topLevel, 1);
     hls.capLevelToPlayerSize = !tvMode && !aggressiveNetwork;
@@ -461,50 +478,51 @@ const HlsPlayer = ({
 
       const hls = new Hls({
         // ⚡ Baixa latência REAL: todos os aparelhos ficam no mesmo segundo
-        // (desligado no Samsung — o decoder não dá conta e gera reconexões)
-        lowLatencyMode: !samsungTune,
-        backBufferLength: samsungTune ? 60 : (lowQuality ? 8 : 30),
-        maxBufferLength: samsungTune ? 60 : (lowQuality ? 12 : 30),
-        maxMaxBufferLength: samsungTune ? 120 : (lowQuality ? 24 : 60),
-        maxBufferSize: samsungTune ? 120 * 1000 * 1000 : (lowQuality ? 30 * 1000 * 1000 : 60 * 1000 * 1000),
-        maxBufferHole: samsungTune ? 2 : 1,
-        highBufferWatchdogPeriod: samsungTune ? 4 : 2,
+        // (desligado no Samsung E no Modo SAT — ambos precisam de estabilidade > latência)
+        lowLatencyMode: !samsungTune && !satelliteMode,
+        // 🛰️ Modo SAT: buffer ENORME (90s+) pra absorver oscilações de 4G/3G
+        backBufferLength: satelliteMode ? 90 : (samsungTune ? 60 : (lowQuality ? 8 : 30)),
+        maxBufferLength: satelliteMode ? 90 : (samsungTune ? 60 : (lowQuality ? 12 : 30)),
+        maxMaxBufferLength: satelliteMode ? 180 : (samsungTune ? 120 : (lowQuality ? 24 : 60)),
+        maxBufferSize: satelliteMode ? 180 * 1000 * 1000 : (samsungTune ? 120 * 1000 * 1000 : (lowQuality ? 30 * 1000 * 1000 : 60 * 1000 * 1000)),
+        maxBufferHole: satelliteMode ? 3 : (samsungTune ? 2 : 1),
+        highBufferWatchdogPeriod: satelliteMode ? 6 : (samsungTune ? 4 : 2),
         nudgeOffset: 0.2,
         nudgeMaxRetry: 30,
         startFragPrefetch: !lowQuality,
-        maxStarvationDelay: samsungTune ? 12 : 8,
+        maxStarvationDelay: satelliteMode ? 20 : (samsungTune ? 12 : 8),
 
-        // ABR — Samsung começa baixo pra não engasgar o decoder
-        startLevel: samsungTune ? 0 : (lowQuality ? 0 : -1),
-        abrEwmaDefaultEstimate: aggressiveNetwork ? 5_000_000 : 1_000_000,
-        abrBandWidthFactor: 0.85,
-        abrBandWidthUpFactor: samsungTune ? 0.4 : 0.6,
+        // ABR — Modo SAT começa baixo e sobe devagar (poupa dados móveis)
+        startLevel: satelliteMode ? 0 : (samsungTune ? 0 : (lowQuality ? 0 : -1)),
+        abrEwmaDefaultEstimate: satelliteMode ? 600_000 : (aggressiveNetwork ? 5_000_000 : 1_000_000),
+        abrBandWidthFactor: satelliteMode ? 0.7 : 0.85,
+        abrBandWidthUpFactor: satelliteMode ? 0.3 : (samsungTune ? 0.4 : 0.6),
 
         // 🔑 Live: tolerante a jitter da rede (sem aceleração brusca)
-        liveSyncDurationCount: samsungTune ? 6 : 3,
-        liveMaxLatencyDurationCount: samsungTune ? 18 : 10,
+        liveSyncDurationCount: satelliteMode ? 8 : (samsungTune ? 6 : 3),
+        liveMaxLatencyDurationCount: satelliteMode ? 24 : (samsungTune ? 18 : 10),
         liveDurationInfinity: true,
         liveSyncOnStallIncrease: 1,
-        maxLiveSyncPlaybackRate: samsungTune ? 1.0 : 1.1,
+        maxLiveSyncPlaybackRate: (satelliteMode || samsungTune) ? 1.0 : 1.1,
         preserveManualLevelOnError: false,
         fpsDroppedMonitoringPeriod: 5000,
         fpsDroppedMonitoringThreshold: 0.2,
 
-        // Retentativas (servidor JMV-Stream oscila)
-        fragLoadingMaxRetry: 30,
-        fragLoadingRetryDelay: samsungTune ? 600 : 300,
-        fragLoadingMaxRetryTimeout: 90000,
-        manifestLoadingMaxRetry: 30,
-        manifestLoadingRetryDelay: samsungTune ? 600 : 300,
-        manifestLoadingMaxRetryTimeout: 90000,
-        levelLoadingMaxRetry: 30,
-        levelLoadingRetryDelay: samsungTune ? 600 : 300,
-        levelLoadingMaxRetryTimeout: 90000,
+        // Retentativas — Modo SAT espera mais entre tentativas (rede móvel oscila)
+        fragLoadingMaxRetry: satelliteMode ? 40 : 30,
+        fragLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
+        fragLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
+        manifestLoadingMaxRetry: satelliteMode ? 40 : 30,
+        manifestLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
+        manifestLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
+        levelLoadingMaxRetry: satelliteMode ? 40 : 30,
+        levelLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
+        levelLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
 
         enableWorker: !samsungTune, // worker no Tizen pode dar problemas
-        capLevelToPlayerSize: samsungTune || !tvMode,
+        capLevelToPlayerSize: satelliteMode || samsungTune || !tvMode,
         testBandwidth: !lowQuality,
-        progressive: !samsungTune,
+        progressive: !samsungTune && !satelliteMode,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -618,7 +636,7 @@ const HlsPlayer = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSrc, tvMode, lowQuality, aggressiveNetwork]);
+  }, [activeSrc, tvMode, lowQuality, aggressiveNetwork, satelliteMode]);
 
   // Força tentativa de play (mudo) sempre que possível
   useEffect(() => {

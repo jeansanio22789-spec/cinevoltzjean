@@ -1,9 +1,10 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite } from "lucide-react";
+import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite, Wifi, Signal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLiveViewers, useLiveViewersMulti } from "@/hooks/useLiveViewers";
+import { useNetworkProfile } from "@/hooks/useNetworkProfile";
 import LiveClockSignal from "@/components/LiveClockSignal";
 import { detectSignalSource, signalSourceClass } from "@/lib/signalSource";
 
@@ -185,6 +186,14 @@ const Live = () => {
   // 🛰️ Detecta origem do sinal (Satélite / IPTV / CDN / Web) pela URL ativa
   const signalSource = useMemo(() => detectSignalSource(playUrl), [playUrl]);
 
+  // 📡 Perfil de rede (Wi-Fi vs 4G/3G) — ativa "Modo SAT" quando o canal é
+  // satélite E o usuário está em rede móvel ou conexão lenta.
+  const network = useNetworkProfile();
+  const satelliteMode = useMemo(
+    () => signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData),
+    [signalSource.kind, network.isMobile, network.isSlow, network.saveData]
+  );
+
   const copyDiagnostics = useCallback(() => {
     const lines = [
       `Canal: ${playTitle}`,
@@ -232,6 +241,15 @@ const Live = () => {
             >
               <Satellite className="w-3 h-3" />
               {signalSource.label}
+            </span>
+          )}
+          {satelliteMode && (
+            <span
+              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border bg-accent/15 text-accent border-accent/40 animate-pulse"
+              title={`Modo SAT ativo — buffer otimizado para rede ${network.isMobile ? "móvel" : "lenta"} (${network.effectiveType !== "unknown" ? network.effectiveType.toUpperCase() : "rede instável"})`}
+            >
+              <Signal className="w-3 h-3" />
+              MODO SAT
             </span>
           )}
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
@@ -282,7 +300,8 @@ const Live = () => {
               }
               autoPlay
               tvMode={tvMode}
-              aggressiveNetwork
+              aggressiveNetwork={!satelliteMode}
+              satelliteMode={satelliteMode}
               onError={handlePlayerError}
             />
           ) : (
