@@ -112,6 +112,35 @@ const Live = () => {
   const playTitle = selected?.name || fallbackTitle;
   const hasContent = !!playUrl;
 
+  // Toggle modo TV: alterna fullscreen no container do player
+  const toggleTvMode = useCallback(async () => {
+    const el = playerWrapRef.current;
+    if (!el) return;
+    try {
+      if (!document.fullscreenElement) {
+        setTvMode(true);
+        if (el.requestFullscreen) await el.requestFullscreen();
+        // @ts-ignore — Safari
+        else if ((el as any).webkitRequestFullscreen) (el as any).webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        setTvMode(false);
+      }
+    } catch {
+      // alguns navegadores bloqueiam — só ativa o HUD mínimo
+      setTvMode((v) => !v);
+    }
+  }, []);
+
+  // Sincroniza estado quando o usuário sai do fullscreen pelo ESC
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement) setTvMode(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -121,12 +150,20 @@ const Live = () => {
             <Radio className="w-3.5 h-3.5" /> AO VIVO
           </span>
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
-          <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider hidden sm:inline">
-            Transmissão exclusiva
-          </span>
+          <button
+            onClick={toggleTvMode}
+            className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
+            aria-label={tvMode ? "Sair do modo TV" : "Ativar modo TV"}
+          >
+            {tvMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+            {tvMode ? "Sair TV" : "Modo TV"}
+          </button>
         </div>
 
-        <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
+        <div
+          ref={playerWrapRef}
+          className={`relative rounded-xl overflow-hidden bg-black ${tvMode ? "fixed inset-0 z-[100] rounded-none" : "aspect-video"}`}
+        >
           {!hasContent ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
               <Tv className="w-12 h-12 text-muted-foreground" />
@@ -135,7 +172,7 @@ const Live = () => {
               </p>
             </div>
           ) : isHls(playUrl) ? (
-            <HlsPlayer key={playUrl} src={playUrl} autoPlay />
+            <HlsPlayer key={`${playUrl}-${tvMode}`} src={playUrl} autoPlay tvMode={tvMode} />
           ) : (
             <iframe
               src={playUrl}
@@ -145,6 +182,15 @@ const Live = () => {
               referrerPolicy="strict-origin-when-cross-origin"
               title={playTitle}
             />
+          )}
+          {tvMode && (
+            <button
+              onClick={toggleTvMode}
+              className="absolute top-3 left-3 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
+              aria-label="Sair do modo TV"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </button>
           )}
         </div>
 
