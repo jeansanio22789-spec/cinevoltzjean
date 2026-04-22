@@ -112,7 +112,7 @@ const LiveClockSignal = forwardRef<HTMLSpanElement, Props>(({ size = "sm" }, _re
   const iconSize = size === "mini" ? "w-2.5 h-2.5" : "w-3 h-3";
 
   return (
-    <div className="flex items-center gap-1">
+    <div ref={_ref as any} className="flex items-center gap-1">
       <span
         className={`flex items-center gap-1 ${padding} rounded-full bg-card border border-border text-foreground font-bold tabular-nums`}
         title="Hora ao vivo"
@@ -138,6 +138,8 @@ const LiveClockSignal = forwardRef<HTMLSpanElement, Props>(({ size = "sm" }, _re
       </span>
     </div>
   );
-};
+});
+
+LiveClockSignal.displayName = "LiveClockSignal";
 
 export default LiveClockSignal;
