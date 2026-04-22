@@ -403,7 +403,7 @@ const Live = () => {
           />
         )}
         {diagOpen && hasContent && !isHls(playUrl) && (
-          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+          <div className="mt-3 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
             ⚠️ Diagnóstico técnico só disponível para streams HLS (.m3u8). Este canal usa iframe externo.
           </div>
         )}
