@@ -13,6 +13,11 @@ interface HlsPlayerProps {
   nativeControls?: boolean;
   /** Classe CSS extra */
   className?: string;
+  /**
+   * Modo TV: HUD mínimo (só badge AO VIVO discreto), trava na maior qualidade,
+   * ignora cliques de pausa, sem controles flutuantes.
+   */
+  tvMode?: boolean;
 }
 
 /**
@@ -26,6 +31,7 @@ const HlsPlayer = ({
   autoPlay = true,
   nativeControls = false,
   className = "",
+  tvMode = false,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -57,24 +63,20 @@ const HlsPlayer = ({
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
       const hls = new Hls({
-        // Baixa latência (delay mínimo possível em HLS)
         lowLatencyMode: true,
-        // Buffer mais agressivo: começa a tocar logo, mantém pouco backbuffer
         backBufferLength: 10,
         maxBufferLength: 15,
         maxMaxBufferLength: 30,
-        // Inicia já com a maior qualidade disponível
         startLevel: -1,
-        // ABR otimizado pra rede instável
         abrEwmaDefaultEstimate: 1_000_000,
-        // Recuperação automática de erros
         fragLoadingMaxRetry: 6,
         manifestLoadingMaxRetry: 6,
         levelLoadingMaxRetry: 6,
-        // Sincroniza com o "ao vivo" sempre que possível
         liveSyncDurationCount: 2,
         liveMaxLatencyDurationCount: 5,
         enableWorker: true,
+        // Modo TV: capacidade alta para não cair de qualidade
+        capLevelToPlayerSize: !tvMode,
       });
       hlsRef.current = hls;
       hls.loadSource(src);
@@ -82,9 +84,11 @@ const HlsPlayer = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLoading(false);
-        // Pula direto pro ponto mais ao vivo
-        if (video.duration === Infinity || isNaN(video.duration)) {
-          // live stream — sem ação extra
+        // Em modo TV: trava na maior qualidade disponível
+        if (tvMode && hls.levels && hls.levels.length > 0) {
+          const topLevel = hls.levels.length - 1;
+          hls.currentLevel = topLevel;
+          hls.nextLevel = topLevel;
         }
       });
 
@@ -122,7 +126,7 @@ const HlsPlayer = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src]);
+  }, [src, tvMode]);
 
   // Força tentativa de play (mudo) sempre que possível
   useEffect(() => {
@@ -143,12 +147,26 @@ const HlsPlayer = ({
     return () => clearInterval(id);
   }, [src, autoPlay]);
 
+  // Em modo TV: nunca deixa pausado — se o usuário pausar de qualquer jeito, retoma
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !tvMode) return;
+    const onPause = () => {
+      // Pequeno delay para não brigar com troca de fonte
+      setTimeout(() => {
+        if (v.paused) v.play().catch(() => {});
+      }, 50);
+    };
+    v.addEventListener("pause", onPause);
+    return () => v.removeEventListener("pause", onPause);
+  }, [tvMode, src]);
+
   const handlePlay = () => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
       v.play().catch(() => { /* autoplay blocked */ });
-    } else {
+    } else if (!tvMode) {
       v.pause();
     }
   };
@@ -228,8 +246,24 @@ const HlsPlayer = ({
         </div>
       )}
 
-      {/* Custom controls — só volume e tela cheia */}
-      {!nativeControls && !error && (
+      {/* HUD mínimo do modo TV: só badge AO VIVO discreto + mudo invisível por hover */}
+      {tvMode && !error && (
+        <>
+          <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/40 backdrop-blur-sm text-[10px] uppercase tracking-wider font-bold text-white/90 px-2 py-1 rounded-full pointer-events-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" /> AO VIVO
+          </div>
+          <button
+            onClick={toggleMute}
+            className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity"
+            aria-label={muted ? "Ativar som" : "Silenciar"}
+          >
+            {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        </>
+      )}
+
+      {/* Controles padrão — só volume e tela cheia (oculto no modo TV) */}
+      {!nativeControls && !error && !tvMode && (
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex items-center gap-2 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <button
             onClick={toggleMute}
