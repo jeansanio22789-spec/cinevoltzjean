@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Search, Bell, User, Menu, X } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navLinks = [
   { label: "Início", path: "/" },
@@ -16,6 +17,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isAdmin } = useIsAdmin();
+  const { user } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -67,7 +69,11 @@ const Navbar = () => {
             Painel Admin
           </Link>
         )}
-        <Link to="/login" className="text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          to={user ? "/minha-conta" : "/login"}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={user ? "Minha conta" : "Entrar"}
+        >
           <User className="w-5 h-5" />
         </Link>
         <button
@@ -98,6 +104,15 @@ const Navbar = () => {
             >
               Assinar Agora
             </Link>
+            {user && (
+              <Link
+                to="/minha-conta"
+                className="inline-flex items-center justify-center px-4 py-2 border border-border text-sm font-medium rounded"
+                onClick={() => setMobileOpen(false)}
+              >
+                Minha Conta
+              </Link>
+            )}
             {isAdmin && (
               <Link
                 to="/admin"
