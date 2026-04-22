@@ -1222,8 +1222,6 @@ const HlsPlayer = ({
       )}
     </div>
   );
-});
-
-HlsPlayer.displayName = "HlsPlayer";
+};
 
 export default HlsPlayer;
