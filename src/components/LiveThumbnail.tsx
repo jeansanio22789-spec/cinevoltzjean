@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Radio, X, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import HlsPlayer from "@/components/HlsPlayer";
+import LiveClockSignal from "@/components/LiveClockSignal";
 
 const isHls = (url: string) => /\.m3u8(\?.*)?$/i.test(url || "");
 
@@ -58,9 +59,12 @@ const LiveThumbnail = () => {
       }`}
     >
       <div className="relative bg-black rounded-xl overflow-hidden border-2 border-primary/40 ring-1 ring-black/40">
-        {/* Live badge */}
-        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-destructive text-destructive-foreground text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">
-          <Radio className="w-3 h-3" /> {title}
+        {/* Live badge + relógio + sinal */}
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 flex-wrap max-w-[calc(100%-80px)]">
+          <span className="flex items-center gap-1 bg-destructive text-destructive-foreground text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">
+            <Radio className="w-3 h-3" /> {title}
+          </span>
+          <LiveClockSignal size="mini" />
         </div>
 
         {/* Controls */}
