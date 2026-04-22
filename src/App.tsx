@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound.tsx";
 import Live from "./pages/Live.tsx";
 import Account from "./pages/Account.tsx";
 import Watch from "./pages/Watch.tsx";
+import ExternalView from "./pages/ExternalView.tsx";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import LiveThumbnail from "@/components/LiveThumbnail";
 
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/ao-vivo" element={<Live />} />
               <Route path="/minha-conta" element={<Account />} />
               <Route path="/assistir/:id" element={<Watch />} />
+              <Route path="/externo" element={<ExternalView />} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
