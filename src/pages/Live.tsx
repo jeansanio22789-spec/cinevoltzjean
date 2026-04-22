@@ -47,13 +47,31 @@ const Live = () => {
       ]);
 
       const list = (chanRes.data || []) as Channel[];
-      setChannels(list);
+      // Atualização ESTÁVEL: só substitui se algo realmente mudou (preserva referências
+      // dos canais inalterados → não força remount do <HlsPlayer>).
+      setChannels((prev) => {
+        if (prev.length !== list.length) return list;
+        const same = prev.every((p, i) => {
+          const n = list[i];
+          return n && p.id === n.id &&
+            p.stream_url === n.stream_url &&
+            p.fallback_url === n.fallback_url &&
+            p.name === n.name &&
+            p.logo_url === n.logo_url &&
+            p.category === n.category &&
+            p.sort_order === n.sort_order &&
+            p.is_active === n.is_active;
+        });
+        return same ? prev : list;
+      });
       setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
 
       const map: Record<string, string> = {};
       (settingsRes.data || []).forEach((s: any) => { map[s.key] = s.value; });
-      setFallbackUrl(map.live_stream_url || "");
-      if (map.live_stream_title) setFallbackTitle(map.live_stream_title);
+      setFallbackUrl((prev) => (prev === (map.live_stream_url || "") ? prev : (map.live_stream_url || "")));
+      if (map.live_stream_title) {
+        setFallbackTitle((prev) => (prev === map.live_stream_title ? prev : map.live_stream_title));
+      }
       setLoaded(true);
     };
     load();
