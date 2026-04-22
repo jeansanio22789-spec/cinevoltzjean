@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Signal } from "lucide-react";
 
 /** Detecta a qualidade da conexão do usuário (1 a 4 barras). */
@@ -84,7 +84,7 @@ interface Props {
 }
 
 /** Relógio ao vivo + indicador de qualidade do sinal, bem compacto. */
-const LiveClockSignal = forwardRef<HTMLDivElement, Props>(({ size = "sm" }, ref) => {
+const LiveClockSignal = ({ size = "sm" }: Props) => {
   const [now, setNow] = useState(() => new Date());
   const { bars, label } = useConnectionQuality();
 
@@ -112,7 +112,7 @@ const LiveClockSignal = forwardRef<HTMLDivElement, Props>(({ size = "sm" }, ref)
   const iconSize = size === "mini" ? "w-2.5 h-2.5" : "w-3 h-3";
 
   return (
-    <div ref={ref} className="flex items-center gap-1">
+    <div className="flex items-center gap-1">
       <span
         className={`flex items-center gap-1 ${padding} rounded-full bg-card border border-border text-foreground font-bold tabular-nums`}
         title="Hora ao vivo"
@@ -138,8 +138,6 @@ const LiveClockSignal = forwardRef<HTMLDivElement, Props>(({ size = "sm" }, ref)
       </span>
     </div>
   );
-});
-
-LiveClockSignal.displayName = "LiveClockSignal";
+};
 
 export default LiveClockSignal;
