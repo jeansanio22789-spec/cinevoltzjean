@@ -223,8 +223,10 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
     const video = videoRef.current;
     if (!video || !activeSrc) return;
 
+    clearScheduledRecovery();
     setError(null);
     setLoading(true);
+    setPlaying(false);
     failureCountRef.current = 0;
     stableFragCountRef.current = 0;
 
@@ -265,6 +267,12 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
         setLoading(false);
         setError(null);
         safariRetries = 0;
+        if (autoPlay || tvMode) {
+          const playAttempt = video.play();
+          if (playAttempt && typeof playAttempt.then === "function") {
+            playAttempt.then(() => syncPlaybackState(true)).catch(() => { /* noop */ });
+          }
+        }
       };
       const onErr = () => {
         if (destroyed) return;
@@ -276,10 +284,12 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
           // Mostra status pra usuário não pensar que travou
           setLoading(true);
           retryTimer = window.setTimeout(tryLoad, 600 * safariRetries);
+          scheduleRecovery(`safari retry ${safariRetries}`, 250 * safariRetries, safariRetries > 1);
         } else if (!tryFallback("safari error after retries")) {
-          // Sem fallback — mostra erro pro usuário poder pular de canal
-          setError("Canal indisponível no momento");
-          setLoading(false);
+          if (!recoverPlayback("safari exhausted retries", true)) {
+            setError("Canal indisponível no momento");
+            setLoading(false);
+          }
         }
       };
       video.addEventListener("loadedmetadata", onLoaded);
@@ -356,6 +366,7 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
         setLoading(false);
         failureCountRef.current = 0;
         applyQualityStrategy();
+        if (!video.paused) syncPlaybackState(true);
       });
 
       // Quando volta a ter dados após buffering, limpa o erro silenciosamente
@@ -376,6 +387,7 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
         }
         setError(null);
         setLoading(false);
+        if (!video.paused) syncPlaybackState(true);
       });
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
@@ -390,6 +402,7 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
               try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
             }
             stepDownQuality("buffer stalled");
+            scheduleRecovery("buffer stalled", 120);
           }
           return;
         }
@@ -405,11 +418,14 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
               failureCountRef.current >= 3
             ) {
               if (tryFallback(data.details)) return;
-              setError("Canal indisponível no momento");
-              setLoading(false);
+              if (!recoverPlayback(data.details, true)) {
+                setError("Canal indisponível no momento");
+                setLoading(false);
+              }
               return;
             }
             setError("Reconectando...");
+            scheduleRecovery(data.details, 180 * failureCountRef.current, failureCountRef.current >= 2);
             try { hls.startLoad(); } catch { /* noop */ }
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
@@ -421,11 +437,14 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
               try { hls.recoverMediaError(); } catch { /* noop */ }
             }
             setError("Recuperando...");
+            scheduleRecovery("media error", 120, true);
             break;
           default:
             if (tryFallback(data.details)) return;
-            setError("Canal indisponível no momento");
-            setLoading(false);
+            if (!recoverPlayback(data.details || "unknown error", true)) {
+              setError("Canal indisponível no momento");
+              setLoading(false);
+            }
             break;
         }
       });
