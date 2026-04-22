@@ -2,7 +2,9 @@ import Navbar from "@/components/Navbar";
 import { Radio, ExternalLink, Tv } from "lucide-react";
 import { useState } from "react";
 
-const STREAM_URL = "https://www2.meufut.xyz/bbb26";
+const YT_VIDEO_ID = "ABVQXgr2LW4";
+const STREAM_URL = `https://www.youtube.com/embed/${YT_VIDEO_ID}?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0`;
+const EXTERNAL_URL = `https://www.youtube.com/watch?v=${YT_VIDEO_ID}`;
 
 const Live = () => {
   const [loadError, setLoadError] = useState(false);
@@ -15,14 +17,14 @@ const Live = () => {
           <span className="flex items-center gap-1.5 bg-destructive text-destructive-foreground text-xs font-bold px-3 py-1 rounded-full animate-pulse">
             <Radio className="w-3.5 h-3.5" /> AO VIVO
           </span>
-          <h1 className="text-xl md:text-2xl font-black">BBB ao Vivo</h1>
+          <h1 className="text-xl md:text-2xl font-black">SBT ao Vivo</h1>
           <a
-            href={STREAM_URL}
+            href={EXTERNAL_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            <ExternalLink className="w-3.5 h-3.5" /> Abrir em nova aba
+            <ExternalLink className="w-3.5 h-3.5" /> Abrir no YouTube
           </a>
         </div>
 
@@ -31,10 +33,10 @@ const Live = () => {
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
               <Tv className="w-12 h-12 text-muted-foreground" />
               <p className="text-sm text-muted-foreground text-center max-w-sm">
-                O site bloqueia reprodução embutida.
+                Não foi possível carregar a transmissão aqui.
               </p>
               <a
-                href={STREAM_URL}
+                href={EXTERNAL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 bg-destructive text-destructive-foreground px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-destructive/90 transition-colors"
@@ -49,8 +51,7 @@ const Live = () => {
               allowFullScreen
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
               referrerPolicy="no-referrer"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
-              title="BBB ao Vivo"
+              title="SBT ao Vivo"
               onError={() => setLoadError(true)}
             />
           )}

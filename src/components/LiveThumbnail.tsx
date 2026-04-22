@@ -5,8 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 const LiveThumbnail = () => {
   const [enabled, setEnabled] = useState(false);
-  const [streamUrl, setStreamUrl] = useState("https://www2.meufut.xyz/bbb26");
-  const [title, setTitle] = useState("AO VIVO 24H");
+  const [streamUrl, setStreamUrl] = useState(
+    "https://www.youtube.com/embed/ABVQXgr2LW4?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0"
+  );
+  const [title, setTitle] = useState("SBT AO VIVO");
   const [closed, setClosed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
