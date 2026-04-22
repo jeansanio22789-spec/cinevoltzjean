@@ -217,7 +217,7 @@ const HlsPlayer = ({
       });
 
       // Quando volta a ter dados após buffering, limpa o erro silenciosamente
-      hls.on(Hls.Events.FRAG_LOADED, () => {
+      hls.on(Hls.Events.FRAG_LOADED, (_e, data: any) => {
         if (failureCountRef.current > 0) failureCountRef.current = Math.max(0, failureCountRef.current - 1);
         if (!lowQuality && hls.autoLevelCapping >= 0 && hls.autoLevelCapping < maxLevelRef.current) {
           stableFragCountRef.current += 1;
@@ -226,6 +226,11 @@ const HlsPlayer = ({
             hls.autoLevelCapping = nextCap;
             stableFragCountRef.current = 0;
           }
+        }
+        // 🕒 Captura PROGRAM-DATE-TIME → permite sincronizar todos os aparelhos pela hora real
+        const frag = data?.frag;
+        if (frag && typeof frag.programDateTime === "number" && typeof frag.start === "number") {
+          pdtAnchorRef.current = { pdt: frag.programDateTime, mediaTime: frag.start };
         }
         setError(null);
         setLoading(false);
