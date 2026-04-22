@@ -689,8 +689,10 @@ const HlsPlayer = ({
         muted={muted}
         playsInline
         controls={nativeControls}
-        controlsList="nodownload noremoteplayback noplaybackrate"
-        disablePictureInPicture
+        controlsList="nodownload noplaybackrate"
+        // Habilita AirPlay (iOS/Safari/Apple TV)
+        {...({ "x-webkit-airplay": "allow" } as any)}
+        // Não bloqueia controles remotos (Chromecast/AirPlay/Miracast)
         onContextMenu={(e) => e.preventDefault()}
         onPlay={() => { setPlaying(true); setLoading(false); }}
         onPlaying={() => { setPlaying(true); setLoading(false); }}
