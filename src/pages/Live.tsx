@@ -1,6 +1,6 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv } from "lucide-react";
+import { Radio, Tv, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -23,6 +23,8 @@ const Live = () => {
   const [fallbackUrl, setFallbackUrl] = useState("");
   const [fallbackTitle, setFallbackTitle] = useState("AO VIVO");
   const [loaded, setLoaded] = useState(false);
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
 
   useEffect(() => {
     const load = async () => {
@@ -64,16 +66,33 @@ const Live = () => {
     [channels, selectedId]
   );
 
+  // Lista de categorias disponíveis
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    channels.forEach((c) => set.add(c.category || "Outros"));
+    return ["all", ...Array.from(set)];
+  }, [channels]);
+
+  // Filtro por busca + categoria
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return channels.filter((c) => {
+      if (activeCategory !== "all" && (c.category || "Outros") !== activeCategory) return false;
+      if (!q) return true;
+      return c.name.toLowerCase().includes(q) || (c.category || "").toLowerCase().includes(q);
+    });
+  }, [channels, search, activeCategory]);
+
   // Agrupa por categoria
   const grouped = useMemo(() => {
     const g: Record<string, Channel[]> = {};
-    channels.forEach((c) => {
+    filtered.forEach((c) => {
       const cat = c.category || "Outros";
       if (!g[cat]) g[cat] = [];
       g[cat].push(c);
     });
     return g;
-  }, [channels]);
+  }, [filtered]);
 
   if (!loaded) {
     return (
