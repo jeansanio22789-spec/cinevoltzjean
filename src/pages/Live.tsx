@@ -375,13 +375,11 @@ const Live = () => {
               }) : undefined}
             />
           ) : (
-            <iframe
+            <IframeWithFallback
+              key={`${selected?.id || "fallback"}-${retryNonce}`}
               src={playUrl}
-              className="w-full h-full border-0"
-              allowFullScreen
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
-              referrerPolicy="strict-origin-when-cross-origin"
               title={playTitle}
+              poster={selected?.logo_url || null}
             />
           )}
           {tvMode && (
