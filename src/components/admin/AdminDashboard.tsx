@@ -4,6 +4,7 @@ import {
   ArrowUpRight, Activity, PlayCircle, Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import LivePreview from "./LivePreview";
 
 interface Transaction {
   amount: number;
