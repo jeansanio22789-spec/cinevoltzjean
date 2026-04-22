@@ -102,6 +102,25 @@ const HlsPlayer = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [src]);
 
+  // Força tentativa de play (mudo) sempre que possível
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !autoPlay) return;
+    const tryPlay = () => {
+      v.muted = true;
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.catch(() => { /* autoplay bloqueado — usuário precisa tocar */ });
+      }
+    };
+    tryPlay();
+    const id = setInterval(() => {
+      if (v.paused) tryPlay();
+      else clearInterval(id);
+    }, 1500);
+    return () => clearInterval(id);
+  }, [src, autoPlay]);
+
   const handlePlay = () => {
     const v = videoRef.current;
     if (!v) return;
