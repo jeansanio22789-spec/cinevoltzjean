@@ -381,13 +381,16 @@ const HlsPlayer = ({
       v.muted = true;
       const p = v.play();
       if (p && typeof p.then === "function") {
-        p.catch(() => { /* autoplay bloqueado — usuário precisa tocar */ });
+        p.then(() => { setPlaying(true); setLoading(false); })
+         .catch(() => { /* autoplay bloqueado — usuário precisa tocar */ });
+      } else {
+        setTimeout(() => { if (!v.paused) setPlaying(true); }, 100);
       }
     };
     tryPlay();
     const id = setInterval(() => {
       if (v.paused) tryPlay();
-      else clearInterval(id);
+      else { setPlaying(true); clearInterval(id); }
     }, 1500);
     return () => clearInterval(id);
   }, [activeSrc, autoPlay]);
@@ -591,14 +594,28 @@ const HlsPlayer = ({
         controlsList="nodownload noremoteplayback noplaybackrate"
         disablePictureInPicture
         onContextMenu={(e) => e.preventDefault()}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
+        onPlay={() => { setPlaying(true); setLoading(false); }}
+        onPlaying={() => { setPlaying(true); setLoading(false); }}
+        onPause={() => {
+          // Só marca como pausado se realmente está parado (ignora pausas espúrias durante troca)
+          const v = videoRef.current;
+          if (v && v.ended) return;
+          setPlaying(false);
+        }}
         onWaiting={() => setLoading(true)}
-        onPlaying={() => setLoading(false)}
+        onCanPlay={() => {
+          const v = videoRef.current;
+          if (v && !v.paused) { setPlaying(true); setLoading(false); }
+        }}
+        onTimeUpdate={() => {
+          // Sincronização final: se o vídeo está avançando, está tocando — sem overlay
+          const v = videoRef.current;
+          if (v && !v.paused && v.currentTime > 0 && !playing) setPlaying(true);
+        }}
         className="w-full h-full object-contain bg-black pointer-events-none"
       />
 
-      {/* Tap-to-play (autoplay bloqueado pelo navegador) */}
+      {/* Tap-to-play (autoplay bloqueado pelo navegador) — só aparece se REALMENTE pausado */}
       {!playing && !loading && !error && (
         <button
           onClick={handlePlay}
