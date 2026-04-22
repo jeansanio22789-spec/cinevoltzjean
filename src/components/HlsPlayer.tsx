@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
+import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw, Cast } from "lucide-react";
 import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
 
 interface HlsPlayerProps {
