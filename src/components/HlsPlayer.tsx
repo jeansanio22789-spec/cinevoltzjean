@@ -454,52 +454,57 @@ const HlsPlayer = ({
 
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
+      const { isSamsungTV, isSamsungBrowser } = detectSamsungTV();
+      // Samsung Tizen / SamsungBrowser: CPU/decoder fracos → buffer grande,
+      // sem low-latency, sem aceleração e retries mais espaçados.
+      const samsungTune = isSamsungTV || isSamsungBrowser;
+
       const hls = new Hls({
         // ⚡ Baixa latência REAL: todos os aparelhos ficam no mesmo segundo
-        lowLatencyMode: true,
-        backBufferLength: lowQuality ? 8 : 30,   // mais histórico — protege contra micro-cortes
-        maxBufferLength: lowQuality ? 12 : 30,   // buffer maior = menos quedas
-        maxMaxBufferLength: lowQuality ? 24 : 60,
-        maxBufferSize: lowQuality ? 30 * 1000 * 1000 : 60 * 1000 * 1000,
-        maxBufferHole: 1,
-        highBufferWatchdogPeriod: 2,
+        // (desligado no Samsung — o decoder não dá conta e gera reconexões)
+        lowLatencyMode: !samsungTune,
+        backBufferLength: samsungTune ? 60 : (lowQuality ? 8 : 30),
+        maxBufferLength: samsungTune ? 60 : (lowQuality ? 12 : 30),
+        maxMaxBufferLength: samsungTune ? 120 : (lowQuality ? 24 : 60),
+        maxBufferSize: samsungTune ? 120 * 1000 * 1000 : (lowQuality ? 30 * 1000 * 1000 : 60 * 1000 * 1000),
+        maxBufferHole: samsungTune ? 2 : 1,
+        highBufferWatchdogPeriod: samsungTune ? 4 : 2,
         nudgeOffset: 0.2,
         nudgeMaxRetry: 30,
         startFragPrefetch: !lowQuality,
-        maxStarvationDelay: 8,                   // espera mais antes de pular pra borda
+        maxStarvationDelay: samsungTune ? 12 : 8,
 
-        // ABR
-        startLevel: lowQuality ? 0 : -1,
+        // ABR — Samsung começa baixo pra não engasgar o decoder
+        startLevel: samsungTune ? 0 : (lowQuality ? 0 : -1),
         abrEwmaDefaultEstimate: aggressiveNetwork ? 5_000_000 : 1_000_000,
         abrBandWidthFactor: 0.85,
-        abrBandWidthUpFactor: 0.6,
+        abrBandWidthUpFactor: samsungTune ? 0.4 : 0.6,
 
         // 🔑 Live: tolerante a jitter da rede (sem aceleração brusca)
-        // Usa apenas *Count (hls.js proíbe misturar com *Duration)
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10,
+        liveSyncDurationCount: samsungTune ? 6 : 3,
+        liveMaxLatencyDurationCount: samsungTune ? 18 : 10,
         liveDurationInfinity: true,
         liveSyncOnStallIncrease: 1,
-        maxLiveSyncPlaybackRate: 1.1,             // aceleração suave (não 1.5x)
+        maxLiveSyncPlaybackRate: samsungTune ? 1.0 : 1.1,
         preserveManualLevelOnError: false,
         fpsDroppedMonitoringPeriod: 5000,
         fpsDroppedMonitoringThreshold: 0.2,
 
         // Retentativas (servidor JMV-Stream oscila)
         fragLoadingMaxRetry: 30,
-        fragLoadingRetryDelay: 300,
+        fragLoadingRetryDelay: samsungTune ? 600 : 300,
         fragLoadingMaxRetryTimeout: 90000,
         manifestLoadingMaxRetry: 30,
-        manifestLoadingRetryDelay: 300,
+        manifestLoadingRetryDelay: samsungTune ? 600 : 300,
         manifestLoadingMaxRetryTimeout: 90000,
         levelLoadingMaxRetry: 30,
-        levelLoadingRetryDelay: 300,
+        levelLoadingRetryDelay: samsungTune ? 600 : 300,
         levelLoadingMaxRetryTimeout: 90000,
 
-        enableWorker: true,
-        capLevelToPlayerSize: !tvMode,
+        enableWorker: !samsungTune, // worker no Tizen pode dar problemas
+        capLevelToPlayerSize: samsungTune || !tvMode,
         testBandwidth: !lowQuality,
-        progressive: true,
+        progressive: !samsungTune,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
