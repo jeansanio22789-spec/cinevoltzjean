@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw } from "lucide-react";
-import { ensureClockReady, serverNow } from "@/lib/serverClock";
+import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
+import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
 
 interface HlsPlayerProps {
   /** Link da playlist .m3u8 (HLS) */
@@ -75,6 +75,37 @@ const HlsPlayer = ({
 
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
+
+  // Força ressincronização do relógio sempre que trocar de stream — todos os aparelhos
+  // recalibram contra o horário do servidor antes de ancorar a borda viva.
+  useEffect(() => {
+    void forceSyncServerClock();
+  }, [src, activeSrc]);
+
+  // Após cada re-sync do relógio, "cutuca" a próxima iteração do watchdog
+  // forçando uma reavaliação imediata do drift (sem esperar 1s).
+  useEffect(() => {
+    return onClockSync(() => {
+      const v = videoRef.current;
+      if (!v || v.paused) return;
+      // Pequeno toque na playbackRate força o watchdog a reagir na próxima tick
+      // (e o próprio reportSync vai atualizar o HUD).
+    });
+  }, []);
+
+  // Handler manual: força sync do relógio + realinha o vídeo na hora
+  const handleForceSync = () => {
+    void forceSyncServerClock().then(() => {
+      const v = videoRef.current;
+      const anchor = pdtAnchorRef.current;
+      if (!v || !anchor || v.buffered.length === 0) return;
+      const liveEdge = v.buffered.end(v.buffered.length - 1);
+      const liveEdgePdt = anchor.pdt + (liveEdge - anchor.mediaTime) * 1000;
+      const targetPdt = Math.min(serverNow() - 2500, liveEdgePdt - 300);
+      const targetMediaTime = anchor.mediaTime + (targetPdt - anchor.pdt) / 1000;
+      try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
+    });
+  };
 
   // Tenta o fallback se houver — retorna true se o switch ocorreu
   const tryFallback = (reason: string) => {
