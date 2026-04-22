@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, QrCode, Copy, CheckCheck, Loader2, CheckCircle2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +35,19 @@ const PixCheckout = ({ plan, onClose }: Props) => {
   const pollRef = useRef<number | null>(null);
   const navigate = useNavigate();
 
+  const getFunctionErrorMessage = async (err: unknown) => {
+    if (err instanceof FunctionsHttpError) {
+      const payload = await err.context.json().catch(() => null);
+      if (payload?.error) return payload.error as string;
+    }
+
+    if (err instanceof Error && err.message) {
+      return err.message;
+    }
+
+    return "Erro ao gerar PIX";
+  };
+
   useEffect(() => {
     const create = async () => {
       try {
@@ -43,9 +57,9 @@ const PixCheckout = ({ plan, onClose }: Props) => {
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         setPix(data);
-      } catch (e: any) {
+      } catch (e) {
         console.error(e);
-        setError(e.message || "Erro ao gerar PIX");
+        setError(await getFunctionErrorMessage(e));
       } finally {
         setLoading(false);
       }
