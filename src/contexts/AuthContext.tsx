@@ -49,6 +49,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (u) {
+        await supabase.from("audit_logs").insert({
+          user_id: u.id,
+          user_email: u.email,
+          action: "logout",
+          resource_type: "auth",
+          description: `Usuário ${u.email} fez logout`,
+        });
+      }
+    } catch { /* silent */ }
     await supabase.auth.signOut();
   };
 

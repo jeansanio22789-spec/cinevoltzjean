@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload,
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { buildShareLink } from "@/lib/videoUrl";
+import { logAudit } from "@/lib/auditLog";
 
 interface Movie {
   id: string;
@@ -95,14 +96,28 @@ const AdminMovies = () => {
         toast.error("Erro ao atualizar filme");
       } else {
         toast.success("Filme atualizado!");
+        await logAudit({
+          action: editing.status !== form.status && form.status === "published" ? "publish" : "update",
+          resource_type: "movie",
+          resource_id: editing.id,
+          description: `Filme "${form.title}" foi ${form.status === "published" ? "publicado/atualizado" : "atualizado"}`,
+          changes: { before: editing as unknown as Record<string, unknown>, after: form },
+        });
       }
     } else {
-      const { error } = await supabase.from("movies").insert(form);
+      const { data: inserted, error } = await supabase.from("movies").insert(form).select().single();
 
       if (error) {
         toast.error("Erro ao adicionar filme");
       } else {
         toast.success("Filme adicionado!");
+        await logAudit({
+          action: "create",
+          resource_type: "movie",
+          resource_id: inserted?.id,
+          description: `Novo filme "${form.title}" adicionado ao catálogo`,
+          changes: { after: form },
+        });
       }
     }
 
@@ -114,11 +129,19 @@ const AdminMovies = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este filme?")) return;
 
+    const movie = movies.find((m) => m.id === id);
     const { error } = await supabase.from("movies").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir");
     } else {
       toast.success("Filme excluído");
+      await logAudit({
+        action: "delete",
+        resource_type: "movie",
+        resource_id: id,
+        description: `Filme "${movie?.title ?? id}" foi excluído`,
+        changes: { before: movie as unknown as Record<string, unknown> },
+      });
       fetchMovies();
     }
   };
