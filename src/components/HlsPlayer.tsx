@@ -25,6 +25,11 @@ interface HlsPlayerProps {
    * ou quando há vários players simultâneos.
    */
   lowQuality?: boolean;
+  /**
+   * Perfil agressivo de rede: pré-buffer maior, retomada mais forte e
+   * priorização de bitrate alto sem travar a UI.
+   */
+  aggressiveNetwork?: boolean;
 }
 
 /**
@@ -39,6 +44,7 @@ const HlsPlayer = ({
   className = "",
   tvMode = false,
   lowQuality = false,
+  aggressiveNetwork = false,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -49,6 +55,8 @@ const HlsPlayer = ({
   const [activeSrc, setActiveSrc] = useState(src);
   const [usingFallback, setUsingFallback] = useState(false);
   const failureCountRef = useRef(0);
+  const maxLevelRef = useRef(0);
+  const stableFragCountRef = useRef(0);
 
   // Tenta o fallback se houver — retorna true se o switch ocorreu
   const tryFallback = (reason: string) => {
@@ -62,6 +70,41 @@ const HlsPlayer = ({
     return false;
   };
 
+  const stepDownQuality = (reason: string) => {
+    const hls = hlsRef.current;
+    if (!hls || lowQuality || !hls.levels?.length) return false;
+
+    const currentCap = hls.autoLevelCapping >= 0 ? hls.autoLevelCapping : maxLevelRef.current;
+    const nextCap = Math.max(0, currentCap - 1);
+    if (nextCap === currentCap) return false;
+
+    console.warn(`[HlsPlayer] Reduzindo qualidade (${reason}) para nível`, nextCap);
+    stableFragCountRef.current = 0;
+    hls.autoLevelCapping = nextCap;
+    hls.nextAutoLevel = nextCap;
+    return true;
+  };
+
+  const applyQualityStrategy = () => {
+    const hls = hlsRef.current;
+    if (!hls || !hls.levels?.length) return;
+
+    const topLevel = hls.levels.length - 1;
+    maxLevelRef.current = topLevel;
+
+    if (lowQuality) {
+      hls.autoLevelCapping = 0;
+      hls.currentLevel = 0;
+      hls.nextLevel = 0;
+      hls.loadLevel = 0;
+      return;
+    }
+
+    hls.autoLevelCapping = topLevel;
+    hls.nextAutoLevel = (tvMode || aggressiveNetwork) ? topLevel : Math.min(topLevel, 1);
+    hls.capLevelToPlayerSize = !tvMode && !aggressiveNetwork;
+  };
+
   const setupPlayer = () => {
     const video = videoRef.current;
     if (!video || !activeSrc) return;
@@ -69,6 +112,7 @@ const HlsPlayer = ({
     setError(null);
     setLoading(true);
     failureCountRef.current = 0;
+    stableFragCountRef.current = 0;
 
     // Limpa instância anterior
     if (hlsRef.current) {
@@ -96,29 +140,36 @@ const HlsPlayer = ({
       const hls = new Hls({
         // Latência baixa, mas com colchão maior para resistir a microcortes
         lowLatencyMode: !lowQuality,
-        backBufferLength: lowQuality ? 5 : 30,
-        maxBufferLength: lowQuality ? 10 : 30,
-        maxMaxBufferLength: lowQuality ? 20 : 60,
-        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : 60 * 1000 * 1000,
+        backBufferLength: lowQuality ? 5 : aggressiveNetwork ? 90 : 45,
+        maxBufferLength: lowQuality ? 10 : aggressiveNetwork ? 90 : 45,
+        maxMaxBufferLength: lowQuality ? 20 : aggressiveNetwork ? 180 : 90,
+        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : aggressiveNetwork ? 180 * 1000 * 1000 : 90 * 1000 * 1000,
         maxBufferHole: 0.5,
         highBufferWatchdogPeriod: 1,
         nudgeOffset: 0.1,
         nudgeMaxRetry: 10,
+        startFragPrefetch: !lowQuality,
+        maxStarvationDelay: aggressiveNetwork ? 12 : 6,
 
         // ABR: thumbnail começa baixo, player principal começa automático
         startLevel: lowQuality ? 0 : -1,
-        abrEwmaDefaultEstimate: 1_000_000,
+        abrEwmaDefaultEstimate: aggressiveNetwork ? 5_000_000 : 1_000_000,
         abrBandWidthFactor: 0.9,
         abrBandWidthUpFactor: 0.7,
+        liveSyncOnStallIncrease: aggressiveNetwork ? 1.5 : 1,
+        maxLiveSyncPlaybackRate: aggressiveNetwork ? 1.5 : 1,
+        preserveManualLevelOnError: false,
+        fpsDroppedMonitoringPeriod: 3000,
+        fpsDroppedMonitoringThreshold: 0.15,
 
         // Retentativas agressivas
-        fragLoadingMaxRetry: 8,
-        fragLoadingRetryDelay: 500,
+        fragLoadingMaxRetry: aggressiveNetwork ? 12 : 8,
+        fragLoadingRetryDelay: 300,
         fragLoadingMaxRetryTimeout: 30000,
-        manifestLoadingMaxRetry: 8,
-        manifestLoadingRetryDelay: 500,
-        levelLoadingMaxRetry: 8,
-        levelLoadingRetryDelay: 500,
+        manifestLoadingMaxRetry: aggressiveNetwork ? 12 : 8,
+        manifestLoadingRetryDelay: 300,
+        levelLoadingMaxRetry: aggressiveNetwork ? 12 : 8,
+        levelLoadingRetryDelay: 300,
 
         // Live: 4 segments do edge (estável)
         liveSyncDurationCount: 4,
@@ -137,23 +188,22 @@ const HlsPlayer = ({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLoading(false);
         failureCountRef.current = 0;
-        if (!hls.levels || hls.levels.length === 0) return;
-        if (tvMode) {
-          // Trava na maior qualidade
-          const topLevel = hls.levels.length - 1;
-          hls.currentLevel = topLevel;
-          hls.nextLevel = topLevel;
-        } else if (lowQuality) {
-          // Trava na MENOR qualidade (thumbnail / múltiplos players)
-          hls.currentLevel = 0;
-          hls.nextLevel = 0;
-          hls.loadLevel = 0;
-        }
+        applyQualityStrategy();
       });
 
       // Quando volta a ter dados após buffering, limpa o erro silenciosamente
       hls.on(Hls.Events.FRAG_LOADED, () => {
         if (failureCountRef.current > 0) failureCountRef.current = Math.max(0, failureCountRef.current - 1);
+        if (!lowQuality && hls.autoLevelCapping >= 0 && hls.autoLevelCapping < maxLevelRef.current) {
+          stableFragCountRef.current += 1;
+          if (stableFragCountRef.current >= 12) {
+            const nextCap = Math.min(maxLevelRef.current, hls.autoLevelCapping + 1);
+            hls.autoLevelCapping = nextCap;
+            stableFragCountRef.current = 0;
+          }
+        }
+        setError(null);
+        setLoading(false);
       });
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
@@ -167,6 +217,7 @@ const HlsPlayer = ({
             if (v && v.buffered.length > 0) {
               try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
             }
+            stepDownQuality("buffer stalled");
           }
           return;
         }
@@ -174,6 +225,7 @@ const HlsPlayer = ({
         failureCountRef.current += 1;
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
+            stepDownQuality(data.details);
             if (
               data.details === "manifestLoadError" ||
               data.details === "manifestLoadTimeOut" ||
@@ -186,6 +238,7 @@ const HlsPlayer = ({
             try { hls.startLoad(); } catch { /* noop */ }
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
+            stepDownQuality("media error");
             if (failureCountRef.current >= 2) {
               if (tryFallback("media error")) return;
               // Última tentativa: troca de codecs
@@ -229,7 +282,7 @@ const HlsPlayer = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSrc, tvMode, lowQuality]);
+  }, [activeSrc, tvMode, lowQuality, aggressiveNetwork]);
 
   // Força tentativa de play (mudo) sempre que possível
   useEffect(() => {
@@ -285,6 +338,7 @@ const HlsPlayer = ({
         stuckCount += 1;
         // 3s travado: tenta cutucar
         if (stuckCount === 3) {
+          stepDownQuality("stall watchdog");
           try {
             if (v.buffered.length > 0) {
               const end = v.buffered.end(v.buffered.length - 1);
@@ -347,6 +401,7 @@ const HlsPlayer = ({
         ref={videoRef}
         poster={poster}
         autoPlay={autoPlay}
+        preload="auto"
         muted={muted}
         playsInline
         controls={nativeControls}
