@@ -675,7 +675,6 @@ const HlsPlayer = ({
 
   return (
     <div
-      ref={ref}
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
       onContextMenu={(e) => e.preventDefault()}
       onCopy={(e) => e.preventDefault()}
