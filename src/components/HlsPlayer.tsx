@@ -152,31 +152,38 @@ const HlsPlayer = ({
     // Outros navegadores → HLS.js
     if (Hls.isSupported()) {
       const hls = new Hls({
-        // Latência baixa, mas com colchão maior para resistir a microcortes
-        lowLatencyMode: !lowQuality,
-        backBufferLength: lowQuality ? 5 : aggressiveNetwork ? 90 : 45,
-        maxBufferLength: lowQuality ? 10 : aggressiveNetwork ? 90 : 45,
-        maxMaxBufferLength: lowQuality ? 20 : aggressiveNetwork ? 180 : 90,
-        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : aggressiveNetwork ? 180 * 1000 * 1000 : 90 * 1000 * 1000,
-        maxBufferHole: 1.0, // tolera buracos maiores no stream
-        highBufferWatchdogPeriod: 2,
-        nudgeOffset: 0.2,
-        nudgeMaxRetry: 20, // mais tentativas de pular adiante
+        // ⚡ Baixa latência REAL: todos os aparelhos ficam no mesmo segundo
+        lowLatencyMode: true,
+        backBufferLength: lowQuality ? 5 : 10, // pouco histórico = menos delay
+        maxBufferLength: lowQuality ? 6 : 8,   // buffer enxuto
+        maxMaxBufferLength: lowQuality ? 12 : 16,
+        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : 30 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        highBufferWatchdogPeriod: 1,
+        nudgeOffset: 0.1,
+        nudgeMaxRetry: 20,
         startFragPrefetch: !lowQuality,
-        maxStarvationDelay: aggressiveNetwork ? 20 : 10, // espera mais antes de desistir
+        maxStarvationDelay: 4, // não espera muito — pula pra borda viva
 
-        // ABR: thumbnail começa baixo, player principal começa automático
+        // ABR
         startLevel: lowQuality ? 0 : -1,
         abrEwmaDefaultEstimate: aggressiveNetwork ? 5_000_000 : 1_000_000,
         abrBandWidthFactor: 0.9,
         abrBandWidthUpFactor: 0.7,
-        liveSyncOnStallIncrease: aggressiveNetwork ? 1.5 : 1,
-        maxLiveSyncPlaybackRate: aggressiveNetwork ? 1.5 : 1.2,
+
+        // 🔑 Sincronização live: fica colado na borda
+        liveSyncDuration: 2,                  // alvo: 2s atrás da borda
+        liveMaxLatencyDuration: 6,            // > 6s = pula pra frente
+        liveSyncDurationCount: 2,             // 2 segmentos atrás (ignorado se liveSyncDuration setado)
+        liveMaxLatencyDurationCount: 6,
+        liveDurationInfinity: true,
+        liveSyncOnStallIncrease: 1,
+        maxLiveSyncPlaybackRate: 1.5,         // acelera até 1.5x para alcançar a borda
         preserveManualLevelOnError: false,
         fpsDroppedMonitoringPeriod: 3000,
         fpsDroppedMonitoringThreshold: 0.15,
 
-        // Retentativas MUITO agressivas (servidor JMV-Stream oscila)
+        // Retentativas (servidor JMV-Stream oscila)
         fragLoadingMaxRetry: 20,
         fragLoadingRetryDelay: 200,
         fragLoadingMaxRetryTimeout: 60000,
@@ -186,11 +193,6 @@ const HlsPlayer = ({
         levelLoadingMaxRetry: 20,
         levelLoadingRetryDelay: 200,
         levelLoadingMaxRetryTimeout: 60000,
-
-        // Live: mais distância da edge = mais buffer pra resistir
-        liveSyncDurationCount: aggressiveNetwork ? 6 : 4,
-        liveMaxLatencyDurationCount: 20,
-        liveDurationInfinity: true,
 
         enableWorker: true,
         capLevelToPlayerSize: !tvMode,
@@ -334,13 +336,36 @@ const HlsPlayer = ({
   }, [tvMode, src]);
 
   // Watchdog: detecta stall silencioso (vídeo "tocando" mas currentTime não avança)
-  // e força recuperação ou fallback se persistir.
+  // E ALÉM DISSO mantém todos os aparelhos colados na borda viva (sincronização).
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     let lastTime = v.currentTime;
     let stuckCount = 0;
+    const TARGET_LATENCY = 2.5; // segundos atrás da borda — alvo igual em todos os aparelhos
+    const MAX_LATENCY = 6;      // se passar disso, pula pra borda
+
     const interval = setInterval(() => {
+      // 🔄 SINCRONIZAÇÃO DE LATÊNCIA — mantém todos no mesmo ponto
+      if (!v.paused && !v.ended && v.readyState >= 2 && v.buffered.length > 0) {
+        const liveEdge = v.buffered.end(v.buffered.length - 1);
+        const latency = liveEdge - v.currentTime;
+
+        // Muito atrás da borda → pula direto pra perto do live (sem delay entre aparelhos)
+        if (latency > MAX_LATENCY) {
+          try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
+        }
+        // Levemente atrás → acelera suavemente (até 1.3x) para alcançar
+        else if (latency > TARGET_LATENCY + 1.5) {
+          v.playbackRate = 1.3;
+        }
+        // Perto da borda → velocidade normal
+        else if (latency <= TARGET_LATENCY + 0.5 && v.playbackRate !== 1) {
+          v.playbackRate = 1;
+        }
+      }
+
+      // 🛡️ Detecção de stall (igual antes)
       if (v.paused || v.ended || v.readyState < 2) {
         lastTime = v.currentTime;
         stuckCount = 0;
@@ -352,7 +377,6 @@ const HlsPlayer = ({
         stuckCount = 0;
       } else {
         stuckCount += 1;
-        // 3s travado: tenta cutucar
         if (stuckCount === 3) {
           stepDownQuality("stall watchdog");
           try {
@@ -363,11 +387,9 @@ const HlsPlayer = ({
             v.play().catch(() => {});
           } catch { /* noop */ }
         }
-        // 6s travado: força reload do hls
         if (stuckCount === 6) {
           try { hlsRef.current?.startLoad(); } catch { /* noop */ }
         }
-        // 10s travado: reseta o player ou cai pro fallback
         if (stuckCount >= 10) {
           stuckCount = 0;
           if (!tryFallback("watchdog stall")) {
