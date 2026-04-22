@@ -335,6 +335,16 @@ const HlsPlayer = ({
       return;
     }
 
+    // 🛰️ Modo SAT: limita à metade inferior das qualidades pra economizar dados
+    // móveis e evitar travamentos (ex.: em 5 níveis, cap = 2)
+    if (satelliteMode) {
+      const satCap = Math.max(0, Math.floor(topLevel / 2));
+      hls.autoLevelCapping = satCap;
+      hls.nextAutoLevel = 0;
+      hls.capLevelToPlayerSize = true;
+      return;
+    }
+
     hls.autoLevelCapping = topLevel;
     hls.nextAutoLevel = (tvMode || aggressiveNetwork) ? topLevel : Math.min(topLevel, 1);
     hls.capLevelToPlayerSize = !tvMode && !aggressiveNetwork;
