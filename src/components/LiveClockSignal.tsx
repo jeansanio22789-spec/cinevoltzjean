@@ -15,35 +15,64 @@ const useConnectionQuality = () => {
       (navigator as any).webkitConnection;
 
     const compute = () => {
-      if (!conn) {
-        setQuality({ bars: 4, label: "ótima" });
+      // Sem internet: zera as barras
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        setQuality((prev) =>
+          prev.bars === 1 && prev.label === "offline" ? prev : { bars: 1, label: "offline" }
+        );
         return;
       }
-      const eff: string = conn.effectiveType || "4g";
-      const downlink: number = conn.downlink || 10;
+
       let bars: 1 | 2 | 3 | 4 = 4;
       let label = "ótima";
-      if (eff === "slow-2g" || downlink < 0.5) {
-        bars = 1;
-        label = "ruim";
-      } else if (eff === "2g" || downlink < 1.5) {
-        bars = 2;
-        label = "fraca";
-      } else if (eff === "3g" || downlink < 5) {
-        bars = 3;
-        label = "boa";
-      } else {
-        bars = 4;
-        label = "ótima";
+
+      if (conn) {
+        const eff: string = conn.effectiveType || "4g";
+        const downlink: number = typeof conn.downlink === "number" ? conn.downlink : 10;
+        if (eff === "slow-2g" || downlink < 0.5) {
+          bars = 1;
+          label = "ruim";
+        } else if (eff === "2g" || downlink < 1.5) {
+          bars = 2;
+          label = "fraca";
+        } else if (eff === "3g" || downlink < 5) {
+          bars = 3;
+          label = "boa";
+        } else {
+          bars = 4;
+          label = "ótima";
+        }
       }
-      setQuality({ bars, label });
+
+      // Só atualiza se algo mudou (evita re-render desnecessário)
+      setQuality((prev) => (prev.bars === bars && prev.label === label ? prev : { bars, label }));
     };
 
     compute();
-    if (conn?.addEventListener) {
-      conn.addEventListener("change", compute);
-      return () => conn.removeEventListener("change", compute);
-    }
+
+    // 1) Evento nativo do Network Information API
+    conn?.addEventListener?.("change", compute);
+
+    // 2) Online/offline do navegador
+    window.addEventListener("online", compute);
+    window.addEventListener("offline", compute);
+
+    // 3) Recalcula ao voltar para a aba
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") compute();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    // 4) Polling de fallback (alguns navegadores não disparam "change")
+    const pollId = window.setInterval(compute, 4000);
+
+    return () => {
+      conn?.removeEventListener?.("change", compute);
+      window.removeEventListener("online", compute);
+      window.removeEventListener("offline", compute);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(pollId);
+    };
   }, []);
 
   return quality;
