@@ -229,7 +229,7 @@ const HlsPlayer = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSrc, tvMode]);
+  }, [activeSrc, tvMode, lowQuality]);
 
   // Força tentativa de play (mudo) sempre que possível
   useEffect(() => {
