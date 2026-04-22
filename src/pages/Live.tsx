@@ -143,15 +143,38 @@ const Live = () => {
   const playTitle = selected?.name || fallbackTitle;
   const hasContent = !!playUrl;
 
+  // Espectadores assistindo o canal atual (este usuário entra na contagem)
+  const viewerKey = selected?.id || (fallbackUrl ? "fallback" : null);
+  const viewersHere = useLiveViewers(viewerKey, true);
+
+  // Espectadores em todos os outros canais (apenas observa, não conta nele)
+  const otherIds = useMemo(
+    () => channels.map((c) => c.id).filter((id) => id !== selected?.id),
+    [channels, selected?.id]
+  );
+  const viewersByChannel = useLiveViewersMulti(otherIds);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-20 px-4 md:px-12 max-w-6xl mx-auto pb-12">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <span className="flex items-center gap-1.5 bg-destructive text-destructive-foreground text-xs font-bold px-3 py-1 rounded-full animate-pulse">
             <Radio className="w-3.5 h-3.5" /> AO VIVO
           </span>
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
+          {viewersHere > 0 && (
+            <span
+              className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-card border border-border text-foreground"
+              title={`${viewersHere} ${viewersHere === 1 ? "espectador" : "espectadores"} assistindo agora`}
+            >
+              <Users className="w-3.5 h-3.5 text-accent" />
+              {viewersHere.toLocaleString("pt-BR")}
+              <span className="text-muted-foreground font-normal hidden sm:inline">
+                {viewersHere === 1 ? "assistindo" : "assistindo"}
+              </span>
+            </span>
+          )}
           <button
             onClick={toggleTvMode}
             className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
@@ -161,6 +184,7 @@ const Live = () => {
             {tvMode ? "Sair TV" : "Modo TV"}
           </button>
         </div>
+
 
         <div
           ref={playerWrapRef}
