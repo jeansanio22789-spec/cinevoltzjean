@@ -25,6 +25,8 @@ const Live = () => {
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [tvMode, setTvMode] = useState(false);
+  const playerWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const load = async () => {
