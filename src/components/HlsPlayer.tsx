@@ -390,45 +390,45 @@ const HlsPlayer = ({
       const hls = new Hls({
         // ⚡ Baixa latência REAL: todos os aparelhos ficam no mesmo segundo
         lowLatencyMode: true,
-        backBufferLength: lowQuality ? 5 : 10, // pouco histórico = menos delay
-        maxBufferLength: lowQuality ? 6 : 8,   // buffer enxuto
-        maxMaxBufferLength: lowQuality ? 12 : 16,
-        maxBufferSize: lowQuality ? 15 * 1000 * 1000 : 30 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        highBufferWatchdogPeriod: 1,
-        nudgeOffset: 0.1,
-        nudgeMaxRetry: 20,
+        backBufferLength: lowQuality ? 8 : 30,   // mais histórico — protege contra micro-cortes
+        maxBufferLength: lowQuality ? 12 : 30,   // buffer maior = menos quedas
+        maxMaxBufferLength: lowQuality ? 24 : 60,
+        maxBufferSize: lowQuality ? 30 * 1000 * 1000 : 60 * 1000 * 1000,
+        maxBufferHole: 1,
+        highBufferWatchdogPeriod: 2,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 30,
         startFragPrefetch: !lowQuality,
-        maxStarvationDelay: 4, // não espera muito — pula pra borda viva
+        maxStarvationDelay: 8,                   // espera mais antes de pular pra borda
 
         // ABR
         startLevel: lowQuality ? 0 : -1,
         abrEwmaDefaultEstimate: aggressiveNetwork ? 5_000_000 : 1_000_000,
-        abrBandWidthFactor: 0.9,
-        abrBandWidthUpFactor: 0.7,
+        abrBandWidthFactor: 0.85,
+        abrBandWidthUpFactor: 0.6,
 
-        // 🔑 Sincronização live: fica colado na borda
-        liveSyncDuration: 2,                  // alvo: 2s atrás da borda
-        liveMaxLatencyDuration: 6,            // > 6s = pula pra frente
-        liveSyncDurationCount: 2,             // 2 segmentos atrás (ignorado se liveSyncDuration setado)
-        liveMaxLatencyDurationCount: 6,
+        // 🔑 Live: tolerante a jitter da rede (sem aceleração brusca)
+        liveSyncDuration: 6,                      // alvo: 6s atrás da borda (mais seguro)
+        liveMaxLatencyDuration: 20,               // só pula se ficar > 20s atrás
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
         liveDurationInfinity: true,
         liveSyncOnStallIncrease: 1,
-        maxLiveSyncPlaybackRate: 1.5,         // acelera até 1.5x para alcançar a borda
+        maxLiveSyncPlaybackRate: 1.1,             // aceleração suave (não 1.5x)
         preserveManualLevelOnError: false,
-        fpsDroppedMonitoringPeriod: 3000,
-        fpsDroppedMonitoringThreshold: 0.15,
+        fpsDroppedMonitoringPeriod: 5000,
+        fpsDroppedMonitoringThreshold: 0.2,
 
         // Retentativas (servidor JMV-Stream oscila)
-        fragLoadingMaxRetry: 20,
-        fragLoadingRetryDelay: 200,
-        fragLoadingMaxRetryTimeout: 60000,
-        manifestLoadingMaxRetry: 20,
-        manifestLoadingRetryDelay: 200,
-        manifestLoadingMaxRetryTimeout: 60000,
-        levelLoadingMaxRetry: 20,
-        levelLoadingRetryDelay: 200,
-        levelLoadingMaxRetryTimeout: 60000,
+        fragLoadingMaxRetry: 30,
+        fragLoadingRetryDelay: 300,
+        fragLoadingMaxRetryTimeout: 90000,
+        manifestLoadingMaxRetry: 30,
+        manifestLoadingRetryDelay: 300,
+        manifestLoadingMaxRetryTimeout: 90000,
+        levelLoadingMaxRetry: 30,
+        levelLoadingRetryDelay: 300,
+        levelLoadingMaxRetryTimeout: 90000,
 
         enableWorker: true,
         capLevelToPlayerSize: !tvMode,
