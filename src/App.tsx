@@ -30,7 +30,8 @@ const App = () => (
         <AuthProvider>
           <MaintenanceGate>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<Navigate to="/ao-vivo" replace />} />
+              <Route path="/inicio" element={<Index />} />
               <Route path="/planos" element={<Pricing />} />
               <Route path="/login" element={<Login />} />
               <Route path="/carreiras" element={<Careers />} />
