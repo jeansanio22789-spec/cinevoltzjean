@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
+import IframeWithFallback from "@/components/IframeWithFallback";
 import LiveDiagnostics, { type LivePlayerStats } from "@/components/LiveDiagnostics";
 import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite, Wifi, Signal, Activity } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
