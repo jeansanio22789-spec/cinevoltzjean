@@ -13,6 +13,7 @@ import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Live from "./pages/Live.tsx";
 import Account from "./pages/Account.tsx";
+import Watch from "./pages/Watch.tsx";
 
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/carreiras" element={<Careers />} />
             <Route path="/ao-vivo" element={<Live />} />
             <Route path="/minha-conta" element={<Account />} />
+            <Route path="/assistir/:id" element={<Watch />} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
