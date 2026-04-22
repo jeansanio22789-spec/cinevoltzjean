@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
 import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
@@ -41,7 +41,7 @@ interface HlsPlayerProps {
 /**
  * Player HLS nativo. Toca .m3u8 direto, sem YouTube/iframe.
  */
-const HlsPlayer = ({
+const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({ 
   src,
   fallbackSrc,
   poster,
@@ -52,7 +52,7 @@ const HlsPlayer = ({
   lowQuality = false,
   aggressiveNetwork = false,
   showSyncIndicator = false,
-}: HlsPlayerProps) => {
+}, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,8 @@ const HlsPlayer = ({
   const failureCountRef = useRef(0);
   const maxLevelRef = useRef(0);
   const stableFragCountRef = useRef(0);
+  const recoveryTimerRef = useRef<number | null>(null);
+  const lastProgressAtRef = useRef(Date.now());
   // 🕒 Sincronização por hora real:
   //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
   const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
@@ -87,6 +89,74 @@ const HlsPlayer = ({
     const off = onClockSync(() => { /* HUD atualiza no próximo tick */ });
     return () => { off(); };
   }, []);
+
+  const syncPlaybackState = (nextPlaying: boolean) => {
+    setPlaying((prev) => (prev === nextPlaying ? prev : nextPlaying));
+    if (nextPlaying) {
+      setLoading(false);
+      setError(null);
+      lastProgressAtRef.current = Date.now();
+    }
+  };
+
+  const clearScheduledRecovery = () => {
+    if (recoveryTimerRef.current !== null) {
+      window.clearTimeout(recoveryTimerRef.current);
+      recoveryTimerRef.current = null;
+    }
+  };
+
+  const recoverPlayback = (reason: string, hard = false) => {
+    const v = videoRef.current;
+    if (!v) return false;
+
+    console.warn(`[HlsPlayer] Forçando retomada (${reason})${hard ? " [hard]" : ""}`);
+    setError(null);
+    setLoading(true);
+
+    try {
+      if (v.buffered.length > 0) {
+        const liveEdge = v.buffered.end(v.buffered.length - 1);
+        const targetLatency = lowQuality ? 1.2 : 2.2;
+        const targetTime = Math.max(0, liveEdge - targetLatency);
+        if (hard || liveEdge - v.currentTime > targetLatency + 1) {
+          v.currentTime = targetTime;
+        }
+      }
+    } catch {
+      /* noop */
+    }
+
+    const hls = hlsRef.current as (Hls & { startLoad?: (startPosition?: number) => void; recoverMediaError?: () => void }) | null;
+    if (hls?.startLoad) {
+      try { hls.startLoad(-1); } catch {
+        try { hls.startLoad(); } catch { /* noop */ }
+      }
+    }
+    if (hard && hls?.recoverMediaError) {
+      try { hls.recoverMediaError(); } catch { /* noop */ }
+    }
+
+    if ((autoPlay || tvMode) && v.paused) {
+      const playAttempt = v.play();
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt.then(() => syncPlaybackState(true)).catch(() => { /* noop */ });
+      }
+    } else if (!v.paused) {
+      syncPlaybackState(true);
+    }
+
+    return true;
+  };
+
+  const scheduleRecovery = (reason: string, delay = 180, hard = false) => {
+    if (recoveryTimerRef.current !== null && !hard) return;
+    clearScheduledRecovery();
+    recoveryTimerRef.current = window.setTimeout(() => {
+      recoveryTimerRef.current = null;
+      recoverPlayback(reason, hard);
+    }, delay);
+  };
 
   // Handler manual: força sync do relógio + realinha o vídeo na hora
   const handleForceSync = () => {
@@ -153,8 +223,10 @@ const HlsPlayer = ({
     const video = videoRef.current;
     if (!video || !activeSrc) return;
 
+    clearScheduledRecovery();
     setError(null);
     setLoading(true);
+    setPlaying(false);
     failureCountRef.current = 0;
     stableFragCountRef.current = 0;
 
@@ -195,6 +267,12 @@ const HlsPlayer = ({
         setLoading(false);
         setError(null);
         safariRetries = 0;
+        if (autoPlay || tvMode) {
+          const playAttempt = video.play();
+          if (playAttempt && typeof playAttempt.then === "function") {
+            playAttempt.then(() => syncPlaybackState(true)).catch(() => { /* noop */ });
+          }
+        }
       };
       const onErr = () => {
         if (destroyed) return;
@@ -206,10 +284,12 @@ const HlsPlayer = ({
           // Mostra status pra usuário não pensar que travou
           setLoading(true);
           retryTimer = window.setTimeout(tryLoad, 600 * safariRetries);
+          scheduleRecovery(`safari retry ${safariRetries}`, 250 * safariRetries, safariRetries > 1);
         } else if (!tryFallback("safari error after retries")) {
-          // Sem fallback — mostra erro pro usuário poder pular de canal
-          setError("Canal indisponível no momento");
-          setLoading(false);
+          if (!recoverPlayback("safari exhausted retries", true)) {
+            setError("Canal indisponível no momento");
+            setLoading(false);
+          }
         }
       };
       video.addEventListener("loadedmetadata", onLoaded);
@@ -286,6 +366,7 @@ const HlsPlayer = ({
         setLoading(false);
         failureCountRef.current = 0;
         applyQualityStrategy();
+        if (!video.paused) syncPlaybackState(true);
       });
 
       // Quando volta a ter dados após buffering, limpa o erro silenciosamente
@@ -306,6 +387,7 @@ const HlsPlayer = ({
         }
         setError(null);
         setLoading(false);
+        if (!video.paused) syncPlaybackState(true);
       });
 
       hls.on(Hls.Events.ERROR, (_evt, data) => {
@@ -320,6 +402,7 @@ const HlsPlayer = ({
               try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
             }
             stepDownQuality("buffer stalled");
+            scheduleRecovery("buffer stalled", 120);
           }
           return;
         }
@@ -335,11 +418,14 @@ const HlsPlayer = ({
               failureCountRef.current >= 3
             ) {
               if (tryFallback(data.details)) return;
-              setError("Canal indisponível no momento");
-              setLoading(false);
+              if (!recoverPlayback(data.details, true)) {
+                setError("Canal indisponível no momento");
+                setLoading(false);
+              }
               return;
             }
             setError("Reconectando...");
+            scheduleRecovery(data.details, 180 * failureCountRef.current, failureCountRef.current >= 2);
             try { hls.startLoad(); } catch { /* noop */ }
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
@@ -351,11 +437,14 @@ const HlsPlayer = ({
               try { hls.recoverMediaError(); } catch { /* noop */ }
             }
             setError("Recuperando...");
+            scheduleRecovery("media error", 120, true);
             break;
           default:
             if (tryFallback(data.details)) return;
-            setError("Canal indisponível no momento");
-            setLoading(false);
+            if (!recoverPlayback(data.details || "unknown error", true)) {
+              setError("Canal indisponível no momento");
+              setLoading(false);
+            }
             break;
         }
       });
@@ -586,6 +675,7 @@ const HlsPlayer = ({
 
   return (
     <div
+      ref={ref}
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
       onContextMenu={(e) => e.preventDefault()}
       onCopy={(e) => e.preventDefault()}
@@ -750,6 +840,8 @@ const HlsPlayer = ({
       )}
     </div>
   );
-};
+});
+
+HlsPlayer.displayName = "HlsPlayer";
 
 export default HlsPlayer;
