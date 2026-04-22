@@ -82,15 +82,10 @@ const HlsPlayer = ({
     void forceSyncServerClock();
   }, [src, activeSrc]);
 
-  // Após cada re-sync do relógio, "cutuca" a próxima iteração do watchdog
-  // forçando uma reavaliação imediata do drift (sem esperar 1s).
+  // Após cada re-sync do relógio, o watchdog (1s) reavalia drift naturalmente.
   useEffect(() => {
-    return onClockSync(() => {
-      const v = videoRef.current;
-      if (!v || v.paused) return;
-      // Pequeno toque na playbackRate força o watchdog a reagir na próxima tick
-      // (e o próprio reportSync vai atualizar o HUD).
-    });
+    const off = onClockSync(() => { /* HUD atualiza no próximo tick */ });
+    return () => { off(); };
   }, []);
 
   // Handler manual: força sync do relógio + realinha o vídeo na hora
