@@ -974,13 +974,27 @@ const HlsPlayer = ({
       {/* Error overlay */}
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center">
-          <AlertTriangle className="w-10 h-10 text-amber-400" />
-          <p className="text-sm text-white">{error}</p>
+          {typeof navigator !== "undefined" && !navigator.onLine ? (
+            <>
+              <div className="w-10 h-10 rounded-full bg-amber-400/20 flex items-center justify-center animate-pulse">
+                <AlertTriangle className="w-6 h-6 text-amber-400" />
+              </div>
+              <p className="text-sm text-white font-semibold">Sem conexão</p>
+              <p className="text-xs text-white/70 max-w-xs">
+                Aguardando Wi-Fi ou 4G voltar — vai retomar sozinho.
+              </p>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="w-10 h-10 text-amber-400" />
+              <p className="text-sm text-white">{error}</p>
+            </>
+          )}
           <button
             onClick={handleRetry}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
           >
-            <RotateCcw className="w-4 h-4" /> Tentar novamente
+            <RotateCcw className="w-4 h-4" /> Tentar agora
           </button>
         </div>
       )}
