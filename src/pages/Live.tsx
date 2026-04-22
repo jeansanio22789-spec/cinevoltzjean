@@ -368,6 +368,11 @@ const Live = () => {
               aggressiveNetwork={!satelliteMode}
               satelliteMode={satelliteMode}
               onError={handlePlayerError}
+              onStats={diagOpen ? (s) => setPlayerStats({
+                ...s,
+                signalKind: signalSource.kind,
+                signalLabel: signalSource.label,
+              }) : undefined}
             />
           ) : (
             <iframe
