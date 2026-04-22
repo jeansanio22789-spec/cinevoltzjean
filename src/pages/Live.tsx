@@ -297,14 +297,30 @@ const Live = () => {
             </span>
           )}
           <button
+            onClick={forceSatScan}
+            disabled={satScanning}
+            className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-accent/15 border border-accent/40 text-accent hover:bg-accent/25 transition-colors disabled:opacity-60 disabled:cursor-wait"
+            aria-label="Forçar busca de canais via satélite"
+            title="Recarrega canais, prioriza SAT e força reconexão"
+          >
+            <Satellite className={`w-3.5 h-3.5 ${satScanning ? "animate-spin" : ""}`} />
+            {satScanning ? "Buscando..." : "Buscar SAT"}
+          </button>
+          <button
             onClick={toggleTvMode}
-            className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
             aria-label={tvMode ? "Sair do modo TV" : "Ativar modo TV"}
           >
             {tvMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
             {tvMode ? "Sair TV" : "Modo TV"}
           </button>
         </div>
+
+        {satScanMsg && (
+          <div className="mb-3 text-xs px-3 py-2 rounded-lg bg-accent/10 border border-accent/30 text-foreground animate-in fade-in slide-in-from-top-1">
+            🛰️ {satScanMsg}
+          </div>
+        )}
 
 
 
