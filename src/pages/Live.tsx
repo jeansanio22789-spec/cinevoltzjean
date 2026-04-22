@@ -31,51 +31,54 @@ const Live = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [tvMode, setTvMode] = useState(false);
+  const [forceSatMode, setForceSatMode] = useState(false);
+  const [satScanning, setSatScanning] = useState(false);
+  const [satScanMsg, setSatScanMsg] = useState<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      const [chanRes, settingsRes] = await Promise.all([
-        supabase
-          .from("live_channels")
-          .select("*")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true })
-          .order("name", { ascending: true }),
-        supabase
-          .from("platform_settings")
-          .select("key, value")
-          .in("key", ["live_stream_url", "live_stream_title"]),
-      ]);
+  const load = useCallback(async () => {
+    const [chanRes, settingsRes] = await Promise.all([
+      supabase
+        .from("live_channels")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("platform_settings")
+        .select("key, value")
+        .in("key", ["live_stream_url", "live_stream_title"]),
+    ]);
 
-      const list = (chanRes.data || []) as Channel[];
-      // Atualização ESTÁVEL: só substitui se algo realmente mudou (preserva referências
-      // dos canais inalterados → não força remount do <HlsPlayer>).
-      setChannels((prev) => {
-        if (prev.length !== list.length) return list;
-        const same = prev.every((p, i) => {
-          const n = list[i];
-          return n && p.id === n.id &&
-            p.stream_url === n.stream_url &&
-            p.fallback_url === n.fallback_url &&
-            p.name === n.name &&
-            p.logo_url === n.logo_url &&
-            p.category === n.category &&
-            p.sort_order === n.sort_order &&
-            p.is_active === n.is_active;
-        });
-        return same ? prev : list;
+    const list = (chanRes.data || []) as Channel[];
+    setChannels((prev) => {
+      if (prev.length !== list.length) return list;
+      const same = prev.every((p, i) => {
+        const n = list[i];
+        return n && p.id === n.id &&
+          p.stream_url === n.stream_url &&
+          p.fallback_url === n.fallback_url &&
+          p.name === n.name &&
+          p.logo_url === n.logo_url &&
+          p.category === n.category &&
+          p.sort_order === n.sort_order &&
+          p.is_active === n.is_active;
       });
-      setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
+      return same ? prev : list;
+    });
+    setSelectedId((prev) => prev ?? (list[0]?.id ?? null));
 
-      const map: Record<string, string> = {};
-      (settingsRes.data || []).forEach((s: any) => { map[s.key] = s.value; });
-      setFallbackUrl((prev) => (prev === (map.live_stream_url || "") ? prev : (map.live_stream_url || "")));
-      if (map.live_stream_title) {
-        setFallbackTitle((prev) => (prev === map.live_stream_title ? prev : map.live_stream_title));
-      }
-      setLoaded(true);
-    };
+    const map: Record<string, string> = {};
+    (settingsRes.data || []).forEach((s: any) => { map[s.key] = s.value; });
+    setFallbackUrl((prev) => (prev === (map.live_stream_url || "") ? prev : (map.live_stream_url || "")));
+    if (map.live_stream_title) {
+      setFallbackTitle((prev) => (prev === map.live_stream_title ? prev : map.live_stream_title));
+    }
+    setLoaded(true);
+    return list;
+  }, []);
+
+  useEffect(() => {
     load();
 
     const channel = supabase
@@ -84,7 +87,7 @@ const Live = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "platform_settings" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [load]);
 
   const selected = useMemo(
     () => channels.find((c) => c.id === selectedId) || null,
@@ -190,9 +193,37 @@ const Live = () => {
   // satélite E o usuário está em rede móvel ou conexão lenta.
   const network = useNetworkProfile();
   const satelliteMode = useMemo(
-    () => signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData),
-    [signalSource.kind, network.isMobile, network.isSlow, network.saveData]
+    () =>
+      forceSatMode ||
+      (signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData)),
+    [forceSatMode, signalSource.kind, network.isMobile, network.isSlow, network.saveData]
   );
+
+  // 🛰️ Força varredura de canais SAT: recarrega lista do banco, prioriza
+  // canais marcados como satélite, força reconexão do player e ativa Modo SAT.
+  const forceSatScan = useCallback(async () => {
+    setSatScanning(true);
+    setSatScanMsg("Buscando canais via satélite...");
+    try {
+      const list = await load();
+      const satChannels = (list || []).filter((c) => detectSignalSource(c.stream_url).kind === "satellite");
+      if (satChannels.length > 0) {
+        setSelectedId(satChannels[0].id);
+        setSatScanMsg(`✅ ${satChannels.length} canal(is) SAT encontrado(s) — sintonizando "${satChannels[0].name}"`);
+      } else if ((list || []).length > 0) {
+        setSatScanMsg(`⚠️ Nenhum canal SAT detectado — forçando Modo SAT no canal atual`);
+      } else {
+        setSatScanMsg("❌ Nenhum canal cadastrado. Adicione em Admin → Canais.");
+      }
+      setForceSatMode(true);
+      setRetryNonce((n) => n + 1);
+    } catch (e: any) {
+      setSatScanMsg(`Erro ao buscar: ${e?.message || "falha desconhecida"}`);
+    } finally {
+      setSatScanning(false);
+      setTimeout(() => setSatScanMsg(null), 5000);
+    }
+  }, [load]);
 
   const copyDiagnostics = useCallback(() => {
     const lines = [
@@ -266,14 +297,30 @@ const Live = () => {
             </span>
           )}
           <button
+            onClick={forceSatScan}
+            disabled={satScanning}
+            className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-accent/15 border border-accent/40 text-accent hover:bg-accent/25 transition-colors disabled:opacity-60 disabled:cursor-wait"
+            aria-label="Forçar busca de canais via satélite"
+            title="Recarrega canais, prioriza SAT e força reconexão"
+          >
+            <Satellite className={`w-3.5 h-3.5 ${satScanning ? "animate-spin" : ""}`} />
+            {satScanning ? "Buscando..." : "Buscar SAT"}
+          </button>
+          <button
             onClick={toggleTvMode}
-            className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
             aria-label={tvMode ? "Sair do modo TV" : "Ativar modo TV"}
           >
             {tvMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
             {tvMode ? "Sair TV" : "Modo TV"}
           </button>
         </div>
+
+        {satScanMsg && (
+          <div className="mb-3 text-xs px-3 py-2 rounded-lg bg-accent/10 border border-accent/30 text-foreground animate-in fade-in slide-in-from-top-1">
+            🛰️ {satScanMsg}
+          </div>
+        )}
 
 
 
