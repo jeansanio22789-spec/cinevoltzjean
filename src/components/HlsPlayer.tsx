@@ -893,6 +893,16 @@ const HlsPlayer = ({
           <span className="ml-auto text-[10px] uppercase tracking-wider font-bold text-white/80 bg-destructive px-2 py-0.5 rounded-full">
             ● AO VIVO
           </span>
+          {(airplayAvailable || castAvailable) && (
+            <button
+              onClick={airplayAvailable ? startAirplay : startCast}
+              className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+              aria-label={airplayAvailable ? "Espelhar via AirPlay" : "Espelhar via Chromecast"}
+              title={airplayAvailable ? "AirPlay" : "Chromecast"}
+            >
+              <Cast className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={goFullscreen}
             className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
