@@ -1,4 +1,5 @@
 import { Play, Info } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { DbMovie } from "@/hooks/useMovies";
 
 interface HeroSectionProps {
@@ -6,6 +7,8 @@ interface HeroSectionProps {
 }
 
 const HeroSection = ({ movie }: HeroSectionProps) => {
+  const navigate = useNavigate();
+  const goToPlans = () => navigate("/planos");
   if (!movie) {
     return (
       <section className="relative w-full h-[85vh] min-h-[500px] bg-background flex items-end px-4 md:px-12 pb-16">
@@ -52,11 +55,17 @@ const HeroSection = ({ movie }: HeroSectionProps) => {
         </div>
 
         <div className="flex items-center gap-3 opacity-0 animate-fade-in-up animate-delay-300">
-          <button className="inline-flex items-center gap-2 px-6 md:px-8 py-3 bg-foreground text-background font-bold text-sm rounded hover:bg-foreground/90 transition-colors">
+          <button
+            onClick={goToPlans}
+            className="inline-flex items-center gap-2 px-6 md:px-8 py-3 bg-foreground text-background font-bold text-sm rounded hover:bg-foreground/90 transition-colors"
+          >
             <Play className="w-5 h-5 fill-current" />
             Assistir
           </button>
-          <button className="inline-flex items-center gap-2 px-6 md:px-8 py-3 bg-muted/60 text-foreground font-semibold text-sm rounded hover:bg-muted/80 transition-colors backdrop-blur-sm">
+          <button
+            onClick={goToPlans}
+            className="inline-flex items-center gap-2 px-6 md:px-8 py-3 bg-muted/60 text-foreground font-semibold text-sm rounded hover:bg-muted/80 transition-colors backdrop-blur-sm"
+          >
             <Info className="w-5 h-5" />
             Mais Informações
           </button>

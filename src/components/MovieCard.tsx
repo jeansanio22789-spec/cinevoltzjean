@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { DbMovie } from "@/hooks/useMovies";
 
 interface MovieCardProps {
@@ -6,8 +7,14 @@ interface MovieCardProps {
 }
 
 const MovieCard = ({ movie }: MovieCardProps) => {
+  const navigate = useNavigate();
+  const goToPlans = () => navigate("/planos");
+
   return (
-    <div className="poster-card relative flex-shrink-0 w-[140px] md:w-[180px] rounded-md overflow-hidden cursor-pointer group">
+    <div
+      onClick={goToPlans}
+      className="poster-card relative flex-shrink-0 w-[140px] md:w-[180px] rounded-md overflow-hidden cursor-pointer group"
+    >
       <div className="aspect-[2/3] relative bg-muted">
         {movie.thumbnail_url ? (
           <img
@@ -22,7 +29,11 @@ const MovieCard = ({ movie }: MovieCardProps) => {
           </div>
         )}
         <div className="absolute inset-0 bg-background/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2 p-3">
-          <button className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center">
+          <button
+            onClick={(e) => { e.stopPropagation(); goToPlans(); }}
+            className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center"
+            aria-label="Assistir"
+          >
             <Play className="w-4 h-4 text-background fill-current ml-0.5" />
           </button>
           <span className="text-xs font-bold text-center leading-tight">{movie.title}</span>
