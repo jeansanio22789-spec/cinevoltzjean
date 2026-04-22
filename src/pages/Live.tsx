@@ -155,6 +155,45 @@ const Live = () => {
   const viewerKey = selected?.id || (fallbackUrl ? "fallback" : null);
   const viewersHere = useLiveViewers(viewerKey, true);
 
+  // 🔴 Erro detalhado vindo do player (ex: "Canal indisponível no momento")
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [errorSince, setErrorSince] = useState<Date | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+
+  // Reseta o erro quando troca de canal/url
+  useEffect(() => {
+    setPlayerError(null);
+    setErrorSince(null);
+  }, [playUrl]);
+
+  const handlePlayerError = useCallback((msg: string | null) => {
+    setPlayerError(msg);
+    if (msg) {
+      setErrorSince((prev) => prev || new Date());
+    } else {
+      setErrorSince(null);
+    }
+  }, []);
+
+  // Extrai identificador LVW-XXXX da URL ativa
+  const lvwId = useMemo(() => {
+    const m = (playUrl || "").match(/LVW-?\d+/i);
+    return m ? m[0].toUpperCase() : null;
+  }, [playUrl]);
+
+  const copyDiagnostics = useCallback(() => {
+    const lines = [
+      `Canal: ${playTitle}`,
+      `ID canal: ${selected?.id || "fallback"}`,
+      `Sinal: ${lvwId || "—"}`,
+      `URL ativa: ${playUrl}`,
+      `Erro: ${playerError || "—"}`,
+      `Desde: ${errorSince?.toLocaleString("pt-BR") || "—"}`,
+      `User-Agent: ${navigator.userAgent}`,
+    ].join("\n");
+    navigator.clipboard?.writeText(lines).catch(() => {});
+  }, [playTitle, selected?.id, lvwId, playUrl, playerError, errorSince]);
+
   // Espectadores em todos os outros canais (apenas observa, não conta nele)
   const otherIds = useMemo(
     () => channels.map((c) => c.id).filter((id) => id !== selected?.id),
