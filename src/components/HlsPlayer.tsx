@@ -311,18 +311,19 @@ const HlsPlayer = ({
           video.src = activeSrc;
           try { video.load(); } catch { /* noop */ }
         }
-        // Watchdog: se em 6s não carregou nada, força um retry / fallback
+        // Watchdog: se em 15s não carregou nada, força um retry / fallback
+        // (segmentos JMVStream chegam a 4s; damos folga real para 1ª conexão)
         if (watchdogTimer) window.clearTimeout(watchdogTimer);
         watchdogTimer = window.setTimeout(() => {
           if (destroyed) return;
           const bufferAhead = getBufferAhead();
-          const noRecentProgress = Date.now() - lastProgressAtRef.current > 6500;
+          const noRecentProgress = Date.now() - lastProgressAtRef.current > 14000;
           const neverStarted = video.currentTime < 0.1 && video.readyState < 2 && bufferAhead < 0.2;
-          if (neverStarted || (noRecentProgress && bufferAhead < 0.2 && video.readyState < 2)) {
-            console.warn("[HlsPlayer] Safari watchdog: stream não respondeu em 6s");
+          if (neverStarted && noRecentProgress) {
+            console.warn("[HlsPlayer] Safari watchdog: stream não respondeu em 15s");
             onErr();
           }
-        }, 6500);
+        }, 15000);
       };
       const onLoaded = () => {
         if (destroyed) return;
