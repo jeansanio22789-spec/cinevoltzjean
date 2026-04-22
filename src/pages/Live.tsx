@@ -395,6 +395,19 @@ const Live = () => {
           )}
         </div>
 
+        {/* 🩺 Painel de diagnóstico técnico em tempo real */}
+        {diagOpen && hasContent && isHls(playUrl) && (
+          <LiveDiagnostics
+            stats={playerStats}
+            onClose={() => setDiagOpen(false)}
+          />
+        )}
+        {diagOpen && hasContent && !isHls(playUrl) && (
+          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+            ⚠️ Diagnóstico técnico só disponível para streams HLS (.m3u8). Este canal usa iframe externo.
+          </div>
+        )}
+
         {/* 🔴 Painel de erro detalhado do player */}
         {playerError && hasContent && (
           <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
