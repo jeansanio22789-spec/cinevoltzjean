@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
-  ShoppingBag, Link2,
+  ShoppingBag, Link2, Radio,
 } from "lucide-react";
 import {
   Sidebar,
@@ -18,6 +18,7 @@ export type AdminTab =
   | "dashboard"
   | "content"
   | "movies"
+  | "channels"
   | "users"
   | "videos"
   | "billing"
@@ -35,6 +36,7 @@ const sections = [
     label: "Conteúdo",
     items: [
       { title: "Catálogo", tab: "movies" as AdminTab, icon: Film },
+      { title: "Canais Ao Vivo", tab: "channels" as AdminTab, icon: Radio },
       { title: "Envio de Vídeos", tab: "videos" as AdminTab, icon: Upload },
     ],
   },
