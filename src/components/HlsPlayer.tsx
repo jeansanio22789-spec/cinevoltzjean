@@ -217,6 +217,7 @@ const HlsPlayer = ({
             if (v && v.buffered.length > 0) {
               try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
             }
+            stepDownQuality("buffer stalled");
           }
           return;
         }
@@ -224,6 +225,7 @@ const HlsPlayer = ({
         failureCountRef.current += 1;
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
+            stepDownQuality(data.details);
             if (
               data.details === "manifestLoadError" ||
               data.details === "manifestLoadTimeOut" ||
@@ -236,6 +238,7 @@ const HlsPlayer = ({
             try { hls.startLoad(); } catch { /* noop */ }
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
+            stepDownQuality("media error");
             if (failureCountRef.current >= 2) {
               if (tryFallback("media error")) return;
               // Última tentativa: troca de codecs
@@ -279,7 +282,7 @@ const HlsPlayer = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSrc, tvMode, lowQuality]);
+  }, [activeSrc, tvMode, lowQuality, aggressiveNetwork]);
 
   // Força tentativa de play (mudo) sempre que possível
   useEffect(() => {
@@ -335,6 +338,7 @@ const HlsPlayer = ({
         stuckCount += 1;
         // 3s travado: tenta cutucar
         if (stuckCount === 3) {
+          stepDownQuality("stall watchdog");
           try {
             if (v.buffered.length > 0) {
               const end = v.buffered.end(v.buffered.length - 1);
@@ -397,6 +401,7 @@ const HlsPlayer = ({
         ref={videoRef}
         poster={poster}
         autoPlay={autoPlay}
+        preload="auto"
         muted={muted}
         playsInline
         controls={nativeControls}
