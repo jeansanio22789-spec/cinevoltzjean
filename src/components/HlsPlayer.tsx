@@ -873,6 +873,89 @@ const HlsPlayer = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSrc, fallbackSrc, showSyncIndicator]);
 
+  // 📊 Reporter de telemetria — emite snapshot a cada 1s para o painel de diagnóstico
+  useEffect(() => {
+    if (!onStats) return;
+    const interval = setInterval(() => {
+      const v = videoRef.current;
+      if (!v) {
+        onStats({
+          engine: "idle", readyState: 0, networkState: 0, paused: true,
+          currentTime: 0, bufferAhead: 0, buffered: 0, bandwidth: 0,
+          currentLevel: -1, autoLevelCap: -1, levelHeight: null, levelBitrate: null,
+          liveLatency: null, droppedFrames: 0,
+          lastError: lastErrorRef.current?.msg || null,
+          lastErrorAt: lastErrorRef.current?.at || null,
+          errorCount: errorCountRef.current,
+          activeSrc, usingFallback,
+        });
+        return;
+      }
+      let bufferAhead = 0;
+      let buffered = 0;
+      try {
+        if (v.buffered.length > 0) {
+          const end = v.buffered.end(v.buffered.length - 1);
+          const start = v.buffered.start(0);
+          bufferAhead = Math.max(0, end - v.currentTime);
+          buffered = Math.max(0, end - start);
+        }
+      } catch { /* noop */ }
+
+      let droppedFrames = 0;
+      try {
+        const q = (v as any).getVideoPlaybackQuality?.();
+        if (q) droppedFrames = q.droppedVideoFrames || 0;
+        else droppedFrames = (v as any).webkitDroppedFrameCount || 0;
+      } catch { /* noop */ }
+
+      const hls = hlsRef.current as any;
+      const isHlsJs = engineRef.current === "hls.js" && hls && typeof hls.loadLevel === "number";
+
+      let bandwidth = 0;
+      let currentLevel = -1;
+      let autoLevelCap = -1;
+      let levelHeight: number | null = null;
+      let levelBitrate: number | null = null;
+      let liveLatency: number | null = null;
+
+      if (isHlsJs) {
+        bandwidth = hls.bandwidthEstimate || 0;
+        currentLevel = typeof hls.currentLevel === "number" ? hls.currentLevel : -1;
+        autoLevelCap = typeof hls.autoLevelCapping === "number" ? hls.autoLevelCapping : -1;
+        const lvl = hls.levels?.[hls.currentLevel >= 0 ? hls.currentLevel : hls.loadLevel];
+        if (lvl) {
+          levelHeight = lvl.height || null;
+          levelBitrate = lvl.bitrate || null;
+        }
+        if (typeof hls.latency === "number" && hls.latency > 0) liveLatency = hls.latency;
+      }
+
+      onStats({
+        engine: engineRef.current,
+        readyState: v.readyState,
+        networkState: v.networkState,
+        paused: v.paused,
+        currentTime: v.currentTime,
+        bufferAhead,
+        buffered,
+        bandwidth,
+        currentLevel,
+        autoLevelCap,
+        levelHeight,
+        levelBitrate,
+        liveLatency,
+        droppedFrames,
+        lastError: lastErrorRef.current?.msg || null,
+        lastErrorAt: lastErrorRef.current?.at || null,
+        errorCount: errorCountRef.current,
+        activeSrc,
+        usingFallback,
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [onStats, activeSrc, usingFallback]);
+
   const handlePlay = () => {
     const v = videoRef.current;
     if (!v) return;
