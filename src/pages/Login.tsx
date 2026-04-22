@@ -3,12 +3,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 import { logAudit } from "@/lib/auditLog";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/admin";
+  const redirectParam = searchParams.get("redirect");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +43,18 @@ const Login = () => {
           description: `Usuário ${email} entrou na plataforma`,
           metadata: { email },
         });
-        navigate(redirect);
+        // Decide destino: admin → /admin, cliente → /minha-conta
+        let destination = redirectParam;
+        if (!destination) {
+          const { data: { user: u } } = await supabase.auth.getUser();
+          if (u) {
+            const { data: isAdmin } = await supabase.rpc("is_admin");
+            destination = isAdmin ? "/admin" : "/minha-conta";
+          } else {
+            destination = "/";
+          }
+        }
+        navigate(destination);
       }
     }
     setLoading(false);
