@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw } from "lucide-react";
+import { ensureClockReady, serverNow } from "@/lib/serverClock";
 
 interface HlsPlayerProps {
   /** Link da playlist .m3u8 (HLS) */
@@ -57,6 +58,12 @@ const HlsPlayer = ({
   const failureCountRef = useRef(0);
   const maxLevelRef = useRef(0);
   const stableFragCountRef = useRef(0);
+  // 🕒 Sincronização por hora real:
+  //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
+  const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
+
+  // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
+  useEffect(() => { ensureClockReady(); }, []);
 
   // Tenta o fallback se houver — retorna true se o switch ocorreu
   const tryFallback = (reason: string) => {
