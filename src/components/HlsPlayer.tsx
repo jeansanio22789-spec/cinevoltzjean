@@ -31,6 +31,11 @@ interface HlsPlayerProps {
    * priorização de bitrate alto sem travar a UI.
    */
   aggressiveNetwork?: boolean;
+  /**
+   * Mostra um pequeno HUD com o status da sincronização por hora real
+   * (modo PDT/borda) e o drift atual em segundos.
+   */
+  showSyncIndicator?: boolean;
 }
 
 /**
@@ -46,6 +51,7 @@ const HlsPlayer = ({
   tvMode = false,
   lowQuality = false,
   aggressiveNetwork = false,
+  showSyncIndicator = false,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -61,6 +67,11 @@ const HlsPlayer = ({
   // 🕒 Sincronização por hora real:
   //   pdtAnchorRef = { pdt: ms epoch do início do segmento, mediaTime: currentTime correspondente }
   const pdtAnchorRef = useRef<{ pdt: number; mediaTime: number } | null>(null);
+  // 📊 Estado da sincronização exposto na UI
+  const [syncInfo, setSyncInfo] = useState<{
+    mode: "pdt" | "edge" | "idle";
+    drift: number; // segundos: + = atrasado, - = à frente
+  }>({ mode: "idle", drift: 0 });
 
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
@@ -354,8 +365,21 @@ const HlsPlayer = ({
     if (!v) return;
     let lastTime = v.currentTime;
     let stuckCount = 0;
+    let lastReport = 0;
     const TARGET_LATENCY = 2.5; // segundos atrás da borda — alvo igual em todos os aparelhos
     const MAX_LATENCY = 6;      // se passar disso, pula pra borda
+
+    const reportSync = (mode: "pdt" | "edge" | "idle", drift: number) => {
+      if (!showSyncIndicator) return;
+      const now = Date.now();
+      // Throttle: só atualiza UI a cada 500ms (e arredonda drift pra 1 casa)
+      if (now - lastReport < 500) return;
+      lastReport = now;
+      const rounded = Math.round(drift * 10) / 10;
+      setSyncInfo((prev) =>
+        prev.mode === mode && prev.drift === rounded ? prev : { mode, drift: rounded }
+      );
+    };
 
     const interval = setInterval(() => {
       // 🔄 SINCRONIZAÇÃO POR HORA REAL — todos os aparelhos no MESMO segundo
@@ -375,6 +399,8 @@ const HlsPlayer = ({
           const targetMediaTime = anchor.mediaTime + (cappedTargetPdt - anchor.pdt) / 1000;
           const drift = targetMediaTime - v.currentTime; // positivo = estamos atrás
 
+          reportSync("pdt", drift);
+
           if (drift > 4) {
             // Muito fora de sincronia → pula direto
             try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
@@ -390,6 +416,9 @@ const HlsPlayer = ({
         } else {
           // Fallback (stream sem PDT): sincroniza pela borda do buffer
           const latency = liveEdge - v.currentTime;
+          const drift = latency - TARGET_LATENCY;
+          reportSync("edge", drift);
+
           if (latency > MAX_LATENCY) {
             try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
           } else if (latency > TARGET_LATENCY + 1.5) {
@@ -398,6 +427,8 @@ const HlsPlayer = ({
             v.playbackRate = 1;
           }
         }
+      } else {
+        reportSync("idle", 0);
       }
 
       // 🛡️ Detecção de stall (igual antes)
@@ -435,7 +466,7 @@ const HlsPlayer = ({
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSrc, fallbackSrc]);
+  }, [activeSrc, fallbackSrc, showSyncIndicator]);
 
   const handlePlay = () => {
     const v = videoRef.current;
@@ -551,6 +582,47 @@ const HlsPlayer = ({
           >
             <RotateCcw className="w-4 h-4" /> Tentar novamente
           </button>
+        </div>
+      )}
+
+      {/* 🕒 Indicador de sincronização por hora real */}
+      {showSyncIndicator && !error && (
+        <div
+          className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm text-[10px] font-bold text-white px-2 py-1 rounded-full pointer-events-none border border-white/10"
+          title={
+            syncInfo.mode === "pdt"
+              ? "Sincronização por hora real (PDT) ativa"
+              : syncInfo.mode === "edge"
+              ? "Sincronização pela borda do buffer (stream sem PDT)"
+              : "Aguardando dados do stream"
+          }
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              syncInfo.mode === "pdt"
+                ? "bg-emerald-400 animate-pulse"
+                : syncInfo.mode === "edge"
+                ? "bg-amber-400"
+                : "bg-zinc-500"
+            }`}
+          />
+          <span className="uppercase tracking-wider">
+            {syncInfo.mode === "pdt" ? "SYNC HORA" : syncInfo.mode === "edge" ? "SYNC BORDA" : "SYNC ..."}
+          </span>
+          {syncInfo.mode !== "idle" && (
+            <span
+              className={`tabular-nums ${
+                Math.abs(syncInfo.drift) < 0.5
+                  ? "text-emerald-300"
+                  : Math.abs(syncInfo.drift) < 1.5
+                  ? "text-amber-300"
+                  : "text-red-300"
+              }`}
+            >
+              {syncInfo.drift > 0 ? "+" : ""}
+              {syncInfo.drift.toFixed(1)}s
+            </span>
+          )}
         </div>
       )}
 
