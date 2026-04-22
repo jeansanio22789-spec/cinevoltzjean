@@ -1,0 +1,1 @@
+UPDATE public.platform_settings SET value = 'false', updated_at = now() WHERE key = 'maintenance_mode';
