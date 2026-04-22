@@ -389,6 +389,37 @@ const HlsPlayer = ({
     else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
   };
 
+  // Reconexão instantânea: limpa erro na hora e tenta caminhos progressivamente
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    failureCountRef.current = 0;
+    stableFragCountRef.current = 0;
+    const v = videoRef.current;
+    const hls = hlsRef.current;
+    try {
+      if (hls) {
+        try { hls.stopLoad(); } catch { /* noop */ }
+        try { hls.startLoad(-1); } catch { /* noop */ }
+        try { hls.recoverMediaError(); } catch { /* noop */ }
+      }
+      if (v) {
+        v.muted = true;
+        const p = v.play();
+        if (p && typeof p.then === "function") p.catch(() => {});
+      }
+      setTimeout(() => {
+        const vv = videoRef.current;
+        const stillStuck = !vv || vv.paused || vv.readyState < 2;
+        if (stillStuck) {
+          if (!tryFallback("manual retry")) setupPlayer();
+        }
+      }, 1500);
+    } catch {
+      setupPlayer();
+    }
+  };
+
   return (
     <div
       className={`relative w-full h-full bg-black overflow-hidden select-none ${className}`}
@@ -442,7 +473,7 @@ const HlsPlayer = ({
           <AlertTriangle className="w-10 h-10 text-amber-400" />
           <p className="text-sm text-white">{error}</p>
           <button
-            onClick={setupPlayer}
+            onClick={handleRetry}
             className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
           >
             <RotateCcw className="w-4 h-4" /> Tentar novamente
