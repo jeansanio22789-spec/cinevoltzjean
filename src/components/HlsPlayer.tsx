@@ -456,8 +456,7 @@ const HlsPlayer = ({
         abrBandWidthUpFactor: 0.6,
 
         // 🔑 Live: tolerante a jitter da rede (sem aceleração brusca)
-        liveSyncDuration: 6,                      // alvo: 6s atrás da borda (mais seguro)
-        liveMaxLatencyDuration: 20,               // só pula se ficar > 20s atrás
+        // Usa apenas *Count (hls.js proíbe misturar com *Duration)
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 10,
         liveDurationInfinity: true,
