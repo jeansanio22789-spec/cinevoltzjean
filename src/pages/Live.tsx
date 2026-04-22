@@ -8,6 +8,7 @@ interface Channel {
   id: string;
   name: string;
   stream_url: string;
+  fallback_url: string | null;
   logo_url: string | null;
   category: string | null;
   sort_order: number;
