@@ -162,6 +162,20 @@ const HlsPlayer = ({
         className="w-full h-full object-contain bg-black"
       />
 
+      {/* Tap-to-play (autoplay bloqueado pelo navegador) */}
+      {!playing && !loading && !error && (
+        <button
+          onClick={handlePlay}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/50 text-white"
+          aria-label="Iniciar transmissão"
+        >
+          <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-2xl animate-pulse">
+            <Play className="w-7 h-7 fill-current ml-1" />
+          </div>
+          <span className="text-xs font-bold uppercase tracking-wider">Toque para iniciar</span>
+        </button>
+      )}
+
       {/* Loading overlay */}
       {loading && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40 pointer-events-none">
