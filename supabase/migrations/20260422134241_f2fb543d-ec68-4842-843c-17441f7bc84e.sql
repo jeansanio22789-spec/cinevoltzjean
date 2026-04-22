@@ -1,0 +1,1 @@
+UPDATE public.platform_settings SET value='https://cdn.live.br1.jmvstream.com/w/LVW-9359/LVW9359_XSyReL0QVf/playlist.m3u8' WHERE key='live_stream_url';
