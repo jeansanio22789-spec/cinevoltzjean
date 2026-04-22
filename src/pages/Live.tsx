@@ -225,6 +225,15 @@ const Live = () => {
             <Radio className="w-3.5 h-3.5" /> AO VIVO
           </span>
           <LiveClockSignal />
+          {hasContent && signalSource.kind !== "unknown" && (
+            <span
+              className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border ${signalSourceClass(signalSource.kind)}`}
+              title={signalSource.fullLabel}
+            >
+              <Satellite className="w-3 h-3" />
+              {signalSource.label}
+            </span>
+          )}
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
           {viewersHere > 0 && (
             <span
