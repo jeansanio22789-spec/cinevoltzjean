@@ -204,8 +204,9 @@ const Live = () => {
               key={`${playUrl}-${tvMode}`}
               src={playUrl}
               fallbackSrc={
+                // Só usa o fallback do PRÓPRIO canal (ou o link único antigo das settings).
+                // NUNCA cai em outro canal — cada transmissão é independente.
                 selected?.fallback_url ||
-                channels.find((c) => c.id !== selected?.id && isHls(c.stream_url))?.stream_url ||
                 (fallbackUrl && isHls(fallbackUrl) && fallbackUrl !== playUrl ? fallbackUrl : null)
               }
               autoPlay
