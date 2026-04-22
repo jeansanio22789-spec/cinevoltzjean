@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw } from "lucide-react";
-import { ensureClockReady, serverNow } from "@/lib/serverClock";
+import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw, RefreshCw } from "lucide-react";
+import { ensureClockReady, serverNow, forceSyncServerClock, onClockSync } from "@/lib/serverClock";
 
 interface HlsPlayerProps {
   /** Link da playlist .m3u8 (HLS) */
@@ -75,6 +75,32 @@ const HlsPlayer = ({
 
   // Inicializa relógio sincronizado (compartilhado entre todas as instâncias)
   useEffect(() => { ensureClockReady(); }, []);
+
+  // Força ressincronização do relógio sempre que trocar de stream — todos os aparelhos
+  // recalibram contra o horário do servidor antes de ancorar a borda viva.
+  useEffect(() => {
+    void forceSyncServerClock();
+  }, [src, activeSrc]);
+
+  // Após cada re-sync do relógio, o watchdog (1s) reavalia drift naturalmente.
+  useEffect(() => {
+    const off = onClockSync(() => { /* HUD atualiza no próximo tick */ });
+    return () => { off(); };
+  }, []);
+
+  // Handler manual: força sync do relógio + realinha o vídeo na hora
+  const handleForceSync = () => {
+    void forceSyncServerClock().then(() => {
+      const v = videoRef.current;
+      const anchor = pdtAnchorRef.current;
+      if (!v || !anchor || v.buffered.length === 0) return;
+      const liveEdge = v.buffered.end(v.buffered.length - 1);
+      const liveEdgePdt = anchor.pdt + (liveEdge - anchor.mediaTime) * 1000;
+      const targetPdt = Math.min(serverNow() - 2500, liveEdgePdt - 300);
+      const targetMediaTime = anchor.mediaTime + (targetPdt - anchor.pdt) / 1000;
+      try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
+    });
+  };
 
   // Tenta o fallback se houver — retorna true se o switch ocorreu
   const tryFallback = (reason: string) => {
@@ -587,42 +613,52 @@ const HlsPlayer = ({
 
       {/* 🕒 Indicador de sincronização por hora real */}
       {showSyncIndicator && !error && (
-        <div
-          className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/55 backdrop-blur-sm text-[10px] font-bold text-white px-2 py-1 rounded-full pointer-events-none border border-white/10"
-          title={
-            syncInfo.mode === "pdt"
-              ? "Sincronização por hora real (PDT) ativa"
-              : syncInfo.mode === "edge"
-              ? "Sincronização pela borda do buffer (stream sem PDT)"
-              : "Aguardando dados do stream"
-          }
-        >
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
+        <div className="absolute top-3 left-3 flex items-center gap-1">
+          <div
+            className="flex items-center gap-1.5 bg-black/55 backdrop-blur-sm text-[10px] font-bold text-white px-2 py-1 rounded-full pointer-events-none border border-white/10"
+            title={
               syncInfo.mode === "pdt"
-                ? "bg-emerald-400 animate-pulse"
+                ? "Sincronização por hora real (PDT) ativa"
                 : syncInfo.mode === "edge"
-                ? "bg-amber-400"
-                : "bg-zinc-500"
-            }`}
-          />
-          <span className="uppercase tracking-wider">
-            {syncInfo.mode === "pdt" ? "SYNC HORA" : syncInfo.mode === "edge" ? "SYNC BORDA" : "SYNC ..."}
-          </span>
-          {syncInfo.mode !== "idle" && (
+                ? "Sincronização pela borda do buffer (stream sem PDT)"
+                : "Aguardando dados do stream"
+            }
+          >
             <span
-              className={`tabular-nums ${
-                Math.abs(syncInfo.drift) < 0.5
-                  ? "text-emerald-300"
-                  : Math.abs(syncInfo.drift) < 1.5
-                  ? "text-amber-300"
-                  : "text-red-300"
+              className={`w-1.5 h-1.5 rounded-full ${
+                syncInfo.mode === "pdt"
+                  ? "bg-emerald-400 animate-pulse"
+                  : syncInfo.mode === "edge"
+                  ? "bg-amber-400"
+                  : "bg-zinc-500"
               }`}
-            >
-              {syncInfo.drift > 0 ? "+" : ""}
-              {syncInfo.drift.toFixed(1)}s
+            />
+            <span className="uppercase tracking-wider">
+              {syncInfo.mode === "pdt" ? "SYNC HORA" : syncInfo.mode === "edge" ? "SYNC BORDA" : "SYNC ..."}
             </span>
-          )}
+            {syncInfo.mode !== "idle" && (
+              <span
+                className={`tabular-nums ${
+                  Math.abs(syncInfo.drift) < 0.5
+                    ? "text-emerald-300"
+                    : Math.abs(syncInfo.drift) < 1.5
+                    ? "text-amber-300"
+                    : "text-red-300"
+                }`}
+              >
+                {syncInfo.drift > 0 ? "+" : ""}
+                {syncInfo.drift.toFixed(1)}s
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleForceSync}
+            className="bg-black/55 hover:bg-black/75 backdrop-blur-sm text-white p-1.5 rounded-full border border-white/10 transition-colors"
+            aria-label="Forçar sincronização"
+            title="Forçar sincronização agora"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </button>
         </div>
       )}
 
