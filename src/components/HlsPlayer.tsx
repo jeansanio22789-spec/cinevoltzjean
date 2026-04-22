@@ -197,16 +197,9 @@ const HlsPlayer = ({
         </div>
       )}
 
-      {/* Custom controls (só se nativeControls = false) */}
+      {/* Custom controls — só volume e tela cheia */}
       {!nativeControls && !error && (
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex items-center gap-2 opacity-0 hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          <button
-            onClick={handlePlay}
-            className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
-            aria-label={playing ? "Pausar" : "Reproduzir"}
-          >
-            <Play className={`w-4 h-4 ${playing ? "" : "fill-current"}`} />
-          </button>
           <button
             onClick={toggleMute}
             className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
