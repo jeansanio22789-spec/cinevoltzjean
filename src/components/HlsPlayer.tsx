@@ -20,13 +20,15 @@ interface HlsPlayerProps {
    * ignora cliques de pausa, sem controles flutuantes.
    */
   tvMode?: boolean;
+  /**
+   * Modo leve: trava na MENOR qualidade, buffer pequeno, ideal para thumbnails
+   * ou quando há vários players simultâneos.
+   */
+  lowQuality?: boolean;
 }
 
 /**
  * Player HLS nativo. Toca .m3u8 direto, sem YouTube/iframe.
- * - Usa HLS.js em navegadores (Chrome, Firefox, Edge, Android)
- * - Usa <video> nativo no Safari (suporta HLS por padrão)
- * - Faz fallback automático para fallbackSrc se o stream principal falhar
  */
 const HlsPlayer = ({
   src,
@@ -36,6 +38,7 @@ const HlsPlayer = ({
   nativeControls = false,
   className = "",
   tvMode = false,
+  lowQuality = false,
 }: HlsPlayerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
