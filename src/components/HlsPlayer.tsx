@@ -5,6 +5,8 @@ import { Loader2, AlertTriangle, Play, Volume2, VolumeX, Maximize, RotateCcw } f
 interface HlsPlayerProps {
   /** Link da playlist .m3u8 (HLS) */
   src: string;
+  /** Link reserva (.m3u8) usado automaticamente se o src principal falhar */
+  fallbackSrc?: string | null;
   /** Imagem opcional mostrada antes do play */
   poster?: string;
   /** Inicia automaticamente (mudo). Padrão: true */
@@ -24,9 +26,11 @@ interface HlsPlayerProps {
  * Player HLS nativo. Toca .m3u8 direto, sem YouTube/iframe.
  * - Usa HLS.js em navegadores (Chrome, Firefox, Edge, Android)
  * - Usa <video> nativo no Safari (suporta HLS por padrão)
+ * - Faz fallback automático para fallbackSrc se o stream principal falhar
  */
 const HlsPlayer = ({
   src,
+  fallbackSrc,
   poster,
   autoPlay = true,
   nativeControls = false,
@@ -39,6 +43,9 @@ const HlsPlayer = ({
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
+  const [activeSrc, setActiveSrc] = useState(src);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const failureCountRef = useRef(0);
 
   const setupPlayer = () => {
     const video = videoRef.current;
