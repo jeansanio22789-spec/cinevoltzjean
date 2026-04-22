@@ -1,19 +1,38 @@
 import { useEffect, useState } from "react";
-import { Globe, Bell, Shield, Save, Loader2 } from "lucide-react";
+import { Globe, Bell, Shield, Save, Loader2, Smartphone, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
+
+interface Device {
+  id: string;
+  device_id: string;
+  device_label: string | null;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at: string;
+}
 
 const AdminSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [currentId, setCurrentId] = useState<string>("");
+
+  const loadDevices = async () => {
+    const { data } = await supabase.from("admin_devices").select("*").order("created_at", { ascending: false });
+    setDevices((data as Device[]) || []);
+  };
 
   useEffect(() => {
+    setCurrentId(getDeviceId());
     const fetch = async () => {
       const { data } = await supabase.from("platform_settings").select("key, value");
       const map: Record<string, string> = {};
       (data || []).forEach((s: any) => { map[s.key] = s.value; });
       setSettings(map);
+      await loadDevices();
       setLoading(false);
     };
     fetch();
@@ -34,6 +53,23 @@ const AdminSettings = () => {
     }
     setSaving(false);
     toast.success("Configurações salvas!");
+  };
+
+  const removeDevice = async (id: string, deviceId: string) => {
+    if (deviceId === currentId) {
+      if (!confirm("Remover ESTE aparelho? Você precisará cadastrar a digital novamente.")) return;
+    } else {
+      if (!confirm("Remover este aparelho da lista de autorizados?")) return;
+    }
+    const { error } = await supabase.from("admin_devices").delete().eq("id", id);
+    if (error) return toast.error("Erro: " + error.message);
+    toast.success("Dispositivo removido");
+    if (deviceId === currentId) {
+      localStorage.removeItem("biometric_credential_id");
+      localStorage.removeItem("biometric_enrolled");
+      window.location.href = "/admin";
+    }
+    loadDevices();
   };
 
   if (loading) {
@@ -68,8 +104,8 @@ const AdminSettings = () => {
             <h3 className="font-bold">Plataforma</h3>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-sm font-medium">Nome da Plataforma</p>
                 <p className="text-xs text-muted-foreground">Nome exibido para os usuários</p>
               </div>
@@ -79,7 +115,7 @@ const AdminSettings = () => {
                 onChange={(e) => updateSetting("platform_name", e.target.value)}
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">Modo Manutenção</p>
                 <p className="text-xs text-muted-foreground">Desativa o site temporariamente</p>
@@ -96,6 +132,62 @@ const AdminSettings = () => {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Dispositivos autorizados */}
+        <div className="bg-card border border-border rounded-lg p-5">
+          <div className="flex items-center gap-3 mb-1">
+            <Smartphone className="w-5 h-5 text-primary" />
+            <h3 className="font-bold">Dispositivos autorizados</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Apenas aparelhos listados aqui podem acessar o painel admin com sua digital.
+          </p>
+          {devices.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum dispositivo cadastrado.</p>
+          ) : (
+            <ul className="space-y-2">
+              {devices.map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-3 p-3 bg-background border border-border rounded">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      {d.device_label || "Dispositivo"}
+                      {d.device_id === currentId && (
+                        <span className="text-[10px] uppercase tracking-wider text-accent bg-accent/20 px-1.5 py-0.5 rounded">
+                          Este aparelho
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      Cadastrado em {new Date(d.created_at).toLocaleDateString("pt-BR")}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeDevice(d.id, d.device_id)}
+                    className="p-2 rounded hover:bg-destructive/10 text-destructive transition-colors"
+                    title="Remover"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            onClick={async () => {
+              const { error } = await supabase.from("admin_devices").insert({
+                user_id: (await supabase.auth.getUser()).data.user?.id,
+                device_id: currentId,
+                device_label: getDeviceLabel(),
+                user_agent: navigator.userAgent,
+              });
+              if (error) toast.error("Erro: " + error.message);
+              else { toast.success("Dispositivo autorizado"); loadDevices(); }
+            }}
+            className="mt-3 flex items-center gap-2 text-xs text-primary hover:underline"
+          >
+            <Plus className="w-3.5 h-3.5" /> Autorizar este aparelho
+          </button>
         </div>
 
         <div className="bg-card border border-border rounded-lg p-5">
@@ -147,15 +239,15 @@ const AdminSettings = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Autenticação Biométrica</p>
-                <p className="text-xs text-muted-foreground">Ativa no app nativo via Capacitor</p>
+                <p className="text-sm font-medium">Biometria + dispositivo travado</p>
+                <p className="text-xs text-muted-foreground">Painel só abre nos aparelhos autorizados</p>
               </div>
               <span className="px-3 py-1.5 bg-accent/20 text-accent text-sm rounded font-medium">Ativo</span>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Admin Restrito</p>
-                <p className="text-xs text-muted-foreground">Apenas email autorizado</p>
+                <p className="text-sm font-medium">Banimento bloqueia conteúdo</p>
+                <p className="text-xs text-muted-foreground">Usuários banidos não acessam filmes</p>
               </div>
               <span className="px-3 py-1.5 bg-accent/20 text-accent text-sm rounded font-medium">Ativo</span>
             </div>
