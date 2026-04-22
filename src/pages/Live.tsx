@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
+import IframeWithFallback from "@/components/IframeWithFallback";
 import LiveDiagnostics, { type LivePlayerStats } from "@/components/LiveDiagnostics";
 import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite, Wifi, Signal, Activity } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -375,13 +376,11 @@ const Live = () => {
               }) : undefined}
             />
           ) : (
-            <iframe
+            <IframeWithFallback
+              key={`${selected?.id || "fallback"}-${retryNonce}`}
               src={playUrl}
-              className="w-full h-full border-0"
-              allowFullScreen
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; accelerometer; gyroscope"
-              referrerPolicy="strict-origin-when-cross-origin"
               title={playTitle}
+              poster={selected?.logo_url || null}
             />
           )}
           {tvMode && (
