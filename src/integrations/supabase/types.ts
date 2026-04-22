@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_devices: {
+        Row: {
+          created_at: string
+          device_id: string
+          device_label: string | null
+          id: string
+          last_seen_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          device_label?: string | null
+          id?: string
+          last_seen_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          device_label?: string | null
+          id?: string
+          last_seen_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -205,6 +235,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_user_status: {
+        Args: { _status: string; _target: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -213,6 +247,11 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_device_authorized: { Args: { _device_id: string }; Returns: boolean }
+      register_admin_device: {
+        Args: { _device_id: string; _label: string; _ua: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
