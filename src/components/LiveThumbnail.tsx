@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Radio, X, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import HlsPlayer from "@/components/HlsPlayer";
+
+const isHls = (url: string) => /\.m3u8(\?.*)?$/i.test(url || "");
 
 const LiveThumbnail = () => {
   const [enabled, setEnabled] = useState(false);
-  const [streamUrl, setStreamUrl] = useState(
-    "https://www.youtube.com/embed/ABVQXgr2LW4?autoplay=1&mute=1&playsinline=1&modestbranding=1&rel=0"
-  );
-  const [title, setTitle] = useState("SBT AO VIVO");
+  const [streamUrl, setStreamUrl] = useState("");
+  const [title, setTitle] = useState("AO VIVO");
   const [closed, setClosed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
@@ -82,14 +83,20 @@ const LiveThumbnail = () => {
 
         {/* Stream — sempre ativo */}
         <div className="relative aspect-video bg-black cursor-pointer" onClick={openLive}>
-          <iframe
-            src={streamUrl}
-            className="w-full h-full border-0 pointer-events-none"
-            allow="autoplay; encrypted-media; picture-in-picture"
-            referrerPolicy="no-referrer"
-            sandbox="allow-scripts allow-same-origin"
-            title="Transmissão ao vivo 24h"
-          />
+          {isHls(streamUrl) ? (
+            <div className="pointer-events-none w-full h-full">
+              <HlsPlayer src={streamUrl} autoPlay nativeControls={false} />
+            </div>
+          ) : streamUrl ? (
+            <iframe
+              src={streamUrl}
+              className="w-full h-full border-0 pointer-events-none"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin"
+              title="Transmissão ao vivo"
+            />
+          ) : null}
           {/* Overlay clicável */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-2">
             <span className="text-[11px] font-bold text-white drop-shadow">
