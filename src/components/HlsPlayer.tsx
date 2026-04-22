@@ -365,8 +365,21 @@ const HlsPlayer = ({
     if (!v) return;
     let lastTime = v.currentTime;
     let stuckCount = 0;
+    let lastReport = 0;
     const TARGET_LATENCY = 2.5; // segundos atrás da borda — alvo igual em todos os aparelhos
     const MAX_LATENCY = 6;      // se passar disso, pula pra borda
+
+    const reportSync = (mode: "pdt" | "edge" | "idle", drift: number) => {
+      if (!showSyncIndicator) return;
+      const now = Date.now();
+      // Throttle: só atualiza UI a cada 500ms (e arredonda drift pra 1 casa)
+      if (now - lastReport < 500) return;
+      lastReport = now;
+      const rounded = Math.round(drift * 10) / 10;
+      setSyncInfo((prev) =>
+        prev.mode === mode && prev.drift === rounded ? prev : { mode, drift: rounded }
+      );
+    };
 
     const interval = setInterval(() => {
       // 🔄 SINCRONIZAÇÃO POR HORA REAL — todos os aparelhos no MESMO segundo
@@ -386,6 +399,8 @@ const HlsPlayer = ({
           const targetMediaTime = anchor.mediaTime + (cappedTargetPdt - anchor.pdt) / 1000;
           const drift = targetMediaTime - v.currentTime; // positivo = estamos atrás
 
+          reportSync("pdt", drift);
+
           if (drift > 4) {
             // Muito fora de sincronia → pula direto
             try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
@@ -401,6 +416,9 @@ const HlsPlayer = ({
         } else {
           // Fallback (stream sem PDT): sincroniza pela borda do buffer
           const latency = liveEdge - v.currentTime;
+          const drift = latency - TARGET_LATENCY;
+          reportSync("edge", drift);
+
           if (latency > MAX_LATENCY) {
             try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
           } else if (latency > TARGET_LATENCY + 1.5) {
@@ -409,6 +427,8 @@ const HlsPlayer = ({
             v.playbackRate = 1;
           }
         }
+      } else {
+        reportSync("idle", 0);
       }
 
       // 🛡️ Detecção de stall (igual antes)
