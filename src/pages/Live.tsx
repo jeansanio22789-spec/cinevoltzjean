@@ -1,8 +1,9 @@
 import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Radio, Tv, Search, X, Monitor, Minimize2 } from "lucide-react";
+import { Radio, Tv, Search, X, Monitor, Minimize2, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useLiveViewers, useLiveViewersMulti } from "@/hooks/useLiveViewers";
 
 interface Channel {
   id: string;
@@ -142,15 +143,38 @@ const Live = () => {
   const playTitle = selected?.name || fallbackTitle;
   const hasContent = !!playUrl;
 
+  // Espectadores assistindo o canal atual (este usuário entra na contagem)
+  const viewerKey = selected?.id || (fallbackUrl ? "fallback" : null);
+  const viewersHere = useLiveViewers(viewerKey, true);
+
+  // Espectadores em todos os outros canais (apenas observa, não conta nele)
+  const otherIds = useMemo(
+    () => channels.map((c) => c.id).filter((id) => id !== selected?.id),
+    [channels, selected?.id]
+  );
+  const viewersByChannel = useLiveViewersMulti(otherIds);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-20 px-4 md:px-12 max-w-6xl mx-auto pb-12">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
           <span className="flex items-center gap-1.5 bg-destructive text-destructive-foreground text-xs font-bold px-3 py-1 rounded-full animate-pulse">
             <Radio className="w-3.5 h-3.5" /> AO VIVO
           </span>
           <h1 className="text-xl md:text-2xl font-black truncate">{playTitle}</h1>
+          {viewersHere > 0 && (
+            <span
+              className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-card border border-border text-foreground"
+              title={`${viewersHere} ${viewersHere === 1 ? "espectador" : "espectadores"} assistindo agora`}
+            >
+              <Users className="w-3.5 h-3.5 text-accent" />
+              {viewersHere.toLocaleString("pt-BR")}
+              <span className="text-muted-foreground font-normal hidden sm:inline">
+                {viewersHere === 1 ? "assistindo" : "assistindo"}
+              </span>
+            </span>
+          )}
           <button
             onClick={toggleTvMode}
             className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold px-3 py-1.5 rounded-full bg-card border border-border hover:border-primary/60 hover:text-primary transition-colors"
@@ -160,6 +184,7 @@ const Live = () => {
             {tvMode ? "Sair TV" : "Modo TV"}
           </button>
         </div>
+
 
         <div
           ref={playerWrapRef}
@@ -267,6 +292,7 @@ const Live = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {list.map((ch) => {
                     const active = ch.id === selectedId;
+                    const channelViewers = active ? viewersHere : (viewersByChannel[ch.id] || 0);
                     return (
                       <button
                         key={ch.id}
@@ -290,8 +316,14 @@ const Live = () => {
                           </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                        <div className="absolute bottom-0 left-0 right-0 p-2">
-                          <p className="text-[11px] font-bold text-white truncate">{ch.name}</p>
+                        <div className="absolute bottom-0 left-0 right-0 p-2 flex items-end justify-between gap-1">
+                          <p className="text-[11px] font-bold text-white truncate flex-1">{ch.name}</p>
+                          {channelViewers > 0 && (
+                            <span className="flex items-center gap-0.5 text-[9px] font-bold text-white bg-black/70 backdrop-blur px-1.5 py-0.5 rounded-full">
+                              <Users className="w-2.5 h-2.5" />
+                              {channelViewers > 999 ? `${(channelViewers / 1000).toFixed(1)}k` : channelViewers}
+                            </span>
+                          )}
                         </div>
                         {active && (
                           <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full">
