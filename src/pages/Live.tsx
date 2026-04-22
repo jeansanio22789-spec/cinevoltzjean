@@ -127,17 +127,6 @@ const Live = () => {
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
-  if (!loaded) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="pt-32 flex justify-center">
-          <Tv className="w-8 h-8 text-muted-foreground animate-pulse" />
-        </div>
-      </div>
-    );
-  }
-
   // Decide o que tocar: canal selecionado OU fallback do settings
   const playUrl = selected?.stream_url || fallbackUrl;
   const playTitle = selected?.name || fallbackTitle;
@@ -153,6 +142,17 @@ const Live = () => {
     [channels, selected?.id]
   );
   const viewersByChannel = useLiveViewersMulti(otherIds);
+
+  if (!loaded) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-32 flex justify-center">
+          <Tv className="w-8 h-8 text-muted-foreground animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
