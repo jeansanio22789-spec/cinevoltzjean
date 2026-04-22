@@ -173,7 +173,17 @@ const Live = () => {
               </p>
             </div>
           ) : isHls(playUrl) ? (
-            <HlsPlayer key={`${playUrl}-${tvMode}`} src={playUrl} autoPlay tvMode={tvMode} />
+            <HlsPlayer
+              key={`${playUrl}-${tvMode}`}
+              src={playUrl}
+              fallbackSrc={
+                selected?.fallback_url ||
+                channels.find((c) => c.id !== selected?.id && isHls(c.stream_url))?.stream_url ||
+                (fallbackUrl && isHls(fallbackUrl) && fallbackUrl !== playUrl ? fallbackUrl : null)
+              }
+              autoPlay
+              tvMode={tvMode}
+            />
           ) : (
             <iframe
               src={playUrl}
