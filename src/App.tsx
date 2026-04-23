@@ -16,6 +16,7 @@ import Account from "./pages/Account.tsx";
 import Watch from "./pages/Watch.tsx";
 import ExternalView from "./pages/ExternalView.tsx";
 import TestChannels from "./pages/TestChannels.tsx";
+import ChannelView from "./pages/ChannelView.tsx";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import LiveThumbnail from "@/components/LiveThumbnail";
 
