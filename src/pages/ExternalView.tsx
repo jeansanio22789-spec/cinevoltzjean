@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 
@@ -12,7 +12,7 @@ import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
  * Em PWA standalone (instalado), a navegação permanece dentro da janela
  * do app, sem barra de navegador.
  */
-const ExternalView = () => {
+const ExternalView = forwardRef<HTMLDivElement>((_props, _ref) => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const url = params.get("url");
@@ -101,6 +101,8 @@ const ExternalView = () => {
       </div>
     </div>
   );
-};
+});
+
+ExternalView.displayName = "ExternalView";
 
 export default ExternalView;
