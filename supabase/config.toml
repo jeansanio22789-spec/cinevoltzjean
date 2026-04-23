@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.mp-check-payment]
 verify_jwt = false
+
+[functions.proxy-stream]
+verify_jwt = false

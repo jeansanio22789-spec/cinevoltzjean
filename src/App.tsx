@@ -44,6 +44,7 @@ const App = () => (
               <Route path="/externo" element={<ExternalView />} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/teste-canais" element={<ProtectedRoute><TestChannels /></ProtectedRoute>} />
+              <Route path="/c/:slug" element={<ChannelView />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <LiveThumbnail />
