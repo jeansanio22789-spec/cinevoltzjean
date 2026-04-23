@@ -1222,6 +1222,8 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
       )}
     </div>
   );
-};
+});
+
+HlsPlayer.displayName = "HlsPlayer";
 
 export default HlsPlayer;
