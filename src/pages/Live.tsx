@@ -197,13 +197,17 @@ const Live = () => {
   const signalSource = useMemo(() => detectSignalSource(playUrl), [playUrl]);
 
   // 📡 Perfil de rede (Wi-Fi vs 4G/3G) — ativa "Modo SAT" quando o canal é
-  // satélite E o usuário está em rede móvel ou conexão lenta.
+  // satélite OU quando o usuário está em rede móvel/lenta (independente do
+  // canal). 1080p sob 4G estoura buffer e dá bufferStalledError no celular.
   const network = useNetworkProfile();
   const satelliteMode = useMemo(
     () =>
       forceSatMode ||
-      (signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData)),
-    [forceSatMode, signalSource.kind, network.isMobile, network.isSlow, network.saveData]
+      (signalSource.kind === "satellite" && (network.isMobile || network.isSlow || network.saveData)) ||
+      network.isSlow ||
+      network.saveData ||
+      (network.isMobile && (network.downlink === 0 || network.downlink < 4)),
+    [forceSatMode, signalSource.kind, network.isMobile, network.isSlow, network.saveData, network.downlink]
   );
 
   // 🛰️ Força varredura de canais SAT: recarrega lista do banco, prioriza
