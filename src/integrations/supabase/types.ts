@@ -355,6 +355,57 @@ export type Database = {
         }
         Relationships: []
       }
+      sponsors: {
+        Row: {
+          clicks: number
+          created_at: string
+          expires_at: string | null
+          id: string
+          impressions: number
+          is_active: boolean
+          logo_url: string | null
+          monthly_amount: number
+          name: string
+          placement: string
+          sort_order: number
+          starts_at: string
+          target_url: string
+          updated_at: string
+        }
+        Insert: {
+          clicks?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          logo_url?: string | null
+          monthly_amount?: number
+          name: string
+          placement?: string
+          sort_order?: number
+          starts_at?: string
+          target_url: string
+          updated_at?: string
+        }
+        Update: {
+          clicks?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          impressions?: number
+          is_active?: boolean
+          logo_url?: string | null
+          monthly_amount?: number
+          name?: string
+          placement?: string
+          sort_order?: number
+          starts_at?: string
+          target_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -481,6 +532,10 @@ export type Database = {
       request_admin_login: {
         Args: { _device_id: string; _device_label: string; _user_agent: string }
         Returns: Json
+      }
+      track_sponsor_event: {
+        Args: { _event: string; _sponsor_id: string }
+        Returns: undefined
       }
     }
     Enums: {

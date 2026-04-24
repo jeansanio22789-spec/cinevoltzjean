@@ -2,6 +2,7 @@ import Navbar from "@/components/Navbar";
 import HlsPlayer from "@/components/HlsPlayer";
 import IframeWithFallback from "@/components/IframeWithFallback";
 import LiveDiagnostics, { type LivePlayerStats } from "@/components/LiveDiagnostics";
+import SponsorBanner from "@/components/SponsorBanner";
 import { Radio, Tv, Search, X, Monitor, Minimize2, Users, AlertTriangle, Copy, RefreshCw, Satellite, Wifi, Signal, Activity } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -343,10 +344,15 @@ const Live = () => {
 
 
 
+        {/* 💰 Banner de patrocinador (topo) — receita em dinheiro */}
+        {!tvMode && <SponsorBanner placement="banner" className="mb-3" />}
+
         <div
           ref={playerWrapRef}
           className={`relative rounded-xl overflow-hidden bg-black ${tvMode ? "fixed inset-0 z-[100] rounded-none" : "aspect-video"}`}
         >
+          {/* 💰 Overlay de patrocinador dentro do player */}
+          {hasContent && <SponsorBanner placement="overlay" />}
           {!hasContent ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6">
               <Tv className="w-12 h-12 text-muted-foreground" />
