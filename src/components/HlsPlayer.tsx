@@ -653,6 +653,15 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
             stepDownQuality("buffer stalled");
             scheduleRecovery("buffer stalled", 120);
           }
+          // levelLoadTimeOut não-fatal → CDN engasgou; força reload imediato
+          // antes que vire fatal e o player desista.
+          if (
+            data.details === "levelLoadTimeOut" ||
+            data.details === "manifestLoadTimeOut" ||
+            data.details === "fragLoadTimeOut"
+          ) {
+            try { hls.startLoad(); } catch { /* noop */ }
+          }
           return;
         }
 
