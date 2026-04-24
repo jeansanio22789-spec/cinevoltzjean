@@ -582,12 +582,17 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
         fpsDroppedMonitoringThreshold: 0.2,
 
         // Retentativas — Modo SAT espera mais entre tentativas (rede móvel oscila)
+        // ⏱️ Timeouts subidos pra 20s (default 10s) — CDNs como JMVStream às vezes
+        // demoram a responder o playlist sob carga, e 10s estoura fácil.
+        fragLoadingTimeOut: satelliteMode ? 30000 : 20000,
         fragLoadingMaxRetry: satelliteMode ? 40 : 30,
         fragLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
         fragLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
+        manifestLoadingTimeOut: satelliteMode ? 30000 : 20000,
         manifestLoadingMaxRetry: satelliteMode ? 40 : 30,
         manifestLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
         manifestLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
+        levelLoadingTimeOut: satelliteMode ? 30000 : 20000,
         levelLoadingMaxRetry: satelliteMode ? 40 : 30,
         levelLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
         levelLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
@@ -647,6 +652,15 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
             }
             stepDownQuality("buffer stalled");
             scheduleRecovery("buffer stalled", 120);
+          }
+          // levelLoadTimeOut não-fatal → CDN engasgou; força reload imediato
+          // antes que vire fatal e o player desista.
+          if (
+            data.details === "levelLoadTimeOut" ||
+            data.details === "manifestLoadTimeOut" ||
+            data.details === "fragLoadTimeOut"
+          ) {
+            try { hls.startLoad(); } catch { /* noop */ }
           }
           return;
         }
