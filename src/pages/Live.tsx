@@ -200,6 +200,19 @@ const Live = () => {
   // satélite OU quando o usuário está em rede móvel/lenta (independente do
   // canal). 1080p sob 4G estoura buffer e dá bufferStalledError no celular.
   const network = useNetworkProfile();
+
+  // 📱 Detecta viewport mobile real (independe da Network API, que mente em alguns
+  // Androids dizendo "4g" mesmo em rede ruim). Em telas pequenas, NUNCA forçar
+  // bitrate alto — o decoder do celular trava em 1080p com chunks de 4s.
+  const [isSmallViewport, setIsSmallViewport] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
+  useEffect(() => {
+    const onResize = () => setIsSmallViewport(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const satelliteMode = useMemo(
     () =>
       forceSatMode ||
@@ -209,6 +222,10 @@ const Live = () => {
       (network.isMobile && (network.downlink === 0 || network.downlink < 4)),
     [forceSatMode, signalSource.kind, network.isMobile, network.isSlow, network.saveData, network.downlink]
   );
+
+  // 🚫 Em mobile (viewport < 768) NUNCA usar aggressiveNetwork — força buffer
+  // grande + qualidade média que cabe no decoder do celular sem travar.
+  const useAggressive = !satelliteMode && !isSmallViewport;
 
   // 🛰️ Força varredura de canais SAT: recarrega lista do banco, prioriza
   // canais marcados como satélite, força reconexão do player e ativa Modo SAT.
@@ -376,8 +393,8 @@ const Live = () => {
               }
               autoPlay
               tvMode={tvMode}
-              aggressiveNetwork={!satelliteMode}
-              satelliteMode={satelliteMode}
+              aggressiveNetwork={useAggressive}
+              satelliteMode={satelliteMode || isSmallViewport}
               onError={handlePlayerError}
               onStats={diagOpen ? (s) => setPlayerStats({
                 ...s,
