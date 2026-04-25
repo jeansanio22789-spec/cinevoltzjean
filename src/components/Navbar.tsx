@@ -36,9 +36,8 @@ const Navbar = () => {
         <span className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-fuchsia-600 flex items-center justify-center shadow-[0_0_16px_hsl(var(--primary)/0.5)]">
           <Play className="w-4 h-4 text-primary-foreground fill-current ml-0.5" />
         </span>
-        <span className="font-black text-xl md:text-2xl tracking-tight">
-          <span className="brand-wordmark">DRAMAS</span>
-          <span className="text-foreground ml-1">TV</span>
+        <span className="font-black text-xl md:text-2xl tracking-tight brand-wordmark">
+          STREAMFLIX
         </span>
       </Link>
 
