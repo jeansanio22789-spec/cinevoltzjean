@@ -25,6 +25,7 @@ const AdminMovies = () => {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [importingTg, setImportingTg] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     title: "",
@@ -280,10 +281,43 @@ const AdminMovies = () => {
                 </label>
                 <input
                   className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder="https://... (YouTube, Vimeo, link direto)"
+                  placeholder="https://... (YouTube, Vimeo, Telegram t.me/..., link direto)"
                   value={form.video_url}
                   onChange={(e) => setForm({ ...form, video_url: e.target.value })}
                 />
+                {/^https?:\/\/(t\.me|telegram\.me)\//i.test(form.video_url) && (
+                  <button
+                    type="button"
+                    disabled={importingTg}
+                    onClick={async () => {
+                      setImportingTg(true);
+                      const tId = toast.loading("Buscando vídeo no Telegram...");
+                      try {
+                        const { data, error } = await supabase.functions.invoke("telegram-fetch", {
+                          body: { url: form.video_url },
+                        });
+                        if (error) throw error;
+                        if (data?.error) throw new Error(data.error);
+                        if (!data?.video_url) throw new Error("Resposta vazia");
+                        setForm((f) => ({ ...f, video_url: data.video_url }));
+                        toast.success("Vídeo importado e hospedado!", { id: tId });
+                      } catch (e) {
+                        const msg = e instanceof Error ? e.message : "Falha ao importar";
+                        toast.error(msg, { id: tId });
+                      } finally {
+                        setImportingTg(false);
+                      }
+                    }}
+                    className="mt-2 w-full flex items-center justify-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-3 py-2 rounded text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {importingTg ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    Importar vídeo do Telegram
+                  </button>
+                )}
               </div>
 
               <div>
