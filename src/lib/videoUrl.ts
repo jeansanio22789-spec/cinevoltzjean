@@ -12,6 +12,16 @@ export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSour
   const url = rawUrl.trim();
   if (!url) return null;
 
+  // Telegram — embed oficial do post (apenas canais PÚBLICOS: t.me/canal/123)
+  // Canais privados (t.me/c/...) não suportam embed pelo Telegram.
+  const tg = url.match(/t\.me\/([A-Za-z0-9_]+)\/(\d+)(?:\?.*)?$/);
+  if (tg) {
+    return {
+      kind: "iframe",
+      url: `https://t.me/${tg[1]}/${tg[2]}?embed=1&mode=tme`,
+    };
+  }
+
   // YouTube
   const yt = url.match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/
