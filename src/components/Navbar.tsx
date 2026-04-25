@@ -36,9 +36,8 @@ const Navbar = () => {
         <span className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-fuchsia-600 flex items-center justify-center shadow-[0_0_16px_hsl(var(--primary)/0.5)]">
           <Play className="w-4 h-4 text-primary-foreground fill-current ml-0.5" />
         </span>
-        <span className="font-black text-xl md:text-2xl tracking-tight">
-          <span className="brand-wordmark">DRAMAS</span>
-          <span className="text-foreground ml-1">TV</span>
+        <span className="font-black text-xl md:text-2xl tracking-tight brand-wordmark">
+          STREAMFLIX
         </span>
       </Link>
 
@@ -63,9 +62,10 @@ const Navbar = () => {
         </button>
         <Link
           to="/planos"
-          className="hidden md:inline-flex items-center px-4 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 btn-premium text-sm font-bold rounded-full hover:scale-105 transition-transform"
         >
-          Assinar
+          <Star className="w-4 h-4 fill-current" />
+          Premium
         </Link>
         {isAdmin && (
           <Link

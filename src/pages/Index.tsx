@@ -31,7 +31,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <HeroSection movie={movies[0] ?? null} />
-      <div className="-mt-16 relative z-10">
+      <div className="relative z-10">
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
