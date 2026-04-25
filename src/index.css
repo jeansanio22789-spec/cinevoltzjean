@@ -120,9 +120,25 @@
 }
 
 .navbar-solid {
-  background: hsl(0 0% 6% / 0.95);
+  background: hsl(230 45% 7% / 0.95);
   backdrop-filter: blur(12px);
   transition: background-color 0.3s ease;
+}
+
+/* Brand wordmark */
+.brand-wordmark {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.02em;
+}
+
+/* Premium pill */
+.btn-premium {
+  background: var(--gradient-gold);
+  color: hsl(var(--gold-foreground));
+  box-shadow: 0 6px 20px -6px hsl(45 95% 58% / 0.55);
 }
 
 /* Fade in animation */
