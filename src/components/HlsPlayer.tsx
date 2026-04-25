@@ -309,9 +309,11 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
     try {
       if (v.buffered.length > 0) {
         const liveEdge = v.buffered.end(v.buffered.length - 1);
-        const targetLatency = lowQuality ? 1.2 : 2.2;
+        // Em celular/Modo SAT, NÃO cola na borda do ao vivo: mantém folga real
+        // de buffer para não entrar em loop de bufferStalledError.
+        const targetLatency = satelliteMode ? 20 : (lowQuality ? 3 : 6);
         const targetTime = Math.max(0, liveEdge - targetLatency);
-        if (hard || liveEdge - v.currentTime > targetLatency + 1) {
+        if (hard || liveEdge - v.currentTime > targetLatency + 8) {
           v.currentTime = targetTime;
         }
       }
