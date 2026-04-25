@@ -62,9 +62,10 @@ const Navbar = () => {
         </button>
         <Link
           to="/planos"
-          className="hidden md:inline-flex items-center px-4 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded hover:bg-primary/90 transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 btn-premium text-sm font-bold rounded-full hover:scale-105 transition-transform"
         >
-          Assinar
+          <Star className="w-4 h-4 fill-current" />
+          Premium
         </Link>
         {isAdmin && (
           <Link
