@@ -640,16 +640,12 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
         if (data.fatal) errorCountRef.current += 1;
 
 
-        // Erros não-fatais: apenas log, hls.js auto-recupera
+        // Erros não-fatais: o hls.js auto-recupera; não ficar pulando currentTime
+        // a cada bufferStalledError, porque isso cria loop de travamento no ao vivo.
         if (!data.fatal) {
-          // bufferStalledError → cutuca o vídeo um pouco à frente
           if (data.details === "bufferStalledError") {
-            const v = videoRef.current;
-            if (v && v.buffered.length > 0) {
-              try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
-            }
             stepDownQuality("buffer stalled");
-            scheduleRecovery("buffer stalled", 120);
+            scheduleRecovery("buffer stalled", satelliteMode ? 2500 : 1400);
           }
           // levelLoadTimeOut não-fatal → CDN engasgou; força reload imediato
           // antes que vire fatal e o player desista.
