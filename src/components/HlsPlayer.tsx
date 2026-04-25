@@ -767,8 +767,8 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
     let lastTime = v.currentTime;
     let stuckCount = 0;
     let lastReport = 0;
-    const TARGET_LATENCY = 2.5; // segundos atrás da borda — alvo igual em todos os aparelhos
-    const MAX_LATENCY = 6;      // se passar disso, pula pra borda
+    const TARGET_LATENCY = satelliteMode ? 20 : 8; // mais folga = menos congelamento
+    const MAX_LATENCY = satelliteMode ? 45 : 24;
 
     const reportSync = (mode: "pdt" | "edge" | "idle", drift: number) => {
       if (!showSyncIndicator) return;
