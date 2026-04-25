@@ -49,22 +49,27 @@
     --sidebar-ring: 357 83% 47%;
 
     /* Custom tokens */
-    --surface: 0 0% 12%;
-    --surface-hover: 0 0% 18%;
-    --text-secondary: 0 0% 70%;
-    --gradient-hero: linear-gradient(to top, hsl(0 0% 6%) 0%, transparent 60%);
-    --gradient-hero-left: linear-gradient(to right, hsl(0 0% 6%) 0%, transparent 50%);
+    --surface: 230 40% 11%;
+    --surface-hover: 230 35% 16%;
+    --text-secondary: 230 15% 75%;
+    --gold: 45 95% 58%;
+    --gold-foreground: 230 45% 7%;
+    --gradient-hero: linear-gradient(to top, hsl(230 45% 7%) 0%, transparent 60%);
+    --gradient-hero-left: linear-gradient(to right, hsl(230 45% 7%) 0%, transparent 50%);
+    --gradient-brand: linear-gradient(135deg, hsl(330 95% 58%) 0%, hsl(290 85% 55%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(48 100% 65%) 0%, hsl(38 95% 55%) 100%);
     --shadow-card: 0 8px 32px -8px hsl(0 0% 0% / 0.6);
+    --shadow-pink-glow: 0 0 24px hsl(330 95% 58% / 0.4);
 
     /* Admin Studio tokens */
-    --admin-bg: 0 0% 4%;
-    --admin-panel: 0 0% 9%;
-    --admin-panel-hover: 0 0% 13%;
-    --admin-border: 0 0% 16%;
-    --gradient-admin-header: linear-gradient(135deg, hsl(357 83% 47% / 0.18) 0%, hsl(0 0% 4%) 60%);
-    --gradient-admin-card: linear-gradient(160deg, hsl(0 0% 11%) 0%, hsl(0 0% 7%) 100%);
-    --gradient-primary-glow: linear-gradient(135deg, hsl(357 83% 55%) 0%, hsl(357 83% 40%) 100%);
-    --shadow-admin: 0 10px 40px -10px hsl(357 83% 47% / 0.25);
+    --admin-bg: 230 50% 5%;
+    --admin-panel: 230 40% 9%;
+    --admin-panel-hover: 230 35% 13%;
+    --admin-border: 230 30% 16%;
+    --gradient-admin-header: linear-gradient(135deg, hsl(330 95% 58% / 0.18) 0%, hsl(230 50% 5%) 60%);
+    --gradient-admin-card: linear-gradient(160deg, hsl(230 40% 11%) 0%, hsl(230 45% 7%) 100%);
+    --gradient-primary-glow: linear-gradient(135deg, hsl(330 95% 65%) 0%, hsl(330 95% 50%) 100%);
+    --shadow-admin: 0 10px 40px -10px hsl(330 95% 58% / 0.25);
     --shadow-admin-card: 0 4px 24px -8px hsl(0 0% 0% / 0.5);
 
   }
