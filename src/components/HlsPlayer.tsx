@@ -802,29 +802,22 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
 
           reportSync("pdt", drift);
 
-          if (drift > 4) {
-            // Muito fora de sincronia → pula direto
+          if (drift > MAX_LATENCY) {
+            // Muito atrasado → pula com folga, sem encostar na borda viva.
             try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
-          } else if (drift > 0.6) {
-            // Levemente atrás → acelera suavemente até alcançar
-            v.playbackRate = 1.3;
-          } else if (drift < -1.5) {
-            // À frente da hora real (raro) → desacelera
-            v.playbackRate = 0.95;
-          } else if (Math.abs(drift) < 0.4 && v.playbackRate !== 1) {
+          } else if (v.playbackRate !== 1) {
             v.playbackRate = 1;
           }
         } else {
-          // Fallback (stream sem PDT): sincroniza pela borda do buffer
+          // Fallback (stream sem PDT): sincroniza pela borda do buffer, sempre
+          // mantendo folga suficiente para evitar bufferStalledError.
           const latency = liveEdge - v.currentTime;
           const drift = latency - TARGET_LATENCY;
           reportSync("edge", drift);
 
           if (latency > MAX_LATENCY) {
-            try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
-          } else if (latency > TARGET_LATENCY + 1.5) {
-            v.playbackRate = 1.3;
-          } else if (latency <= TARGET_LATENCY + 0.5 && v.playbackRate !== 1) {
+            try { v.currentTime = liveEdge - TARGET_LATENCY; v.playbackRate = 1; } catch { /* noop */ }
+          } else if (v.playbackRate !== 1) {
             v.playbackRate = 1;
           }
         }
