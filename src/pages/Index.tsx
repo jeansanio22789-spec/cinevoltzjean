@@ -1,12 +1,18 @@
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import ContentRail from "@/components/ContentRail";
+import AutoScrollRail from "@/components/AutoScrollRail";
 import Footer from "@/components/Footer";
 import { useMovies } from "@/hooks/useMovies";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const { movies, loading } = useMovies();
+
+  const series = movies.filter((m) => {
+    const g = m.genre?.toLowerCase() ?? "";
+    return g.includes("série") || g.includes("serie") || g.includes("seriado");
+  });
 
   const categories = [
     { title: "Em Alta", items: movies },
@@ -39,9 +45,12 @@ const Index = () => {
         ) : categories.length === 0 ? (
           <p className="text-center text-muted-foreground py-20">Nenhum conteúdo disponível ainda.</p>
         ) : (
-          categories.map((cat) => (
-            <ContentRail key={cat.title} title={cat.title} movies={cat.items} />
-          ))
+          <>
+            {categories.map((cat) => (
+              <ContentRail key={cat.title} title={cat.title} movies={cat.items} />
+            ))}
+            <AutoScrollRail title="Séries em destaque" movies={series.length > 0 ? series : movies} />
+          </>
         )}
       </div>
       <Footer />
