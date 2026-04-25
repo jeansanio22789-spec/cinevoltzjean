@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Search, Bell, User, Menu, X } from "lucide-react";
+import { Search, Bell, User, Menu, X, Play, Star } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -32,8 +32,14 @@ const Navbar = () => {
         scrolled ? "navbar-solid" : "navbar-transparent"
       }`}
     >
-      <Link to="/" className="text-primary font-black text-2xl md:text-3xl tracking-tight mr-8">
-        STREAMFLIX
+      <Link to="/" className="flex items-center gap-2 mr-6 shrink-0">
+        <span className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-fuchsia-600 flex items-center justify-center shadow-[0_0_16px_hsl(var(--primary)/0.5)]">
+          <Play className="w-4 h-4 text-primary-foreground fill-current ml-0.5" />
+        </span>
+        <span className="font-black text-xl md:text-2xl tracking-tight">
+          <span className="brand-wordmark">DRAMAS</span>
+          <span className="text-foreground ml-1">TV</span>
+        </span>
       </Link>
 
       <div className="hidden md:flex items-center gap-6 flex-1">
