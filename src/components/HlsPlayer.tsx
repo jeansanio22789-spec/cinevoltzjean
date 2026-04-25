@@ -309,9 +309,11 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
     try {
       if (v.buffered.length > 0) {
         const liveEdge = v.buffered.end(v.buffered.length - 1);
-        const targetLatency = lowQuality ? 1.2 : 2.2;
+        // Em celular/Modo SAT, NÃO cola na borda do ao vivo: mantém folga real
+        // de buffer para não entrar em loop de bufferStalledError.
+        const targetLatency = satelliteMode ? 20 : (lowQuality ? 3 : 6);
         const targetTime = Math.max(0, liveEdge - targetLatency);
-        if (hard || liveEdge - v.currentTime > targetLatency + 1) {
+        if (hard || liveEdge - v.currentTime > targetLatency + 8) {
           v.currentTime = targetTime;
         }
       }
@@ -550,57 +552,53 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
       const samsungTune = isSamsungTV || isSamsungBrowser;
 
       const hls = new Hls({
-        // ⚡ Baixa latência REAL: todos os aparelhos ficam no mesmo segundo
-        // (desligado no Samsung E no Modo SAT — ambos precisam de estabilidade > latência)
-        lowLatencyMode: !samsungTune && !satelliteMode,
-        // 🛰️ Modo SAT: buffer ENORME (90s+) pra absorver oscilações de 4G/3G
-        backBufferLength: satelliteMode ? 90 : (samsungTune ? 60 : (lowQuality ? 8 : 30)),
-        maxBufferLength: satelliteMode ? 90 : (samsungTune ? 60 : (lowQuality ? 12 : 30)),
-        maxMaxBufferLength: satelliteMode ? 180 : (samsungTune ? 120 : (lowQuality ? 24 : 60)),
-        maxBufferSize: satelliteMode ? 180 * 1000 * 1000 : (samsungTune ? 120 * 1000 * 1000 : (lowQuality ? 30 * 1000 * 1000 : 60 * 1000 * 1000)),
-        maxBufferHole: satelliteMode ? 3 : (samsungTune ? 2 : 1),
-        highBufferWatchdogPeriod: satelliteMode ? 6 : (samsungTune ? 4 : 2),
-        nudgeOffset: 0.2,
-        nudgeMaxRetry: 30,
-        startFragPrefetch: !lowQuality,
-        maxStarvationDelay: satelliteMode ? 20 : (samsungTune ? 12 : 8),
+        // Estabilidade acima de baixa latência: o JMVStream está emitindo chunks
+        // curtos (1–4s). Low-latency + live-edge agressivo causa bufferStalledError.
+        lowLatencyMode: false,
+        backBufferLength: satelliteMode ? 120 : (samsungTune ? 90 : (lowQuality ? 12 : 60)),
+        maxBufferLength: satelliteMode ? 120 : (samsungTune ? 90 : (lowQuality ? 18 : 60)),
+        maxMaxBufferLength: satelliteMode ? 240 : (samsungTune ? 180 : (lowQuality ? 36 : 120)),
+        maxBufferSize: satelliteMode ? 220 * 1000 * 1000 : (samsungTune ? 160 * 1000 * 1000 : (lowQuality ? 40 * 1000 * 1000 : 120 * 1000 * 1000)),
+        maxBufferHole: satelliteMode ? 6 : (samsungTune ? 4 : 3),
+        highBufferWatchdogPeriod: satelliteMode ? 8 : (samsungTune ? 6 : 4),
+        nudgeOffset: 0.08,
+        nudgeMaxRetry: 20,
+        startFragPrefetch: true,
+        maxStarvationDelay: satelliteMode ? 30 : (samsungTune ? 20 : 14),
 
-        // ABR — Modo SAT começa baixo e sobe devagar (poupa dados móveis)
-        startLevel: satelliteMode ? 0 : (samsungTune ? 0 : (lowQuality ? 0 : -1)),
-        abrEwmaDefaultEstimate: satelliteMode ? 600_000 : (aggressiveNetwork ? 5_000_000 : 1_000_000),
-        abrBandWidthFactor: satelliteMode ? 0.7 : 0.85,
-        abrBandWidthUpFactor: satelliteMode ? 0.3 : (samsungTune ? 0.4 : 0.6),
+        // ABR conservador: começa baixo e só sobe se a conexão provar estabilidade.
+        startLevel: 0,
+        abrEwmaDefaultEstimate: satelliteMode ? 450_000 : (aggressiveNetwork ? 1_500_000 : 700_000),
+        abrBandWidthFactor: satelliteMode ? 0.55 : 0.65,
+        abrBandWidthUpFactor: satelliteMode ? 0.2 : (samsungTune ? 0.25 : 0.35),
 
-        // 🔑 Live: tolerante a jitter da rede (sem aceleração brusca)
-        liveSyncDurationCount: satelliteMode ? 8 : (samsungTune ? 6 : 3),
-        liveMaxLatencyDurationCount: satelliteMode ? 24 : (samsungTune ? 18 : 10),
+        // Live com folga de buffer; sem aceleração automática de playbackRate.
+        liveSyncDurationCount: satelliteMode ? 10 : (samsungTune ? 8 : 6),
+        liveMaxLatencyDurationCount: satelliteMode ? 36 : (samsungTune ? 28 : 20),
         liveDurationInfinity: true,
-        liveSyncOnStallIncrease: 1,
-        maxLiveSyncPlaybackRate: (satelliteMode || samsungTune) ? 1.0 : 1.1,
+        liveSyncOnStallIncrease: 2,
+        maxLiveSyncPlaybackRate: 1.0,
         preserveManualLevelOnError: false,
         fpsDroppedMonitoringPeriod: 5000,
         fpsDroppedMonitoringThreshold: 0.2,
 
-        // Retentativas — Modo SAT espera mais entre tentativas (rede móvel oscila)
-        // ⏱️ Timeouts subidos pra 20s (default 10s) — CDNs como JMVStream às vezes
-        // demoram a responder o playlist sob carga, e 10s estoura fácil.
-        fragLoadingTimeOut: satelliteMode ? 30000 : 20000,
-        fragLoadingMaxRetry: satelliteMode ? 40 : 30,
-        fragLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
-        fragLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
-        manifestLoadingTimeOut: satelliteMode ? 30000 : 20000,
-        manifestLoadingMaxRetry: satelliteMode ? 40 : 30,
-        manifestLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
-        manifestLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
-        levelLoadingTimeOut: satelliteMode ? 30000 : 20000,
-        levelLoadingMaxRetry: satelliteMode ? 40 : 30,
-        levelLoadingRetryDelay: satelliteMode ? 1000 : (samsungTune ? 600 : 300),
-        levelLoadingMaxRetryTimeout: satelliteMode ? 120000 : 90000,
+        fragLoadingTimeOut: satelliteMode ? 45000 : 30000,
+        fragLoadingMaxRetry: satelliteMode ? 60 : 45,
+        fragLoadingRetryDelay: satelliteMode ? 1500 : (samsungTune ? 1000 : 800),
+        fragLoadingMaxRetryTimeout: satelliteMode ? 180000 : 120000,
+        manifestLoadingTimeOut: satelliteMode ? 45000 : 30000,
+        manifestLoadingMaxRetry: satelliteMode ? 60 : 45,
+        manifestLoadingRetryDelay: satelliteMode ? 1500 : (samsungTune ? 1000 : 800),
+        manifestLoadingMaxRetryTimeout: satelliteMode ? 180000 : 120000,
+        levelLoadingTimeOut: satelliteMode ? 45000 : 30000,
+        levelLoadingMaxRetry: satelliteMode ? 60 : 45,
+        levelLoadingRetryDelay: satelliteMode ? 1500 : (samsungTune ? 1000 : 800),
+        levelLoadingMaxRetryTimeout: satelliteMode ? 180000 : 120000,
 
-        enableWorker: !samsungTune, // worker no Tizen pode dar problemas
-        capLevelToPlayerSize: satelliteMode || samsungTune || !tvMode,
+        enableWorker: !samsungTune,
+        capLevelToPlayerSize: true,
         testBandwidth: !lowQuality,
-        progressive: !samsungTune && !satelliteMode,
+        progressive: false,
       });
       hlsRef.current = hls;
       hls.loadSource(activeSrc);
@@ -642,16 +640,12 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
         if (data.fatal) errorCountRef.current += 1;
 
 
-        // Erros não-fatais: apenas log, hls.js auto-recupera
+        // Erros não-fatais: o hls.js auto-recupera; não ficar pulando currentTime
+        // a cada bufferStalledError, porque isso cria loop de travamento no ao vivo.
         if (!data.fatal) {
-          // bufferStalledError → cutuca o vídeo um pouco à frente
           if (data.details === "bufferStalledError") {
-            const v = videoRef.current;
-            if (v && v.buffered.length > 0) {
-              try { v.currentTime = v.currentTime + 0.1; } catch { /* noop */ }
-            }
             stepDownQuality("buffer stalled");
-            scheduleRecovery("buffer stalled", 120);
+            scheduleRecovery("buffer stalled", satelliteMode ? 2500 : 1400);
           }
           // levelLoadTimeOut não-fatal → CDN engasgou; força reload imediato
           // antes que vire fatal e o player desista.
@@ -773,8 +767,8 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
     let lastTime = v.currentTime;
     let stuckCount = 0;
     let lastReport = 0;
-    const TARGET_LATENCY = 2.5; // segundos atrás da borda — alvo igual em todos os aparelhos
-    const MAX_LATENCY = 6;      // se passar disso, pula pra borda
+    const TARGET_LATENCY = satelliteMode ? 20 : 8; // mais folga = menos congelamento
+    const MAX_LATENCY = satelliteMode ? 45 : 24;
 
     const reportSync = (mode: "pdt" | "edge" | "idle", drift: number) => {
       if (!showSyncIndicator) return;
@@ -808,29 +802,22 @@ const HlsPlayer = forwardRef<HTMLDivElement, HlsPlayerProps>(({
 
           reportSync("pdt", drift);
 
-          if (drift > 4) {
-            // Muito fora de sincronia → pula direto
+          if (drift > MAX_LATENCY) {
+            // Muito atrasado → pula com folga, sem encostar na borda viva.
             try { v.currentTime = targetMediaTime; v.playbackRate = 1; } catch { /* noop */ }
-          } else if (drift > 0.6) {
-            // Levemente atrás → acelera suavemente até alcançar
-            v.playbackRate = 1.3;
-          } else if (drift < -1.5) {
-            // À frente da hora real (raro) → desacelera
-            v.playbackRate = 0.95;
-          } else if (Math.abs(drift) < 0.4 && v.playbackRate !== 1) {
+          } else if (v.playbackRate !== 1) {
             v.playbackRate = 1;
           }
         } else {
-          // Fallback (stream sem PDT): sincroniza pela borda do buffer
+          // Fallback (stream sem PDT): sincroniza pela borda do buffer, sempre
+          // mantendo folga suficiente para evitar bufferStalledError.
           const latency = liveEdge - v.currentTime;
           const drift = latency - TARGET_LATENCY;
           reportSync("edge", drift);
 
           if (latency > MAX_LATENCY) {
-            try { v.currentTime = liveEdge - TARGET_LATENCY; } catch { /* noop */ }
-          } else if (latency > TARGET_LATENCY + 1.5) {
-            v.playbackRate = 1.3;
-          } else if (latency <= TARGET_LATENCY + 0.5 && v.playbackRate !== 1) {
+            try { v.currentTime = liveEdge - TARGET_LATENCY; v.playbackRate = 1; } catch { /* noop */ }
+          } else if (v.playbackRate !== 1) {
             v.playbackRate = 1;
           }
         }
