@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
-  ShoppingBag, Link2, Radio, Megaphone, Send, Library,
+  ShoppingBag, Link2, Radio, Megaphone, Send, Library, Crown, BarChart3, Bell, Palette,
 } from "lucide-react";
 import {
   Sidebar,
@@ -16,8 +16,10 @@ import {
 
 export type AdminTab =
   | "dashboard"
+  | "reports"
   | "content"
   | "movies"
+  | "plans"
   | "channels"
   | "users"
   | "videos"
@@ -27,13 +29,18 @@ export type AdminTab =
   | "purchases"
   | "sponsors"
   | "links"
+  | "notifications"
+  | "branding"
   | "audit"
   | "settings";
 
 const sections = [
   {
     label: "Visão Geral",
-    items: [{ title: "Dashboard", tab: "dashboard" as AdminTab, icon: LayoutDashboard }],
+    items: [
+      { title: "Dashboard", tab: "dashboard" as AdminTab, icon: LayoutDashboard },
+      { title: "Relatórios", tab: "reports" as AdminTab, icon: BarChart3 },
+    ],
   },
   {
     label: "Conteúdo",
@@ -48,6 +55,7 @@ const sections = [
   {
     label: "Negócio",
     items: [
+      { title: "Planos", tab: "plans" as AdminTab, icon: Crown },
       { title: "Faturamento", tab: "billing" as AdminTab, icon: DollarSign },
       { title: "Patrocinadores", tab: "sponsors" as AdminTab, icon: Megaphone },
       { title: "Compras (PIX)", tab: "purchases" as AdminTab, icon: ShoppingBag },
@@ -58,6 +66,8 @@ const sections = [
   {
     label: "Sistema",
     items: [
+      { title: "Notificações", tab: "notifications" as AdminTab, icon: Bell },
+      { title: "Identidade Visual", tab: "branding" as AdminTab, icon: Palette },
       { title: "Log de Auditoria", tab: "audit" as AdminTab, icon: Shield },
       { title: "Configurações", tab: "settings" as AdminTab, icon: Settings },
     ],

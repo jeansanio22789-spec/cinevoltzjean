@@ -256,6 +256,114 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          link: string | null
+          message: string | null
+          title: string
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string | null
+          title: string
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string | null
+          title?: string
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      plan_movies: {
+        Row: {
+          created_at: string
+          id: string
+          movie_id: string
+          plan_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          movie_id: string
+          plan_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          movie_id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_movies_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_movies_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_days: number
+          features: Json | null
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          features?: Json | null
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_days?: number
+          features?: Json | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           id: string
@@ -419,6 +527,7 @@ export type Database = {
           id: string
           last_payment_id: string | null
           plan: string
+          plan_id: string | null
           starts_at: string
           status: string
           updated_at: string
@@ -430,6 +539,7 @@ export type Database = {
           id?: string
           last_payment_id?: string | null
           plan?: string
+          plan_id?: string | null
           starts_at?: string
           status?: string
           updated_at?: string
@@ -441,12 +551,21 @@ export type Database = {
           id?: string
           last_payment_id?: string | null
           plan?: string
+          plan_id?: string | null
           starts_at?: string
           status?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       telegram_bot_state: {
         Row: {
@@ -623,6 +742,38 @@ export type Database = {
         }
         Relationships: []
       }
+      video_views: {
+        Row: {
+          created_at: string
+          id: string
+          movie_id: string
+          user_id: string | null
+          watched_seconds: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          movie_id: string
+          user_id?: string | null
+          watched_seconds?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          movie_id?: string
+          user_id?: string | null
+          watched_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_views_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -640,6 +791,10 @@ export type Database = {
       }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
       has_movie_access: {
+        Args: { _movie_id: string; _user_id: string }
+        Returns: boolean
+      }
+      has_plan_access: {
         Args: { _movie_id: string; _user_id: string }
         Returns: boolean
       }

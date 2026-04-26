@@ -81,19 +81,19 @@ const Watch = () => {
     }
 
     const checkAccess = async () => {
-      // 1. Acesso individual ao filme (liberado pelo admin)
-      const { data: movieAcc } = await supabase.rpc("has_movie_access", {
+      // 1. Acesso por plano (cobre admin, free mode, acesso individual, assinatura)
+      const { data: planAcc } = await supabase.rpc("has_plan_access", {
         _user_id: user.id,
         _movie_id: id,
       });
-      if (movieAcc) {
+      if (planAcc) {
         setHasAccess(true);
         setCheckingAccess(false);
+        // log de view
+        supabase.from("video_views").insert({ movie_id: id, user_id: user.id }).then(() => {});
         return;
       }
-      // 2. Plano ativo libera tudo
-      const { data: planAcc } = await supabase.rpc("has_active_access", { _user_id: user.id });
-      setHasAccess(!!planAcc);
+      setHasAccess(false);
       setCheckingAccess(false);
     };
     checkAccess();

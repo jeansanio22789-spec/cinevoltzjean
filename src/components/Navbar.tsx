@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Search, Bell, User, Menu, X, Play, Star } from "lucide-react";
+import { Search, User, Menu, X, Play, Star } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranding } from "@/hooks/useBranding";
+import NotificationBell from "@/components/NotificationBell";
 
 const navLinks = [
   { label: "Início", path: "/" },
@@ -18,6 +20,7 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isAdmin } = useIsAdmin();
   const { user } = useAuth();
+  const brand = useBranding();
   const location = useLocation();
 
   useEffect(() => {
@@ -33,11 +36,15 @@ const Navbar = () => {
       }`}
     >
       <Link to="/" className="flex items-center gap-2 mr-6 shrink-0">
-        <span className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-fuchsia-600 flex items-center justify-center shadow-[0_0_16px_hsl(var(--primary)/0.5)]">
-          <Play className="w-4 h-4 text-primary-foreground fill-current ml-0.5" />
-        </span>
+        {brand.logoUrl ? (
+          <img src={brand.logoUrl} alt={brand.name} className="w-8 h-8 rounded-md object-contain" />
+        ) : (
+          <span className="w-8 h-8 rounded-md bg-gradient-to-br from-primary to-fuchsia-600 flex items-center justify-center shadow-[0_0_16px_hsl(var(--primary)/0.5)]">
+            <Play className="w-4 h-4 text-primary-foreground fill-current ml-0.5" />
+          </span>
+        )}
         <span className="font-black text-xl md:text-2xl tracking-tight brand-wordmark">
-          STREAMFLIX
+          {(brand.name || "STREAMFLIX").toUpperCase()}
         </span>
       </Link>
 
@@ -57,9 +64,7 @@ const Navbar = () => {
         <button className="text-muted-foreground hover:text-foreground transition-colors">
           <Search className="w-5 h-5" />
         </button>
-        <button className="text-muted-foreground hover:text-foreground transition-colors hidden md:block">
-          <Bell className="w-5 h-5" />
-        </button>
+        <NotificationBell />
         <Link
           to="/planos"
           className="inline-flex items-center gap-1.5 px-4 py-1.5 btn-premium text-sm font-bold rounded-full hover:scale-105 transition-transform"
