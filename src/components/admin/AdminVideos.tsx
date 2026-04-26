@@ -499,80 +499,23 @@ const AdminVideos = () => {
           )}
 
           <div className="space-y-2">
-            {jobs.map((j) => {
+            {jobs.map((j) => (
+              <UploadJobCard
+                key={j.id}
+                job={j}
+                onRetry={() => retry(j.id)}
+                onRemove={() => removeJob(j.id)}
+              />
+            ))}
+            {false && (jobs.map((j) => {
               const badge = statusBadge(j);
               const Icon = badge.icon;
               return (
-                <div
-                  key={j.id}
-                  className="bg-background border border-border rounded-lg p-3 space-y-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <FileVideo className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{j.meta.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {j.file.name} • {(j.file.size / 1024 / 1024).toFixed(1)} MB
-                      </p>
-                    </div>
-                    <span
-                      className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${badge.color}`}
-                    >
-                      <Icon
-                        className={`w-3 h-3 ${
-                          j.status === "saving" || j.status === "uploading"
-                            ? "animate-pulse"
-                            : ""
-                        }`}
-                      />
-                      {badge.label}
-                    </span>
-
-                    {/* Ações */}
-                    {j.status === "error" && (
-                      <button
-                        onClick={() => retry(j.id)}
-                        className="p-1.5 hover:bg-muted rounded transition-colors"
-                        title="Tentar novamente"
-                      >
-                        <RotateCw className="w-3.5 h-3.5 text-primary" />
-                      </button>
-                    )}
-                    {(j.status === "done" || j.status === "error") && (
-                      <button
-                        onClick={() => removeJob(j.id)}
-                        className="p-1.5 hover:bg-muted rounded transition-colors"
-                        title="Remover da fila"
-                      >
-                        <X className="w-3.5 h-3.5 text-muted-foreground" />
-                      </button>
-                    )}
-                  </div>
-
-                  {(j.status === "uploading" ||
-                    j.status === "saving" ||
-                    j.status === "warning") && (
-                    <>
-                      <Progress
-                        value={j.progress}
-                        className={`h-2 ${j.status === "warning" ? "[&>div]:bg-amber-500" : ""}`}
-                      />
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono gap-2 flex-wrap">
-                        <span>{j.progress.toFixed(1)}%</span>
-                        {j.speedMBs > 0 && (
-                          <span className="text-right">
-                            ⚡ {j.speedMBs.toFixed(1)} MB/s
-                            {j.etaSec > 0 && j.etaSec < 99999 && (
-                              <>
-                                {" "}• ⏱ falta {fmtEta(j.etaSec)}
-                                {" "}• 🕒 termina às <b className="text-foreground">{fmtEndTime(j.etaSec)}</b>
-                              </>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  )}
+                <div key={j.id}>
+                  {/* legacy */}
+                </div>
+              );
+            }))}
 
                   {j.status === "warning" && (
                     <p className="text-[11px] text-amber-500">
