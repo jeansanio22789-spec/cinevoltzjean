@@ -7,7 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
-import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
+import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo, saveLocalVideo } from "@/lib/localVideoStore";
+import { Smartphone } from "lucide-react";
 
 interface Video {
   id: string;
