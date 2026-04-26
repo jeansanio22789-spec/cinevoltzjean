@@ -303,14 +303,33 @@ const AdminVideos = () => {
             />
           </div>
 
+          {uploading && (
+            <div className="mt-4 p-4 bg-background border border-border rounded-lg space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-primary" />
+                  {uploadStage}
+                </span>
+                <span className="font-mono text-primary font-bold">{uploadProgress.toFixed(1)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+              {uploadSpeed && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>⚡ {uploadSpeed}</span>
+                  {uploadEta && <span>⏱ Faltam ~{uploadEta}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3 mt-4">
             <button
               onClick={handleUpload}
-              disabled={uploading}
+              disabled={uploading || !selectedFile}
               className="px-6 py-2 bg-primary text-primary-foreground rounded text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {uploading ? uploadProgress : "Enviar e Publicar"}
+              {uploading ? `${uploadStage}...` : "Enviar e Publicar"}
             </button>
           </div>
         </div>
