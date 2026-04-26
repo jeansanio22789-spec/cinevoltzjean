@@ -29,12 +29,13 @@ const statusBadge = (j: UploadJob) => {
     case "queued":
       return { label: "Na fila", icon: Clock, color: "text-muted-foreground bg-muted" };
     case "uploading":
-      return { label: "Enviando", icon: Zap, color: "text-primary bg-primary/15" };
+      return { label: "Em andamento", icon: Zap, color: "text-primary bg-primary/15" };
     case "saving":
       return { label: "Publicando", icon: Loader2, color: "text-primary bg-primary/15" };
     case "warning":
+      // Continua marcando como "Em andamento" (não some), só fica âmbar pra indicar lentidão
       return {
-        label: "Demorando…",
+        label: "Em andamento",
         icon: AlertTriangle,
         color: "text-amber-500 bg-amber-500/15",
       };
