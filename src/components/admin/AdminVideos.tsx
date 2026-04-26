@@ -302,13 +302,29 @@ const AdminVideos = () => {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Image className="w-3.5 h-3.5" /> Thumbnail</label>
+              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Image className="w-3.5 h-3.5" /> Thumbnail (capa)</label>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => e.target.files && setThumbnailFile(e.target.files[0])}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  setThumbnailFile(f);
+                  setForm((prev) => {
+                    if (prev.title.trim()) return prev;
+                    const guess = guessTitleFromFilename(f.name);
+                    if (!guess) return prev;
+                    toast.success(`Título reconhecido: "${guess}"`);
+                    return { ...prev, title: guess };
+                  });
+                }}
                 className="w-full px-3 py-2 bg-background border border-border rounded text-sm file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-muted file:text-foreground"
               />
+              {thumbnailFile && (
+                <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                  📎 {thumbnailFile.name}
+                </p>
+              )}
             </div>
           </div>
 
