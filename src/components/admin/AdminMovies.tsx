@@ -331,6 +331,22 @@ const AdminMovies = () => {
 
               <div>
                 <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-sky-500" /> Link do Telegram (canal/grupo)
+                </label>
+                <input
+                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="https://t.me/+xxxxx ou https://t.me/seucanal/123"
+                  value={form.telegram_url}
+                  onChange={(e) => setForm({ ...form, telegram_url: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                  Quando preenchido, o botão "Assistir" abre essa mensagem direto no Telegram (em vez do player).
+                  Use o link da mensagem do filme/série dentro do seu canal privado.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
                   <Image className="w-3.5 h-3.5" /> Capa do Filme
                 </label>
                 <input
