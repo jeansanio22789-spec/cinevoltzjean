@@ -44,6 +44,34 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+// Detecta faixa de áudio pelo nome do arquivo
+// "Filme.DUAL.1080p.mkv" -> "Dual"   |   "Serie.LEG.mp4" -> "Legendado"
+type AudioTrack = "Dublado" | "Legendado" | "Dual" | "Original";
+const detectAudioFromFilename = (name: string): AudioTrack | null => {
+  const n = name.toLowerCase();
+  // Dual primeiro (tem prioridade — quer dizer que tem dublado E legendado)
+  if (/\b(dual|dual[\s._-]?audio|multi[\s._-]?audio|2audios?)\b/.test(n))
+    return "Dual";
+  if (
+    /\b(dub|dubl|dublad[oa]|dublagem|nacional|português|portugues|pt[\s._-]?br|ptbr|brazilian)\b/.test(
+      n,
+    )
+  )
+    return "Dublado";
+  if (/\b(leg|legend|legendad[oa]|sub|subbed|subtitle[ds]?|vose)\b/.test(n))
+    return "Legendado";
+  return null;
+};
+
+// Detecta a primeira faixa que aparecer numa lista de arquivos (consenso simples)
+const detectAudioFromFiles = (files: File[]): AudioTrack | null => {
+  for (const f of files) {
+    const a = detectAudioFromFilename(f.name);
+    if (a) return a;
+  }
+  return null;
+};
+
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
     case "queued":
