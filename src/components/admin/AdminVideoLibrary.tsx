@@ -33,7 +33,15 @@ interface TgRow {
   processing_error: string | null;
   created_at: string;
   movie_id: string | null;
+  raw_update: any;
 }
+
+const extractChatTitle = (raw: any): string | null => {
+  const msg = raw?.message ?? raw?.channel_post ?? raw?.edited_message ?? raw?.my_chat_member;
+  const chat = msg?.chat;
+  if (!chat) return null;
+  return chat.title ?? chat.username ?? (chat.first_name ? `${chat.first_name}${chat.last_name ? " " + chat.last_name : ""}` : null);
+};
 
 const MONTHS_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
