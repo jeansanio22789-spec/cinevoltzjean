@@ -285,7 +285,7 @@ Deno.serve(async (req) => {
             });
             continue;
           }
-          publicVideoUrl = buildTelegramLink(chatId, row.message_id);
+          publicVideoUrl = buildTelegramLink(row.chat_id, row.message_id);
           viaTelegramLink = true;
         }
 
