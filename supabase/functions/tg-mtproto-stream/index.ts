@@ -1,5 +1,5 @@
-// Edge function: proxia o stream de vídeo do Telegram via MTProto
-// Suporta Range requests (HTTP 206) pra player tocar sem baixar tudo
+// Edge function: proxia stream MTProto com Range requests, retry e cache
+// Otimizado pra vídeos grandes (2-3GB) sem estourar timeout
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { TelegramClient, Api } from "https://deno.land/x/grm@0.8.2/mod.ts";
 import { StringSession } from "https://deno.land/x/grm@0.8.2/sessions/mod.ts";
@@ -8,10 +8,40 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, range",
-  "Access-Control-Expose-Headers": "content-length, content-range, accept-ranges",
+  "Access-Control-Expose-Headers":
+    "content-length, content-range, accept-ranges, content-type",
 };
 
-// Parse https://t.me/c/123456/789  ou  https://t.me/canal_publico/789
+// Cache de cliente MTProto reaproveitado entre requests no mesmo isolate
+let cachedClient: TelegramClient | null = null;
+let cachedSession = "";
+
+async function getClient(stringSession: string, apiId: number, apiHash: string) {
+  if (cachedClient && cachedSession === stringSession) {
+    try {
+      // ping pra ver se ainda tá vivo
+      if (!cachedClient.connected) await cachedClient.connect();
+      return cachedClient;
+    } catch {
+      cachedClient = null;
+    }
+  }
+  const client = new TelegramClient(
+    new StringSession(stringSession),
+    apiId,
+    apiHash,
+    { connectionRetries: 5, retryDelay: 1000, timeout: 15 },
+  );
+  await client.connect();
+  cachedClient = client;
+  cachedSession = stringSession;
+  return client;
+}
+
+// Cache de metadados de mídia (size, mimeType, document) por URL
+const mediaCache = new Map<string, { size: number; mimeType: string; document: any; ts: number }>();
+const META_TTL = 5 * 60 * 1000; // 5 min
+
 function parseTelegramUrl(url: string): { username?: string; channelId?: number; messageId: number } | null {
   try {
     const u = new URL(url.replace(/^https?:\/\/telegram\.me\//i, "https://t.me/"));
@@ -26,6 +56,23 @@ function parseTelegramUrl(url: string): { username?: string; channelId?: number;
     }
   } catch {}
   return null;
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let lastErr: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      // reseta cliente em caso de erro de conexão
+      if (i < attempts - 1) {
+        cachedClient = null;
+        await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 Deno.serve(async (req) => {
@@ -73,45 +120,47 @@ Deno.serve(async (req) => {
       );
     }
 
-    const client = new TelegramClient(
-      new StringSession(sess.string_session),
-      apiId,
-      apiHash,
-      { connectionRetries: 2 },
-    );
-    await client.connect();
+    const client = await getClient(sess.string_session, apiId, apiHash);
 
-    // Resolve a entidade (canal/usuário)
-    let entity: any;
-    if (parsed.username) {
-      entity = await client.getEntity(parsed.username);
-    } else {
-      // canal privado: precisa do peer com -100 prefix
-      entity = await client.getEntity(BigInt(`-100${parsed.channelId}`));
+    // Resolve metadados (com cache)
+    let meta = mediaCache.get(tgUrl);
+    if (!meta || Date.now() - meta.ts > META_TTL) {
+      meta = await withRetry(async () => {
+        let entity: any;
+        if (parsed.username) {
+          entity = await client.getEntity(parsed.username);
+        } else {
+          entity = await client.getEntity(BigInt(`-100${parsed.channelId}`));
+        }
+        const messages = await client.getMessages(entity, { ids: [parsed.messageId] });
+        const msg = messages[0];
+        if (!msg || !msg.media) throw new Error("Mídia não encontrada");
+        const document: any = (msg.media as any).document;
+        if (!document) throw new Error("Mensagem não é vídeo");
+        return {
+          size: Number(document.size),
+          mimeType: document.mimeType || "video/mp4",
+          document,
+          ts: Date.now(),
+        };
+      });
+      mediaCache.set(tgUrl, meta);
     }
 
-    // Pega a mensagem
-    const messages = await client.getMessages(entity, { ids: [parsed.messageId] });
-    const msg = messages[0];
-    if (!msg || !msg.media) {
-      await client.disconnect();
-      return new Response(JSON.stringify({ error: "Mídia não encontrada" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { size: fileSize, mimeType, document } = meta;
+
+    // HEAD request: só metadados, sem corpo
+    if (req.method === "HEAD") {
+      return new Response(null, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": mimeType,
+          "Content-Length": String(fileSize),
+          "Accept-Ranges": "bytes",
+        },
       });
     }
-
-    const document: any = (msg.media as any).document;
-    if (!document) {
-      await client.disconnect();
-      return new Response(JSON.stringify({ error: "Mensagem não é vídeo" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const fileSize = Number(document.size);
-    const mimeType = document.mimeType || "video/mp4";
 
     // Range parsing
     const rangeHeader = req.headers.get("range") || req.headers.get("Range");
@@ -119,70 +168,77 @@ Deno.serve(async (req) => {
     let end = fileSize - 1;
     let isPartial = false;
 
+    // Chunk grande (8MB) — equilíbrio entre throughput e timeout
+    const MAX_CHUNK = 8 * 1024 * 1024;
+
     if (rangeHeader) {
       const m = rangeHeader.match(/bytes=(\d+)-(\d*)/);
       if (m) {
         start = parseInt(m[1]);
         end = m[2] ? parseInt(m[2]) : fileSize - 1;
-        // Limita chunk pra evitar timeout: máx 4MB por request
-        const maxChunk = 4 * 1024 * 1024;
-        if (end - start + 1 > maxChunk) end = start + maxChunk - 1;
+        if (end - start + 1 > MAX_CHUNK) end = start + MAX_CHUNK - 1;
         isPartial = true;
       }
     } else {
-      // Sem range: retorna primeiros 4MB
-      end = Math.min(fileSize - 1, 4 * 1024 * 1024 - 1);
+      end = Math.min(fileSize - 1, MAX_CHUNK - 1);
       isPartial = true;
     }
 
+    // Garante que start está alinhado em 4KB (requisito MTProto)
+    const alignedStart = Math.floor(start / 4096) * 4096;
+    const skip = start - alignedStart;
     const length = end - start + 1;
 
-    // Stream via MTProto - downloadFile com offset/limit
-    // limit precisa ser múltiplo de 4096 e <= 1MB por chunk
+    // Stream chunks MTProto (1MB cada) com retry
+    const CHUNK_LIMIT = 1024 * 1024;
     const chunks: Uint8Array[] = [];
-    const CHUNK_LIMIT = 1024 * 1024; // 1MB chunks MTProto
-    let offset = start;
-    let remaining = length;
+    let offset = alignedStart;
+    let collected = 0;
+    const targetLen = length + skip;
 
-    while (remaining > 0) {
+    while (collected < targetLen) {
+      const remaining = targetLen - collected;
       const limit = Math.min(CHUNK_LIMIT, Math.ceil(remaining / 4096) * 4096);
-      const result: any = await client.invoke(
-        new Api.upload.GetFile({
-          location: new Api.InputDocumentFileLocation({
-            id: document.id,
-            accessHash: document.accessHash,
-            fileReference: document.fileReference,
-            thumbSize: "",
+
+      const result: any = await withRetry(() =>
+        client.invoke(
+          new Api.upload.GetFile({
+            location: new Api.InputDocumentFileLocation({
+              id: document.id,
+              accessHash: document.accessHash,
+              fileReference: document.fileReference,
+              thumbSize: "",
+            }),
+            offset: BigInt(offset),
+            limit,
           }),
-          offset: BigInt(offset),
-          limit,
-        }),
+        ),
       );
+
       const bytes: Uint8Array = result.bytes;
-      // Pode ter retornado mais que pediu (alinhado em 4096); cortar
-      const usable = bytes.subarray(0, Math.min(bytes.length, remaining));
-      chunks.push(usable);
-      offset += usable.length;
-      remaining -= usable.length;
-      if (bytes.length === 0) break;
+      if (!bytes || bytes.length === 0) break;
+      chunks.push(bytes);
+      offset += bytes.length;
+      collected += bytes.length;
     }
 
-    await client.disconnect();
-
+    // Junta chunks e remove o "skip" inicial
     const totalLen = chunks.reduce((a, c) => a + c.length, 0);
-    const body = new Uint8Array(totalLen);
+    const merged = new Uint8Array(totalLen);
     let pos = 0;
     for (const c of chunks) {
-      body.set(c, pos);
+      merged.set(c, pos);
       pos += c.length;
     }
+    const body = merged.subarray(skip, skip + length);
 
     const headers: Record<string, string> = {
       ...corsHeaders,
       "Content-Type": mimeType,
       "Content-Length": String(body.length),
       "Accept-Ranges": "bytes",
-      "Cache-Control": "public, max-age=3600",
+      // Cache CDN por 1h — mesmo range pedido de novo vem do cache
+      "Cache-Control": "public, max-age=3600, immutable",
     };
 
     if (isPartial) {
