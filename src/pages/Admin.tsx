@@ -47,6 +47,13 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Permite abrir o painel direto numa aba específica via ?tab=videos
+  useEffect(() => {
+    const tab = searchParams.get("tab") as AdminTab | null;
+    if (tab && tab in tabTitles) setActiveTab(tab);
+  }, [searchParams]);
 
   const handleSignOut = async () => {
     await signOut();
