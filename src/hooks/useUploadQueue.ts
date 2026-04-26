@@ -108,7 +108,7 @@ const uploadFileTus = (
 interface EnqueueInput {
   file: File;
   thumbnail?: File | null;
-  meta: { title: string; genre: string; description: string };
+  meta: { title: string; genre: string; description: string; audio?: string };
 }
 
 export const useUploadQueue = (onJobDone?: () => void) => {
