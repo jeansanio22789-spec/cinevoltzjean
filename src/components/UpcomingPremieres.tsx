@@ -34,8 +34,11 @@ const UpcomingPremieres = () => {
 
       <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-2">
         {upcoming.map((j) => {
-          const hasEta = j.etaSec > 0 && j.etaSec < 99999;
-          const endLabel = hasEta ? fmtEndTime(j.etaSec) : null;
+          // Hora prevista CONGELADA (não oscila). Se ainda não foi travada,
+          // usa o ETA atual como fallback.
+          const endAt =
+            j.lockedEndAt ?? (j.etaSec > 0 ? Date.now() + j.etaSec * 1000 : 0);
+          const endLabel = endAt > 0 ? fmtEndTimeFromTs(endAt) : null;
           const isWaiting = j.status === "queued" || j.status === "saving";
           return (
             <div
