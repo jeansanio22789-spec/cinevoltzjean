@@ -367,35 +367,6 @@ Deno.serve(async (req) => {
             );
           } catch (_) { /* ignora */ }
         }
-        } catch (procErr) {
-          const errMsg = (procErr as Error).message;
-          console.error(`[update ${update.update_id}]`, errMsg);
-          log.push(`update ${update.update_id}: ${errMsg}`);
-          await supabase
-            .from("telegram_messages")
-            .update({
-              processing_status: "error",
-              processing_error: errMsg,
-              processed_at: new Date().toISOString(),
-            })
-            .eq("update_id", update.update_id);
-
-          // Tenta avisar no chat
-          try {
-            await tg(
-              "sendMessage",
-              {
-                chat_id: msg.chat.id,
-                reply_to_message_id: msg.message_id,
-                text: `❌ Erro ao processar: ${errMsg.slice(0, 200)}`,
-              },
-              LOVABLE_API_KEY,
-              TELEGRAM_API_KEY,
-            );
-          } catch (_) {
-            // ignora
-          }
-        }
       }
 
       // Avança offset apenas após processamento bem-sucedido
