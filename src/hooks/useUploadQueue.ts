@@ -365,6 +365,7 @@ const runJob = async (job: UploadJob) => {
     if (error) throw error;
 
     store.update(job.id, { status: "done", progress: 100 });
+    void deletePersistedUploadJob(job.id);
     for (const cb of doneCallbacks) {
       try {
         cb();
