@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -16,10 +15,9 @@ import type { UploadJob } from "@/hooks/useUploadQueue";
 const fmtEta = (sec: number) =>
   sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
 
-// Hora local prevista de término (ex.: 14:32) — usa o ETA pra prever
-const fmtEndTime = (etaSec: number) => {
-  const end = new Date(Date.now() + etaSec * 1000);
-  return end.toLocaleTimeString("pt-BR", {
+// Hora local prevista de término (ex.: 14:32) — recebe um timestamp absoluto
+const fmtEndTimeFromTs = (endAtMs: number) => {
+  return new Date(endAtMs).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -59,29 +57,12 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
   const showProgress =
     j.status === "uploading" || j.status === "saving" || j.status === "warning";
 
-  // Snapshot do ETA / hora prevista no momento em que o upload trava ("warning").
-  // Assim o tempo estimado e a hora prevista ficam PARADOS enquanto a rede está
-  // lenta, em vez de ficar oscilando e confundindo.
-  const frozenRef = useRef<{ etaSec: number; endLabel: string } | null>(null);
-  useEffect(() => {
-    if (j.status === "warning") {
-      if (!frozenRef.current && j.etaSec > 0 && j.etaSec < 99999) {
-        frozenRef.current = {
-          etaSec: j.etaSec,
-          endLabel: fmtEndTime(j.etaSec),
-        };
-      }
-    } else {
-      frozenRef.current = null;
-    }
-  }, [j.status, j.etaSec]);
-
-  const displayEta =
-    j.status === "warning" && frozenRef.current ? frozenRef.current.etaSec : j.etaSec;
-  const displayEndLabel =
-    j.status === "warning" && frozenRef.current
-      ? frozenRef.current.endLabel
-      : fmtEndTime(j.etaSec);
+  // Estimativas FIXAS vindas do hook (não oscilam).
+  // Se ainda não foi travada (uploads muito rápidos ou início), usa o ETA atual.
+  const displayEta = j.lockedEtaSec ?? j.etaSec;
+  const displayEndAt =
+    j.lockedEndAt ?? (j.etaSec > 0 ? Date.now() + j.etaSec * 1000 : 0);
+  const displayEndLabel = displayEndAt > 0 ? fmtEndTimeFromTs(displayEndAt) : "";
 
   return (
     <div className="bg-background border border-border rounded-lg p-3 space-y-2">

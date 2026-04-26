@@ -1,13 +1,11 @@
 import { FileVideo, Sparkles } from "lucide-react";
 import { useUploadQueue } from "@/hooks/useUploadQueue";
 
-const fmtEndTime = (etaSec: number) => {
-  const end = new Date(Date.now() + etaSec * 1000);
-  return end.toLocaleTimeString("pt-BR", {
+const fmtEndTimeFromTs = (endAtMs: number) =>
+  new Date(endAtMs).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
 
 /**
  * Mostra na home, estilo "estreia", os filmes que estão sendo enviados agora,
@@ -36,8 +34,11 @@ const UpcomingPremieres = () => {
 
       <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-2">
         {upcoming.map((j) => {
-          const hasEta = j.etaSec > 0 && j.etaSec < 99999;
-          const endLabel = hasEta ? fmtEndTime(j.etaSec) : null;
+          // Hora prevista CONGELADA (não oscila). Se ainda não foi travada,
+          // usa o ETA atual como fallback.
+          const endAt =
+            j.lockedEndAt ?? (j.etaSec > 0 ? Date.now() + j.etaSec * 1000 : 0);
+          const endLabel = endAt > 0 ? fmtEndTimeFromTs(endAt) : null;
           const isWaiting = j.status === "queued" || j.status === "saving";
           return (
             <div
