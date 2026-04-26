@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
-  ShoppingBag, Link2, Radio, Megaphone, Send,
+  ShoppingBag, Link2, Radio, Megaphone, Send, Library,
 } from "lucide-react";
 import {
   Sidebar,
