@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { buildShareLink } from "@/lib/videoUrl";
 import { logAudit } from "@/lib/auditLog";
+import { useResumableUpload } from "@/hooks/useResumableUpload";
+import VideoUploadProgress from "./VideoUploadProgress";
 
 interface Movie {
   id: string;
