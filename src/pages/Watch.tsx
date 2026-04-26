@@ -188,8 +188,13 @@ const Watch = () => {
 
   const source = resolveVideoSource(movie.video_url);
 
+  // Mostra a vinheta de abertura (estilo Netflix) só quando há vídeo de fato
+  const hasPlayableVideo = source && source.kind !== "unknown";
+  const showIntro = hasPlayableVideo && !introDone;
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
+      {showIntro && <IntroVignette onFinish={() => setIntroDone(true)} />}
       <div className="w-full h-screen">
         {!source || source.kind === "unknown" ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white gap-4">
