@@ -59,12 +59,6 @@ const AdminVideos = () => {
     }
   };
 
-  const handleUpload = async () => {
-    if (!form.title.trim()) {
-      toast.error("Título é obrigatório");
-      return;
-    }
-
   // Upload file via XHR to Supabase Storage REST API with real progress tracking
   const uploadFileWithProgress = async (
     bucket: string,
