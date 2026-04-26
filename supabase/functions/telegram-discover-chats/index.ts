@@ -46,7 +46,21 @@ Deno.serve(async (req) => {
       }),
     });
 
-    const data = await response.json();
+    const rawText = await response.text();
+    let data: any = null;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: `Gateway respondeu ${response.status} sem JSON. Conteúdo: ${rawText.slice(0, 200)}`,
+          hint: 'O conector Telegram pode estar com problema. Tente reconectar ou aguarde uns segundos (pode haver outro polling rodando em paralelo).',
+        }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     if (!response.ok || !data.ok) {
       return new Response(
         JSON.stringify({
