@@ -344,7 +344,7 @@ const AdminVideos = () => {
                   {uploadEta && <span className="font-semibold">⏱ Faltam ~{uploadEta}</span>}
                 </div>
               )}
-              <div className="flex items-start gap-2 text-xs text-amber-500 bg-amber-500/10 p-2 rounded">
+              <div className="flex items-start gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <p>
                   <b>Mantenha esta aba aberta</b> até terminar. Se fechar o navegador, o upload para
