@@ -77,6 +77,11 @@ const store = {
     jobs.forEach((j) => void persistUploadJob(toPersistedJob(j)));
     this.emit();
   },
+  hydrate(jobs: UploadJob[]) {
+    this.jobs = jobs;
+    this.initialized = true;
+    this.emit();
+  },
   remove(id: string) {
     const target = this.jobs.find((j) => j.id === id);
     target?.abort?.();
