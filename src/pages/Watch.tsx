@@ -187,24 +187,11 @@ const Watch = () => {
   const source = resolveVideoSource(movie.video_url);
 
   return (
-    <div className="min-h-screen bg-black">
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-white text-sm font-medium hover:opacity-80"
-        >
-          <ArrowLeft className="w-5 h-5" /> Voltar
-        </button>
-        <h2 className="text-white font-semibold text-sm md:text-base truncate max-w-[60%]">
-          {movie.title}
-        </h2>
-        <div className="w-16" />
-      </div>
-
-      <div className="w-full h-screen flex items-center justify-center">
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="w-full h-screen">
         {!source || source.kind === "unknown" ? (
-          <div className="text-center px-6 text-white">
-            <p className="mb-4">Este filme ainda não tem vídeo disponível.</p>
+          <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white gap-4">
+            <p>Este filme ainda não tem vídeo disponível.</p>
             {source?.url && (
               <a
                 href={source.url}
@@ -215,26 +202,36 @@ const Watch = () => {
                 <ExternalLink className="w-4 h-4" /> Abrir link externo
               </a>
             )}
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 text-white/80 text-sm hover:text-white"
+            >
+              <ArrowLeft className="w-4 h-4" /> Voltar
+            </button>
           </div>
         ) : source.kind === "iframe" ? (
-          <iframe
-            src={source.url}
-            className="w-full h-full border-0"
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            allowFullScreen
-            title={movie.title}
-          />
+          <div className="relative w-full h-full">
+            <button
+              onClick={() => navigate(-1)}
+              className="absolute top-3 left-3 z-20 flex items-center gap-2 bg-black/60 backdrop-blur-md text-white text-sm font-medium px-3 py-2 rounded-full hover:bg-black/80 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Voltar
+            </button>
+            <iframe
+              src={source.url}
+              className="w-full h-full border-0"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              allowFullScreen
+              title={movie.title}
+            />
+          </div>
         ) : (
-          <video
+          <VideoPlayer
             src={source.url}
-            poster={movie.thumbnail_url || undefined}
-            controls
-            autoPlay
-            playsInline
-            className="w-full h-full object-contain bg-black"
-          >
-            Seu navegador não suporta o player de vídeo.
-          </video>
+            poster={movie.thumbnail_url}
+            title={movie.title}
+            onBack={() => navigate(-1)}
+          />
         )}
       </div>
     </div>
