@@ -762,7 +762,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                     4K
                   </span>
                 )}
-                {currentQuality !== -1 && qualities[currentQuality]?.height >= 2160 && (
+                {currentQuality !== -1 && (displayQualities.find((d) => d.index === currentQuality)?.height ?? 0) >= 2160 && (
                   <span className="text-[9px] font-bold bg-accent text-accent-foreground px-1 py-0.5 rounded leading-none">
                     4K
                   </span>
