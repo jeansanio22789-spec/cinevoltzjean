@@ -32,6 +32,10 @@ export interface UploadJob {
   progress: number;
   speedMBs: number;
   etaSec: number;
+  /** Estimativa CONGELADA do tempo restante (não oscila). Setado uma vez. */
+  lockedEtaSec?: number;
+  /** Timestamp absoluto (ms) da hora prevista de término. Não muda. */
+  lockedEndAt?: number;
   errorMsg?: string;
   startedAt?: number;
   timedOut: boolean;
