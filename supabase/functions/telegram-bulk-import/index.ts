@@ -12,7 +12,8 @@ const corsHeaders = {
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-const MAX_TG_FILE_BYTES = 20 * 1024 * 1024; // Bot API hard limit
+// Sem limite local de tamanho — tenta baixar qualquer arquivo. O Telegram pode
+// recusar arquivos > 20MB via Bot API, e nesse caso o erro é registrado.
 const DORAMAS_CHAT_KEY = 'telegram_doramas_chat_id';
 
 interface ProcessResult {
