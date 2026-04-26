@@ -138,6 +138,8 @@ const AdminVideos = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
+  const [downloadingLink, setDownloadingLink] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [recognizingTitle, setRecognizingTitle] = useState(false);
 
   // Lê o título escrito na capa via IA com visão (OCR semântico).
