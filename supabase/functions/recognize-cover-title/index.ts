@@ -9,13 +9,18 @@ const corsHeaders = {
 };
 
 const SYSTEM_PROMPT = `Você analisa capas (pôsteres) de filmes, séries, animes e doramas.
-Sua tarefa: LER o título principal escrito na imagem e devolvê-lo limpo.
+Sua tarefa: LER o que está escrito na imagem e devolver o título e a faixa de áudio.
 
 Regras:
 - "title": apenas o nome principal da obra como aparece na capa (em qualquer idioma).
   Sem ano, sem "Temporada 1", sem "S01E02", sem "1080p", sem nome do estúdio.
 - "original_title": se houver dois títulos visíveis (ex.: original em japonês + traduzido),
   coloque o original aqui. Senão null.
+- "audio": leia se a capa indica a faixa de áudio. Procure por selos/textos como:
+  "DUBLADO", "DUB", "NACIONAL", "PT-BR", "PORTUGUÊS" → "Dublado".
+  "LEGENDADO", "LEG", "SUB", "SUBTITLED" → "Legendado".
+  "DUAL", "DUAL ÁUDIO", "DUB+LEG", "DUBLADO E LEGENDADO" → "Dual".
+  Se a capa NÃO mostra nenhum desses indicadores, use "Original".
 - "confidence": "high" se você leu o título com clareza,
   "medium" se está parcialmente legível,
   "low" se não dá pra ter certeza.
