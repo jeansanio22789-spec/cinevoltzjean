@@ -177,7 +177,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [settingsTab, setSettingsTab] = useState<
     null | "main" | "speed" | "quality" | "audio" | "subs"
   >(null);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(() => getPlayerPrefs().speed ?? 1);
   const [seeking, setSeeking] = useState(false);
   const [centerHint, setCenterHint] = useState<null | "play" | "pause" | "back" | "forward">(null);
 
