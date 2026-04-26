@@ -218,40 +218,148 @@ const AdminTelegramImport = () => {
     }
   };
 
-  // Bulk import
-  const [bulkRunning, setBulkRunning] = useState(false);
-  const [bulkResults, setBulkResults] = useState<{
-    imported: number;
+  // Fila de revisão (preview antes de publicar)
+  interface PreviewItem {
+    update_id: number;
+    title: string;
+    video_url: string;
+    thumbnail_url: string | null;
+    duration_min: number | null;
+    size_mb: number | null;
+    meta: AIMetadata;
+  }
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
+  const [previewSummary, setPreviewSummary] = useState<{
     skipped: number;
     errors: number;
     still_pending: number;
-    results: Array<{ status: string; reason?: string; title?: string }>;
   } | null>(null);
+  const [publishingId, setPublishingId] = useState<number | null>(null);
 
-  const runBulkImport = async () => {
-    setBulkRunning(true);
+  const loadPreviewQueue = async () => {
+    setPreviewLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("telegram-bulk-import", {
-        body: { limit: 5 },
+        body: { limit: 5, dryRun: true },
       });
       if (error) throw new Error(error.message);
       if (!data?.ok) throw new Error(data?.error || "Falha desconhecida");
-      setBulkResults(data);
-      toast({
-        title: `${data.imported} publicado(s)`,
-        description:
-          data.skipped > 0 || data.errors > 0
-            ? `${data.skipped} pulado(s), ${data.errors} erro(s). ${data.still_pending} pendente(s).`
-            : `${data.still_pending} pendente(s) restando.`,
+
+      const items: PreviewItem[] = (data.results || [])
+        .filter((r: any) => r.status === "preview")
+        .map((r: any) => ({
+          update_id: r.update_id,
+          title: r.title,
+          video_url: r.video_url,
+          thumbnail_url: r.thumbnail_url,
+          duration_min: r.duration_min,
+          size_mb: r.size_mb,
+          meta: r.meta,
+        }));
+      setPreviewItems(items);
+      setPreviewSummary({
+        skipped: data.skipped || 0,
+        errors: data.errors || 0,
+        still_pending: data.still_pending || 0,
       });
+
+      if (items.length === 0) {
+        toast({
+          title: "Nada pra revisar",
+          description: data.still_pending > 0
+            ? `${data.still_pending} pendente(s) — todos falharam ou são >20MB.`
+            : "Não há vídeos pendentes do canal.",
+        });
+      } else {
+        toast({
+          title: `${items.length} vídeo(s) pronto(s) pra revisar`,
+          description: "Confira capa/título e clique em Publicar.",
+        });
+      }
     } catch (e) {
       toast({
-        title: "Erro no import em massa",
+        title: "Erro ao preparar fila",
         description: e instanceof Error ? e.message : "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
-      setBulkRunning(false);
+      setPreviewLoading(false);
+    }
+  };
+
+  const updatePreviewItem = (updateId: number, patch: Partial<PreviewItem>) => {
+    setPreviewItems((prev) =>
+      prev.map((it) => (it.update_id === updateId ? { ...it, ...patch } : it)),
+    );
+  };
+
+  const updatePreviewMeta = (updateId: number, patch: Partial<AIMetadata>) => {
+    setPreviewItems((prev) =>
+      prev.map((it) =>
+        it.update_id === updateId ? { ...it, meta: { ...it.meta, ...patch } } : it,
+      ),
+    );
+  };
+
+  const confirmPublish = async (item: PreviewItem) => {
+    if (!item.meta.title.trim()) {
+      toast({ title: "Título obrigatório", variant: "destructive" });
+      return;
+    }
+    setPublishingId(item.update_id);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-publish-one", {
+        body: {
+          update_id: item.update_id,
+          title: item.meta.title,
+          video_url: item.video_url,
+          thumbnail_url: item.thumbnail_url,
+          genre: item.meta.genre,
+          year: item.meta.year,
+          duration_min: item.duration_min,
+          description: item.meta.synopsis,
+          kind: item.meta.kind,
+          season: item.meta.season,
+          episode: item.meta.episode,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Falha ao publicar");
+      toast({ title: "Publicado!", description: data.title });
+      setPreviewItems((prev) => prev.filter((it) => it.update_id !== item.update_id));
+    } catch (e) {
+      toast({
+        title: "Erro ao publicar",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const discardItem = async (item: PreviewItem) => {
+    setPublishingId(item.update_id);
+    try {
+      const { error } = await supabase
+        .from("telegram_messages")
+        .update({
+          processing_status: "discarded",
+          processed_at: new Date().toISOString(),
+        })
+        .eq("update_id", item.update_id);
+      if (error) throw error;
+      setPreviewItems((prev) => prev.filter((it) => it.update_id !== item.update_id));
+      toast({ title: "Vídeo descartado" });
+    } catch (e) {
+      toast({
+        title: "Erro ao descartar",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setPublishingId(null);
     }
   };
 
