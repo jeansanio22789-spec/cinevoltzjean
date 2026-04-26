@@ -332,25 +332,26 @@ const AdminVideos = () => {
               <input
                 type="file"
                 accept="image/*"
+                disabled={recognizingTitle}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
                   setThumbnailFile(f);
-                  setForm((prev) => {
-                    if (prev.title.trim()) return prev;
-                    const guess = guessTitleFromFilename(f.name);
-                    if (!guess) return prev;
-                    toast.success(`Título reconhecido: "${guess}"`);
-                    return { ...prev, title: guess };
-                  });
+                  // Lê o título escrito na própria capa via IA
+                  void recognizeTitleFromCover(f);
                 }}
-                className="w-full px-3 py-2 bg-background border border-border rounded text-sm file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-muted file:text-foreground"
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-muted file:text-foreground disabled:opacity-60"
               />
-              {thumbnailFile && (
+              {recognizingTitle ? (
+                <p className="text-[11px] text-primary mt-1 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Lendo o título escrito na capa…
+                </p>
+              ) : thumbnailFile ? (
                 <p className="text-[11px] text-muted-foreground mt-1 truncate">
                   📎 {thumbnailFile.name}
                 </p>
-              )}
+              ) : null}
             </div>
           </div>
 
