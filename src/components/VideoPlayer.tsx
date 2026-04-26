@@ -238,6 +238,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("canplay", onPlaying);
       v.removeEventListener("progress", onProgress);
       v.removeEventListener("volumechange", onVol);
+    };
   }, []);
 
   // ---- Aplica preferências (volume/velocidade) ao trocar de filme ----
