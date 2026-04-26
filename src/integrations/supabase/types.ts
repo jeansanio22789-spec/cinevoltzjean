@@ -214,6 +214,7 @@ export type Database = {
           id: string
           rating: string | null
           status: string | null
+          telegram_url: string | null
           thumbnail_url: string | null
           title: string
           updated_at: string
@@ -228,6 +229,7 @@ export type Database = {
           id?: string
           rating?: string | null
           status?: string | null
+          telegram_url?: string | null
           thumbnail_url?: string | null
           title: string
           updated_at?: string
@@ -242,6 +244,7 @@ export type Database = {
           id?: string
           rating?: string | null
           status?: string | null
+          telegram_url?: string | null
           thumbnail_url?: string | null
           title?: string
           updated_at?: string
@@ -564,6 +567,41 @@ export type Database = {
         }
         Relationships: []
       }
+      user_movie_access: {
+        Row: {
+          expires_at: string | null
+          granted_at: string
+          granted_by: string | null
+          id: string
+          movie_id: string
+          user_id: string
+        }
+        Insert: {
+          expires_at?: string | null
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          movie_id: string
+          user_id: string
+        }
+        Update: {
+          expires_at?: string | null
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          movie_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_movie_access_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -598,6 +636,10 @@ export type Database = {
         Returns: Json
       }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
+      has_movie_access: {
+        Args: { _movie_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
