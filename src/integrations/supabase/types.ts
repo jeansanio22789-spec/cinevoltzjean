@@ -442,6 +442,92 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_bot_state: {
+        Row: {
+          id: number
+          update_offset: number
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          update_offset?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          update_offset?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telegram_messages: {
+        Row: {
+          caption: string | null
+          chat_id: number
+          created_at: string
+          duration: number | null
+          file_id: string | null
+          file_size: number | null
+          file_unique_id: string | null
+          message_id: number | null
+          mime_type: string | null
+          movie_id: string | null
+          processed_at: string | null
+          processing_error: string | null
+          processing_status: string
+          raw_update: Json
+          text: string | null
+          thumb_file_id: string | null
+          update_id: number
+        }
+        Insert: {
+          caption?: string | null
+          chat_id: number
+          created_at?: string
+          duration?: number | null
+          file_id?: string | null
+          file_size?: number | null
+          file_unique_id?: string | null
+          message_id?: number | null
+          mime_type?: string | null
+          movie_id?: string | null
+          processed_at?: string | null
+          processing_error?: string | null
+          processing_status?: string
+          raw_update: Json
+          text?: string | null
+          thumb_file_id?: string | null
+          update_id: number
+        }
+        Update: {
+          caption?: string | null
+          chat_id?: number
+          created_at?: string
+          duration?: number | null
+          file_id?: string | null
+          file_size?: number | null
+          file_unique_id?: string | null
+          message_id?: number | null
+          mime_type?: string | null
+          movie_id?: string | null
+          processed_at?: string | null
+          processing_error?: string | null
+          processing_status?: string
+          raw_update?: Json
+          text?: string | null
+          thumb_file_id?: string | null
+          update_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_messages_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
