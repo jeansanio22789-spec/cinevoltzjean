@@ -1,13 +1,11 @@
 import { FileVideo, Sparkles } from "lucide-react";
 import { useUploadQueue } from "@/hooks/useUploadQueue";
 
-const fmtEndTime = (etaSec: number) => {
-  const end = new Date(Date.now() + etaSec * 1000);
-  return end.toLocaleTimeString("pt-BR", {
+const fmtEndTimeFromTs = (endAtMs: number) =>
+  new Date(endAtMs).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
 
 /**
  * Mostra na home, estilo "estreia", os filmes que estão sendo enviados agora,
