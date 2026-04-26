@@ -269,7 +269,23 @@ Deno.serve(async (req) => {
             ? `${meta.title} — T${meta.season}E${meta.episode}`
             : meta.title;
 
-        // Insere movie
+        if (dryRun) {
+          // Modo preview: NÃO publica em movies, NÃO altera processing_status.
+          // Retorna URLs já carregadas no storage + metadados sugeridos.
+          results.push({
+            update_id: row.update_id,
+            status: 'preview',
+            title: fullTitle,
+            video_url: pub.publicUrl,
+            thumbnail_url: thumbUrl,
+            duration_min: row.duration ? Math.round(row.duration / 60) : null,
+            size_mb: row.file_size ? Math.round((row.file_size / 1024 / 1024) * 10) / 10 : null,
+            meta,
+          });
+          continue;
+        }
+
+        // Modo publish direto (legado): cria movie e marca como imported.
         const { data: movie, error: movieErr } = await supabase
           .from('movies')
           .insert({
@@ -303,14 +319,17 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        await supabase
-          .from('telegram_messages')
-          .update({
-            processing_status: 'error',
-            processing_error: msg.slice(0, 500),
-            processed_at: new Date().toISOString(),
-          })
-          .eq('update_id', row.update_id);
+        // Em dryRun também não persistimos erro permanente — só reportamos.
+        if (!dryRun) {
+          await supabase
+            .from('telegram_messages')
+            .update({
+              processing_status: 'error',
+              processing_error: msg.slice(0, 500),
+              processed_at: new Date().toISOString(),
+            })
+            .eq('update_id', row.update_id);
+        }
         results.push({ update_id: row.update_id, status: 'error', reason: msg });
       }
     }
