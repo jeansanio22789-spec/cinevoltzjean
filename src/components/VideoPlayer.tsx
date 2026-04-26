@@ -55,6 +55,18 @@ const fmt = (s: number) => {
   return `${m}:${String(sec).padStart(2, "0")}`;
 };
 
+const labelForHeight = (h: number, bitrate?: number): string => {
+  if (h >= 4320) return "8K (4320p)";
+  if (h >= 2160) return "4K UHD (2160p)";
+  if (h >= 1440) return "2K (1440p)";
+  if (h >= 1080) return "Full HD (1080p)";
+  if (h >= 720) return "HD (720p)";
+  if (h >= 480) return "SD (480p)";
+  if (h > 0) return `${h}p`;
+  if (bitrate) return `${Math.round(bitrate / 1000)} kbps`;
+  return "Auto";
+};
+
 // ---------- Subcomponentes do menu de configurações ----------
 const SettingsRow = ({
   icon,
