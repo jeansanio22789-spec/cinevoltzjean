@@ -65,14 +65,23 @@ const randomId = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 export const saveLocalVideo = async (file: File): Promise<string> => {
+  return saveLocalBlob(file, file.name, file.type || "video/mp4");
+};
+
+// Salva qualquer Blob (ex.: baixado de um link via fetch) no IndexedDB
+export const saveLocalBlob = async (
+  blob: Blob,
+  name: string,
+  type?: string,
+): Promise<string> => {
   const id = randomId();
   const record: StoredRecord = {
     id,
-    name: file.name,
-    size: file.size,
-    type: file.type || "video/mp4",
+    name,
+    size: blob.size,
+    type: type || blob.type || "video/mp4",
     createdAt: Date.now(),
-    blob: file,
+    blob,
   };
   const { db, tx, store } = await txStore("readwrite");
   store.put(record);
