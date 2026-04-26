@@ -152,11 +152,22 @@ if (typeof window !== "undefined") {
     e.returnValue = "Uploads em andamento — se fechar, vão parar!";
   });
 
-  // Quando a aba volta do background, re-pede wake lock (browser solta sozinho)
+  // Quando a aba volta do background, re-pede wake lock e retoma
+  // qualquer job que estava rodando mas perdeu o XHR vivo.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && hasActiveUploads()) {
-      void requestWakeLock();
-    }
+    if (document.visibilityState !== "visible") return;
+    if (hasActiveUploads()) void requestWakeLock();
+    // Retoma jobs que estavam ativos mas não têm runner vivo (ex.: aba foi
+    // pro background no mobile e o navegador matou o XHR).
+    store.jobs.forEach((j) => {
+      const isActive =
+        j.status === "uploading" ||
+        j.status === "warning" ||
+        j.status === "queued";
+      if (isActive && !runningJobIds.has(j.id)) {
+        void runJob(j);
+      }
+    });
   });
 }
 
