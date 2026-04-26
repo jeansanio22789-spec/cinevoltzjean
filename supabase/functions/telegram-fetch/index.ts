@@ -116,6 +116,50 @@ Deno.serve(async (req) => {
       );
     }
 
+    // 0. Valida que o bot consegue enxergar o chat de armazenamento e tem
+    // permissão de postar/encaminhar mensagens nele. Falha cedo com erro claro.
+    try {
+      const chat = await tg(
+        "getChat",
+        { chat_id: STORAGE_CHAT_ID },
+        LOVABLE_API_KEY,
+        TELEGRAM_API_KEY,
+      );
+      // Confirma que o bot é membro (e idealmente admin) do chat
+      const me = await tg("getMe", {}, LOVABLE_API_KEY, TELEGRAM_API_KEY);
+      const member = await tg(
+        "getChatMember",
+        { chat_id: STORAGE_CHAT_ID, user_id: me.id },
+        LOVABLE_API_KEY,
+        TELEGRAM_API_KEY,
+      );
+      const status = member?.status;
+      if (status === "left" || status === "kicked") {
+        throw new Error(
+          `O bot não é membro do chat de armazenamento "${chat.title || STORAGE_CHAT_ID}". Adicione o bot ao grupo como administrador.`,
+        );
+      }
+      if (chat.type === "channel" && status !== "administrator" && status !== "creator") {
+        throw new Error(
+          `O bot precisa ser administrador no canal "${chat.title || STORAGE_CHAT_ID}" pra encaminhar vídeos.`,
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Mensagens típicas do Telegram quando o bot não tem acesso
+      if (/chat not found/i.test(msg)) {
+        throw new Error(
+          `TELEGRAM_STORAGE_CHAT_ID inválido ou inacessível (${STORAGE_CHAT_ID}). Crie um grupo, adicione o bot como administrador e atualize o secret com o chat_id correto (ex: -1001234567890).`,
+        );
+      }
+      if (/bot is not a member|user not found|PEER_ID_INVALID/i.test(msg)) {
+        throw new Error(
+          `O bot não foi adicionado ao chat de armazenamento (${STORAGE_CHAT_ID}). Adicione-o como administrador antes de importar.`,
+        );
+      }
+      throw e;
+    }
+
     // 1. forwardMessage → bot encaminha pro grupo de armazenamento e recebe o objeto Message
     const fwd = await tg(
       "forwardMessage",
