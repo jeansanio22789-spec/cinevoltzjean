@@ -62,6 +62,22 @@ const extractPhoto = (msg: any): { file_id: string } | null => {
   return null;
 };
 
+// Detecta URL de vídeo na legenda/texto. Aceita .mp4, .m3u8, .mkv, .webm, .mov,
+// e também links genéricos http(s) (drive, dropbox, etc — confia no usuário).
+const URL_REGEX = /https?:\/\/[^\s<>"']+/gi;
+const extractVideoUrl = (text: string | null | undefined): string | null => {
+  if (!text) return null;
+  const matches = text.match(URL_REGEX);
+  if (!matches) return null;
+  // Prioriza URLs com extensão de vídeo conhecida
+  const videoExt = matches.find((u) =>
+    /\.(mp4|m3u8|mkv|webm|mov|avi|ts)(\?|#|$)/i.test(u)
+  );
+  return videoExt || matches[0];
+};
+
+const TELEGRAM_DOWNLOAD_LIMIT = 20 * 1024 * 1024; // 20 MB
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -120,8 +136,20 @@ Deno.serve(async (req) => {
         if (!msg) continue;
 
         const video = extractVideo(msg);
+        const photo = extractPhoto(msg);
+        const captionOrText = (msg.caption ?? msg.text ?? "").trim();
+        const externalUrl = extractVideoUrl(captionOrText);
 
-        // Salva mensagem no audit trail
+        const hasContent = !!(video || externalUrl);
+        const tooBig =
+          !!video && !externalUrl &&
+          (video.file_size ?? 0) > TELEGRAM_DOWNLOAD_LIMIT;
+
+        let initialStatus = "ignored";
+        if (externalUrl) initialStatus = "processing";
+        else if (video && !tooBig) initialStatus = "processing";
+        else if (tooBig) initialStatus = "error";
+
         const baseRow = {
           update_id: update.update_id,
           chat_id: msg.chat.id,
@@ -135,7 +163,10 @@ Deno.serve(async (req) => {
           file_size: video?.file_size ?? null,
           thumb_file_id: video?.thumbnail?.file_id ?? null,
           raw_update: update,
-          processing_status: video ? "processing" : "ignored",
+          processing_status: initialStatus,
+          processing_error: tooBig
+            ? `Vídeo excede 20 MB (${Math.round((video!.file_size ?? 0) / 1024 / 1024)} MB). Cole o link direto na legenda.`
+            : null,
         };
 
         await supabase
@@ -144,46 +175,70 @@ Deno.serve(async (req) => {
 
         totalProcessed++;
 
-        if (!video) continue;
+        if (tooBig) {
+          try {
+            await tg(
+              "sendMessage",
+              {
+                chat_id: msg.chat.id,
+                reply_to_message_id: msg.message_id,
+                text:
+                  `⚠️ Vídeo muito grande (${Math.round((video!.file_size ?? 0) / 1024 / 1024)} MB). ` +
+                  `O Telegram só permite baixar até 20 MB pelo bot.\n\n` +
+                  `📝 Para vídeos maiores, hospede em Drive/Bunny/R2 e mande:\n` +
+                  `Título do filme\nDescrição\nhttps://link-direto-do-video.mp4\n\n` +
+                  `Pode mandar a CAPA junto na mesma mensagem.`,
+              },
+              LOVABLE_API_KEY,
+              TELEGRAM_API_KEY,
+            );
+          } catch (_) { /* ignora */ }
+          continue;
+        }
 
-        // Processa vídeo: baixa do Telegram, sobe pro bucket, cria filme
+        if (!hasContent) continue;
+
         try {
-          // a) getFile pro vídeo
-          const { result: fileInfo } = await tg(
-            "getFile",
-            { file_id: video.file_id },
-            LOVABLE_API_KEY,
-            TELEGRAM_API_KEY,
-          );
+          let videoUrl: string;
 
-          const dl = await fetch(`${GATEWAY_URL}/file/${fileInfo.file_path}`, {
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "X-Connection-Api-Key": TELEGRAM_API_KEY,
-            },
-          });
-          if (!dl.ok) throw new Error(`Download vídeo [${dl.status}]`);
-          const videoBytes = new Uint8Array(await dl.arrayBuffer());
-          const ext = (fileInfo.file_path.split(".").pop() || "mp4")
-            .toLowerCase();
-          const videoPath = `telegram/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+          if (externalUrl) {
+            videoUrl = externalUrl;
+          } else {
+            const { result: fileInfo } = await tg(
+              "getFile",
+              { file_id: video!.file_id },
+              LOVABLE_API_KEY,
+              TELEGRAM_API_KEY,
+            );
 
-          const { error: vUpErr } = await supabase.storage
-            .from("videos")
-            .upload(videoPath, videoBytes, {
-              contentType: video.mime_type || "video/mp4",
-              upsert: false,
+            const dl = await fetch(`${GATEWAY_URL}/file/${fileInfo.file_path}`, {
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "X-Connection-Api-Key": TELEGRAM_API_KEY,
+              },
             });
-          if (vUpErr) throw new Error(`Upload vídeo: ${vUpErr.message}`);
+            if (!dl.ok) throw new Error(`Download vídeo [${dl.status}]`);
+            const videoBytes = new Uint8Array(await dl.arrayBuffer());
+            const ext = (fileInfo.file_path.split(".").pop() || "mp4")
+              .toLowerCase();
+            const videoPath = `telegram/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
-          const { data: vPub } = supabase.storage
-            .from("videos")
-            .getPublicUrl(videoPath);
+            const { error: vUpErr } = await supabase.storage
+              .from("videos")
+              .upload(videoPath, videoBytes, {
+                contentType: video!.mime_type || "video/mp4",
+                upsert: false,
+              });
+            if (vUpErr) throw new Error(`Upload vídeo: ${vUpErr.message}`);
 
-          // b) Thumbnail: usa thumb do vídeo OU foto enviada na mesma msg
+            const { data: vPub } = supabase.storage
+              .from("videos")
+              .getPublicUrl(videoPath);
+            videoUrl = vPub.publicUrl;
+          }
+
           let thumbnailUrl: string | null = null;
-          const photo = extractPhoto(msg);
-          const thumbSource = photo?.file_id || video.thumbnail?.file_id;
+          const thumbSource = photo?.file_id || video?.thumbnail?.file_id;
 
           if (thumbSource) {
             try {
@@ -225,30 +280,32 @@ Deno.serve(async (req) => {
             }
           }
 
-          // c) Parse caption: 1ª linha = título, resto = descrição
-          const caption = (msg.caption || "").trim();
-          const lines = caption.split(/\r?\n/);
+          const lines = captionOrText.split(/\r?\n/);
           const title = (lines[0] || `Vídeo Telegram ${update.update_id}`)
             .trim()
+            .replace(URL_REGEX, "")
+            .trim()
             .slice(0, 200);
-          const description = lines.slice(1).join("\n").trim();
+          const description = lines
+            .slice(1)
+            .join("\n")
+            .replace(URL_REGEX, "")
+            .trim();
 
-          // Formata duração mm:ss
           let durationStr = "";
-          if (video.duration && video.duration > 0) {
+          if (video?.duration && video.duration > 0) {
             const m = Math.floor(video.duration / 60);
             const s = video.duration % 60;
             durationStr = `${m}min`;
             if (s > 0) durationStr += ` ${s}s`;
           }
 
-          // d) Cria filme publicado
           const { data: movie, error: movieErr } = await supabase
             .from("movies")
             .insert({
-              title,
+              title: title || `Vídeo Telegram ${update.update_id}`,
               description,
-              video_url: vPub.publicUrl,
+              video_url: videoUrl,
               thumbnail_url: thumbnailUrl,
               duration: durationStr,
               status: "published",
@@ -270,21 +327,20 @@ Deno.serve(async (req) => {
 
           totalMovies++;
 
-          // e) Notifica de volta no chat
           try {
             await tg(
               "sendMessage",
               {
                 chat_id: msg.chat.id,
                 reply_to_message_id: msg.message_id,
-                text: `✅ Adicionado ao catálogo: ${title}`,
+                text: `✅ Adicionado ao catálogo: ${title}${
+                  externalUrl ? "\n🔗 Usando link externo" : ""
+                }`,
               },
               LOVABLE_API_KEY,
               TELEGRAM_API_KEY,
             );
-          } catch (_) {
-            // ignora falha de notificação
-          }
+          } catch (_) { /* ignora */ }
         } catch (procErr) {
           const errMsg = (procErr as Error).message;
           console.error(`[update ${update.update_id}]`, errMsg);
@@ -298,7 +354,6 @@ Deno.serve(async (req) => {
             })
             .eq("update_id", update.update_id);
 
-          // Tenta avisar no chat
           try {
             await tg(
               "sendMessage",
@@ -310,9 +365,7 @@ Deno.serve(async (req) => {
               LOVABLE_API_KEY,
               TELEGRAM_API_KEY,
             );
-          } catch (_) {
-            // ignora
-          }
+          } catch (_) { /* ignora */ }
         }
       }
 
