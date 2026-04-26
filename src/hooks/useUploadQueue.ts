@@ -45,32 +45,53 @@ const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
 // ---------------------------------------------------------------------------
 type Listener = (jobs: UploadJob[]) => void;
 
+const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
+  id: job.id,
+  file: job.file,
+  thumbnail: job.thumbnail ?? null,
+  meta: job.meta,
+  status: job.status === "done" ? "done" : job.status === "error" ? "error" : "queued",
+  progress: job.status === "done" ? 100 : 0,
+  speedMBs: 0,
+  etaSec: 0,
+  errorMsg: job.errorMsg,
+  startedAt: job.startedAt,
+  timedOut: false,
+});
+
 const store = {
   jobs: [] as UploadJob[],
   listeners: new Set<Listener>(),
+  initialized: false,
   emit() {
     for (const l of this.listeners) l([...this.jobs]);
   },
-  setAll(next: UploadJob[]) {
-    this.jobs = next;
-    this.emit();
-  },
   update(id: string, patch: Partial<UploadJob>) {
     this.jobs = this.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j));
+    const updated = this.jobs.find((j) => j.id === id);
+    if (updated && updated.status !== "done") void persistUploadJob(toPersistedJob(updated));
     this.emit();
   },
   add(jobs: UploadJob[]) {
     this.jobs = [...this.jobs, ...jobs];
+    jobs.forEach((j) => void persistUploadJob(toPersistedJob(j)));
     this.emit();
   },
   remove(id: string) {
     const target = this.jobs.find((j) => j.id === id);
     target?.abort?.();
+    if (target?.thumbPreviewUrl) URL.revokeObjectURL(target.thumbPreviewUrl);
     this.jobs = this.jobs.filter((j) => j.id !== id);
+    void deletePersistedUploadJob(id);
     this.emit();
   },
   clearDone() {
+    const doneIds = this.jobs.filter((j) => j.status === "done").map((j) => j.id);
+    this.jobs
+      .filter((j) => j.status === "done" && j.thumbPreviewUrl)
+      .forEach((j) => URL.revokeObjectURL(j.thumbPreviewUrl!));
     this.jobs = this.jobs.filter((j) => j.status !== "done");
+    void deletePersistedUploadJobs(doneIds);
     this.emit();
   },
   subscribe(l: Listener) {
