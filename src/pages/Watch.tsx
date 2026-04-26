@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
+import { useLocalVideoSrc } from "@/hooks/useLocalVideoSrc";
 import TelegramPlayer from "@/components/TelegramPlayer";
 import VideoPlayer from "@/components/VideoPlayer";
 import IntroVignette from "@/components/IntroVignette";

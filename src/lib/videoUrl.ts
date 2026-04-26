@@ -5,12 +5,18 @@
 export type VideoSource =
   | { kind: "iframe"; url: string }
   | { kind: "video"; url: string }
+  | { kind: "local"; url: string } // local://<id> guardado no IndexedDB
   | { kind: "unknown"; url: string };
 
 export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSource | null => {
   if (!rawUrl) return null;
   const url = rawUrl.trim();
   if (!url) return null;
+
+  // Vídeo armazenado localmente no dispositivo (IndexedDB)
+  if (url.startsWith("local://")) {
+    return { kind: "local", url };
+  }
 
   // YouTube
   const yt = url.match(
