@@ -170,8 +170,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(() => getPlayerPrefs().volume ?? 1);
+  const [muted, setMuted] = useState(() => getPlayerPrefs().muted ?? false);
   const [fs, setFs] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [settingsTab, setSettingsTab] = useState<
