@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Lock, Play, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
@@ -11,6 +11,7 @@ interface WatchMovie {
   description: string | null;
   thumbnail_url: string | null;
   video_url: string | null;
+  telegram_url: string | null;
   year: number | null;
   duration: string | null;
   genre: string | null;
@@ -53,7 +54,7 @@ const Watch = () => {
         _token: token,
         _movie_id: id,
       });
-      if ((data as any)?.ok) {
+      if ((data as { ok?: boolean } | null)?.ok) {
         setTokenAccess(true);
         await supabase.rpc("consume_access_token", { _token: token });
       }
@@ -68,19 +69,30 @@ const Watch = () => {
       setCheckingAccess(false);
       return;
     }
-    if (!user) {
+    if (!user || !id) {
       setHasAccess(false);
       setCheckingAccess(false);
       return;
     }
 
     const checkAccess = async () => {
-      const { data } = await supabase.rpc("has_active_access", { _user_id: user.id });
-      setHasAccess(!!data);
+      // 1. Acesso individual ao filme (liberado pelo admin)
+      const { data: movieAcc } = await supabase.rpc("has_movie_access", {
+        _user_id: user.id,
+        _movie_id: id,
+      });
+      if (movieAcc) {
+        setHasAccess(true);
+        setCheckingAccess(false);
+        return;
+      }
+      // 2. Plano ativo libera tudo
+      const { data: planAcc } = await supabase.rpc("has_active_access", { _user_id: user.id });
+      setHasAccess(!!planAcc);
       setCheckingAccess(false);
     };
     checkAccess();
-  }, [user, authLoading, tokenAccess]);
+  }, [user, authLoading, tokenAccess, id]);
 
   const isLoading = loading || authLoading || checkingAccess;
 
@@ -136,18 +148,82 @@ const Watch = () => {
             className="w-40 h-56 object-cover rounded-lg shadow-lg"
           />
         )}
+        <Lock className="w-10 h-10 text-muted-foreground" />
         <div>
           <h1 className="text-2xl font-bold mb-2">{movie.title}</h1>
           <p className="text-muted-foreground text-sm max-w-md">
-            Você precisa de um plano ativo para assistir a este filme.
+            Você não tem acesso a este conteúdo. Fale com o administrador para liberar
+            ou assine um plano para ver tudo.
           </p>
         </div>
-        <button
-          onClick={() => navigate("/planos")}
-          className="bg-primary text-primary-foreground px-6 py-3 rounded font-bold text-sm flex items-center gap-2"
-        >
-          <Play className="w-4 h-4 fill-current" /> Assinar plano
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+          <button
+            onClick={() => navigate("/planos")}
+            className="flex-1 bg-primary text-primary-foreground px-5 py-3 rounded font-bold text-sm flex items-center justify-center gap-2"
+          >
+            <Play className="w-4 h-4 fill-current" /> Assinar
+          </button>
+          <button
+            onClick={() => navigate("/")}
+            className="flex-1 bg-muted text-foreground px-5 py-3 rounded font-semibold text-sm"
+          >
+            Voltar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Tem acesso. Se há link do Telegram, prioriza ele.
+  if (movie.telegram_url) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex items-center justify-between p-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-foreground text-sm font-medium hover:opacity-80"
+          >
+            <ArrowLeft className="w-5 h-5" /> Voltar
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-5 max-w-md mx-auto pb-12">
+          {movie.thumbnail_url && (
+            <img
+              src={movie.thumbnail_url}
+              alt={movie.title}
+              className="w-44 h-64 object-cover rounded-xl shadow-2xl"
+            />
+          )}
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black mb-2">{movie.title}</h1>
+            {movie.description && (
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {movie.description}
+              </p>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap justify-center">
+            {movie.year && <span>{movie.year}</span>}
+            {movie.duration && <span>• {movie.duration}</span>}
+            {movie.rating && <span>• {movie.rating}</span>}
+            {movie.genre && <span>• {movie.genre}</span>}
+          </div>
+
+          <a
+            href={movie.telegram_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-primary text-primary-foreground px-6 py-4 rounded-xl font-black text-base flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors shadow-lg"
+          >
+            <Send className="w-5 h-5" /> Assistir no Telegram
+          </a>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            O conteúdo abre direto no app do Telegram. Você precisa estar no canal
+            para assistir.
+          </p>
+        </div>
       </div>
     );
   }
