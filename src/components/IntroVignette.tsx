@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getAudioContext, primeAudio } from "@/lib/audioUnlock";
 
 interface IntroVignetteProps {
   /** Chamado quando a vinheta termina (fade-out completo). */
