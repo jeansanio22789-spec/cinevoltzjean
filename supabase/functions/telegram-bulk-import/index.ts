@@ -17,10 +17,24 @@ const DORAMAS_CHAT_KEY = 'telegram_doramas_chat_id';
 
 interface ProcessResult {
   update_id: number;
-  status: 'imported' | 'skipped' | 'error';
+  status: 'imported' | 'skipped' | 'error' | 'preview';
   reason?: string;
   movie_id?: string;
   title?: string;
+  // Campos extras quando dryRun=true (preview):
+  video_url?: string;
+  thumbnail_url?: string | null;
+  duration_min?: number | null;
+  size_mb?: number | null;
+  meta?: {
+    title: string;
+    year?: number;
+    genre: string;
+    kind: 'movie' | 'series';
+    season?: number;
+    episode?: number;
+    synopsis: string;
+  };
 }
 
 async function extractMetadata(
@@ -135,6 +149,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Number(body?.limit) || 5, 10);
+    const dryRun = Boolean(body?.dryRun);
 
     // 1) Carrega o chat_id salvo
     const { data: settingRow } = await supabase
@@ -254,7 +269,23 @@ Deno.serve(async (req) => {
             ? `${meta.title} — T${meta.season}E${meta.episode}`
             : meta.title;
 
-        // Insere movie
+        if (dryRun) {
+          // Modo preview: NÃO publica em movies, NÃO altera processing_status.
+          // Retorna URLs já carregadas no storage + metadados sugeridos.
+          results.push({
+            update_id: row.update_id,
+            status: 'preview',
+            title: fullTitle,
+            video_url: pub.publicUrl,
+            thumbnail_url: thumbUrl,
+            duration_min: row.duration ? Math.round(row.duration / 60) : null,
+            size_mb: row.file_size ? Math.round((row.file_size / 1024 / 1024) * 10) / 10 : null,
+            meta,
+          });
+          continue;
+        }
+
+        // Modo publish direto (legado): cria movie e marca como imported.
         const { data: movie, error: movieErr } = await supabase
           .from('movies')
           .insert({
@@ -288,14 +319,17 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        await supabase
-          .from('telegram_messages')
-          .update({
-            processing_status: 'error',
-            processing_error: msg.slice(0, 500),
-            processed_at: new Date().toISOString(),
-          })
-          .eq('update_id', row.update_id);
+        // Em dryRun também não persistimos erro permanente — só reportamos.
+        if (!dryRun) {
+          await supabase
+            .from('telegram_messages')
+            .update({
+              processing_status: 'error',
+              processing_error: msg.slice(0, 500),
+              processed_at: new Date().toISOString(),
+            })
+            .eq('update_id', row.update_id);
+        }
         results.push({ update_id: row.update_id, status: 'error', reason: msg });
       }
     }
@@ -312,7 +346,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
+        dryRun,
         processed: results.length,
+        previews: results.filter((r) => r.status === 'preview').length,
         imported: results.filter((r) => r.status === 'imported').length,
         skipped: results.filter((r) => r.status === 'skipped').length,
         errors: results.filter((r) => r.status === 'error').length,
