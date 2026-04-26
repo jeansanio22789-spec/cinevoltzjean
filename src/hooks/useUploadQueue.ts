@@ -186,6 +186,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
           thumbnail_url: thumbnailUrl,
           genre: job.meta.genre,
           description: job.meta.description,
+          audio: job.meta.audio || "Original",
           status: "published",
         });
         if (error) throw error;
