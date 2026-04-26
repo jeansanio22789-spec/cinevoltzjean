@@ -71,7 +71,7 @@ const VideoUploadProgress = ({ state, onPause, onResume, onCancel, onPick }: Pro
     <div className="w-full border border-border rounded-lg p-3 bg-card space-y-2.5">
       <div className="flex items-center gap-2">
         {isRetrying ? (
-          <WifiOff className="w-4 h-4 text-yellow-500 animate-pulse flex-shrink-0" />
+          <WifiOff className="w-4 h-4 text-primary animate-pulse flex-shrink-0" />
         ) : isError ? (
           <WifiOff className="w-4 h-4 text-destructive flex-shrink-0" />
         ) : isPaused ? (
