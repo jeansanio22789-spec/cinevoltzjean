@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Eye, Loader2, Zap, AlertTriangle
+  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
-import * as tus from "tus-js-client";
+import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 
 interface Video {
   id: string;
@@ -19,16 +19,35 @@ interface Video {
   created_at: string;
 }
 
+const fmtEta = (sec: number) =>
+  sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
+
+const statusBadge = (j: UploadJob) => {
+  switch (j.status) {
+    case "queued":
+      return { label: "Na fila", icon: Clock, color: "text-muted-foreground bg-muted" };
+    case "uploading":
+      return { label: "Enviando", icon: Zap, color: "text-primary bg-primary/15" };
+    case "saving":
+      return { label: "Publicando", icon: Loader2, color: "text-primary bg-primary/15" };
+    case "warning":
+      return {
+        label: "Demorando…",
+        icon: AlertTriangle,
+        color: "text-amber-500 bg-amber-500/15",
+      };
+    case "done":
+      return { label: "Publicado", icon: CheckCircle, color: "text-accent bg-accent/15" };
+    case "error":
+      return { label: "Falhou", icon: XCircle, color: "text-destructive bg-destructive/15" };
+  }
+};
+
 const AdminVideos = () => {
   const [showUpload, setShowUpload] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStage, setUploadStage] = useState("");
-  const [uploadSpeed, setUploadSpeed] = useState("");
-  const [uploadEta, setUploadEta] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -37,7 +56,7 @@ const AdminVideos = () => {
     type: "Filme",
     description: "",
   });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 
   const fetchVideos = async () => {
@@ -50,155 +69,67 @@ const AdminVideos = () => {
     setLoading(false);
   };
 
+  const { jobs, enqueue, removeJob, clearDone, retry, activeCount } = useUploadQueue(
+    () => fetchVideos(),
+  );
+
   useEffect(() => {
     fetchVideos();
   }, []);
 
-  // Avisa o usuário se tentar fechar a aba durante upload
+  // Avisa o usuário se tentar fechar a aba durante upload ativo
   useEffect(() => {
-    if (!uploading) return;
+    if (activeCount === 0) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = "Upload em andamento — se você sair, vai parar!";
+      e.returnValue = "Uploads em andamento — se você sair, vão parar!";
       return e.returnValue;
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [uploading]);
+  }, [activeCount]);
 
   const handleFileSelect = (files: FileList | null) => {
-    if (files && files[0]) {
-      setSelectedFile(files[0]);
+    if (!files || files.length === 0) return;
+    setSelectedFiles((prev) => [...prev, ...Array.from(files)]);
+  };
+
+  const removeSelected = (idx: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpload = () => {
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um arquivo");
+      return;
     }
-  };
-
-  // Upload PARALELO via TUS resumable — divide em chunks de 6MB e envia 6 ao mesmo tempo
-  // Resultado: satura a banda do usuário, ~3-6x mais rápido que upload sequencial
-  const uploadFileWithProgress = async (
-    bucket: string,
-    path: string,
-    file: File,
-    onProgress: (pct: number, speedMBs: number, etaSec: number) => void
-  ): Promise<string> => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const endpoint = `https://${projectId}.supabase.co/storage/v1/upload/resumable`;
-
-    return new Promise((resolve, reject) => {
-      const startTime = Date.now();
-      const upload = new tus.Upload(file, {
-        endpoint,
-        retryDelays: [0, 1000, 3000, 5000, 10000],
-        headers: {
-          authorization: `Bearer ${token}`,
-          "x-upsert": "true",
-        },
-        uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true,
-        metadata: {
-          bucketName: bucket,
-          objectName: path,
-          contentType: file.type || "application/octet-stream",
-          cacheControl: "3600",
-        },
-        chunkSize: 6 * 1024 * 1024, // 6MB chunks (mínimo exigido pelo Supabase)
-        parallelUploads: 1, // TUS no Supabase só permite 1 — mas dentro do chunk é otimizado
-        onError: (err) => reject(err),
-        onProgress: (bytesUploaded, bytesTotal) => {
-          const pct = (bytesUploaded / bytesTotal) * 100;
-          const elapsed = (Date.now() - startTime) / 1000;
-          const speedMBs = bytesUploaded / 1024 / 1024 / Math.max(elapsed, 0.1);
-          const remaining = (bytesTotal - bytesUploaded) / 1024 / 1024;
-          const etaSec = remaining / Math.max(speedMBs, 0.01);
-          onProgress(pct, speedMBs, etaSec);
-        },
-        onSuccess: () => {
-          const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-          resolve(data.publicUrl);
-        },
-      });
-
-      // Verifica se há upload anterior (retomada automática)
-      upload.findPreviousUploads().then((prev) => {
-        if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
-        upload.start();
-      });
-    });
-  };
-
-  const handleUpload = async () => {
     if (!form.title.trim()) {
       toast.error("Título é obrigatório");
       return;
     }
 
-    setUploading(true);
-    setUploadProgress(0);
-    let videoUrl = "";
-    let thumbnailUrl = "";
-
-    try {
-      // Upload video file with real progress
-      if (selectedFile) {
-        setUploadStage("Enviando vídeo");
-        const ext = selectedFile.name.split(".").pop();
-        const path = `videos/${Date.now()}.${ext}`;
-        videoUrl = await uploadFileWithProgress(
-          "videos",
-          path,
-          selectedFile,
-          (pct, speed, eta) => {
-            setUploadProgress(pct);
-            setUploadSpeed(`${speed.toFixed(1)} MB/s`);
-            setUploadEta(eta > 60 ? `${Math.ceil(eta / 60)}min` : `${Math.ceil(eta)}s`);
-          }
-        );
-      }
-
-      // Upload thumbnail
-      if (thumbnailFile) {
-        setUploadStage("Enviando thumbnail");
-        const ext = thumbnailFile.name.split(".").pop();
-        const path = `thumbnails/${Date.now()}.${ext}`;
-        thumbnailUrl = await uploadFileWithProgress(
-          "videos",
-          path,
-          thumbnailFile,
-          (pct) => setUploadProgress(pct)
-        );
-      }
-
-      // Save to DB
-      setUploadStage("Salvando no catálogo");
-      setUploadProgress(99);
-      const { error } = await supabase.from("movies").insert({
-        title: form.title,
-        video_url: videoUrl || null,
-        thumbnail_url: thumbnailUrl || null,
+    // Para múltiplos arquivos, anexa numeração ao título (ex.: "Meu Filme (2)")
+    const items = selectedFiles.map((file, idx) => ({
+      file,
+      thumbnail: idx === 0 ? thumbnailFile : null, // só o 1º herda a thumb
+      meta: {
+        title:
+          selectedFiles.length === 1 ? form.title : `${form.title} (${idx + 1})`,
         genre: form.genre,
         description: form.description,
-        status: "published",
-      });
+      },
+    }));
 
-      if (error) throw error;
+    enqueue(items);
 
-      setUploadProgress(100);
-      toast.success("✅ Vídeo publicado com sucesso!");
-      setShowUpload(false);
-      setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
-      setSelectedFile(null);
-      setThumbnailFile(null);
-      fetchVideos();
-    } catch (err: any) {
-      toast.error(err.message || "Erro no upload");
-    }
+    toast.success(
+      `${items.length} ${items.length === 1 ? "envio iniciado" : "envios iniciados"} em paralelo`,
+    );
 
-    setUploading(false);
-    setUploadProgress(0);
-    setUploadStage("");
-    setUploadSpeed("");
-    setUploadEta("");
+    // Limpa o formulário, mas mantém o painel aberto para a fila
+    setSelectedFiles([]);
+    setThumbnailFile(null);
+    setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
   };
 
   const handleDelete = async (id: string) => {
@@ -215,19 +146,27 @@ const AdminVideos = () => {
   const totalSize = videos.length;
   const published = videos.filter((v) => v.status === "published").length;
   const drafts = videos.filter((v) => v.status === "draft").length;
+  const doneCount = jobs.filter((j) => j.status === "done").length;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold">Envio de Vídeos</h2>
-          <p className="text-sm text-muted-foreground mt-1">Gerencie e envie filmes, séries e trailers</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Gerencie e envie filmes, séries e trailers — vários ao mesmo tempo
+          </p>
         </div>
         <button
           onClick={() => setShowUpload(!showUpload)}
           className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded text-sm font-semibold hover:bg-primary/90 transition-colors"
         >
           <Upload className="w-4 h-4" /> Novo Upload
+          {activeCount > 0 && (
+            <span className="ml-1 bg-primary-foreground/20 px-1.5 py-0.5 rounded-full text-xs">
+              {activeCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -242,26 +181,51 @@ const AdminVideos = () => {
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFileSelect(e.dataTransfer.files); }}
           >
             <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            {selectedFile ? (
-              <p className="font-medium text-accent">{selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)</p>
+            {selectedFiles.length > 0 ? (
+              <div className="space-y-2 max-w-md mx-auto">
+                <p className="text-sm font-semibold text-accent">
+                  {selectedFiles.length} {selectedFiles.length === 1 ? "arquivo" : "arquivos"} selecionado{selectedFiles.length === 1 ? "" : "s"}
+                </p>
+                <div className="space-y-1 max-h-40 overflow-y-auto text-left">
+                  {selectedFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-background rounded px-2 py-1.5 text-xs">
+                      <FileVideo className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{f.name}</span>
+                      <span className="text-muted-foreground shrink-0">
+                        {(f.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                      <button
+                        onClick={() => removeSelected(i)}
+                        className="p-0.5 hover:bg-destructive/20 rounded text-destructive"
+                        aria-label="Remover"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               <>
-                <p className="font-medium mb-1">Arraste o vídeo aqui ou clique para selecionar</p>
-                <p className="text-xs text-muted-foreground">MP4, MKV, AVI, MOV • Máx. 50GB por arquivo</p>
+                <p className="font-medium mb-1">Arraste os vídeos aqui ou clique para selecionar</p>
+                <p className="text-xs text-muted-foreground">
+                  MP4, MKV, AVI, MOV • Máx. 50 GB por arquivo • vários ao mesmo tempo
+                </p>
               </>
             )}
             <input
               ref={fileInputRef}
               type="file"
               accept="video/*"
+              multiple
               className="hidden"
               onChange={(e) => handleFileSelect(e.target.files)}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="mt-4 px-6 py-2 bg-muted text-foreground rounded text-sm font-medium hover:bg-muted/80 transition-colors"
+              className="mt-4 px-6 py-2 bg-muted text-foreground rounded text-sm font-medium hover:bg-muted/80 transition-colors inline-flex items-center gap-1.5"
             >
-              Selecionar Arquivo
+              <Plus className="w-4 h-4" /> Adicionar Arquivos
             </button>
           </div>
 
@@ -270,7 +234,7 @@ const AdminVideos = () => {
               <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Type className="w-3.5 h-3.5" /> Título</label>
               <input
                 className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="Nome do filme ou série"
+                placeholder={selectedFiles.length > 1 ? "Título base (vai virar 'Título (1)', 'Título (2)'…)" : "Nome do filme ou série"}
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
@@ -328,41 +292,141 @@ const AdminVideos = () => {
             />
           </div>
 
-          {uploading && (
-            <div className="mt-4 p-4 bg-background border border-primary/40 rounded-lg space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-primary animate-pulse" />
-                  {uploadStage}
-                </span>
-                <span className="font-mono text-primary font-bold text-lg">{uploadProgress.toFixed(1)}%</span>
-              </div>
-              <Progress value={uploadProgress} className="h-3" />
-              {uploadSpeed && (
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="font-semibold">⚡ {uploadSpeed}</span>
-                  {uploadEta && <span className="font-semibold">⏱ Faltam ~{uploadEta}</span>}
-                </div>
-              )}
-              <div className="flex items-start gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <p>
-                  <b>Mantenha esta aba aberta</b> até terminar. Se fechar o navegador, o upload para
-                  (limitação do browser). Se cair a conexão, ele retoma automaticamente.
-                </p>
-              </div>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              onClick={handleUpload}
+              disabled={selectedFiles.length === 0}
+              className="px-6 py-2 bg-primary text-primary-foreground rounded text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Enviar e Publicar
+              {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
+            </button>
+            <p className="text-xs text-muted-foreground self-center">
+              Você pode adicionar mais arquivos enquanto outros estão enviando.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Fila de uploads */}
+      {jobs.length > 0 && (
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" />
+              Fila de envios
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                {activeCount} ativo{activeCount === 1 ? "" : "s"} • {doneCount} concluído{doneCount === 1 ? "" : "s"}
+              </span>
+            </h3>
+            {doneCount > 0 && (
+              <button
+                onClick={clearDone}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Limpar concluídos
+              </button>
+            )}
+          </div>
+
+          {activeCount > 0 && (
+            <div className="flex items-start gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <p>
+                <b>Mantenha esta aba aberta</b> até terminar. Se cair a conexão, os envios retomam automaticamente.
+                Envios que passam de <b>2 minutos</b> ficam marcados em amarelo, mas seguem tentando.
+              </p>
             </div>
           )}
 
-          <div className="flex gap-3 mt-4">
-            <button
-              onClick={handleUpload}
-              disabled={uploading || !selectedFile}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-            >
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {uploading ? `${uploadStage}...` : "Enviar e Publicar"}
-            </button>
+          <div className="space-y-2">
+            {jobs.map((j) => {
+              const badge = statusBadge(j);
+              const Icon = badge.icon;
+              return (
+                <div
+                  key={j.id}
+                  className="bg-background border border-border rounded-lg p-3 space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileVideo className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{j.meta.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {j.file.name} • {(j.file.size / 1024 / 1024).toFixed(1)} MB
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${badge.color}`}
+                    >
+                      <Icon
+                        className={`w-3 h-3 ${
+                          j.status === "saving" || j.status === "uploading"
+                            ? "animate-pulse"
+                            : ""
+                        }`}
+                      />
+                      {badge.label}
+                    </span>
+
+                    {/* Ações */}
+                    {j.status === "error" && (
+                      <button
+                        onClick={() => retry(j.id)}
+                        className="p-1.5 hover:bg-muted rounded transition-colors"
+                        title="Tentar novamente"
+                      >
+                        <RotateCw className="w-3.5 h-3.5 text-primary" />
+                      </button>
+                    )}
+                    {(j.status === "done" || j.status === "error") && (
+                      <button
+                        onClick={() => removeJob(j.id)}
+                        className="p-1.5 hover:bg-muted rounded transition-colors"
+                        title="Remover da fila"
+                      >
+                        <X className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                  </div>
+
+                  {(j.status === "uploading" ||
+                    j.status === "saving" ||
+                    j.status === "warning") && (
+                    <>
+                      <Progress
+                        value={j.progress}
+                        className={`h-2 ${j.status === "warning" ? "[&>div]:bg-amber-500" : ""}`}
+                      />
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                        <span>{j.progress.toFixed(1)}%</span>
+                        {j.speedMBs > 0 && (
+                          <span>
+                            ⚡ {j.speedMBs.toFixed(1)} MB/s
+                            {j.etaSec > 0 && j.etaSec < 99999 && (
+                              <> • ⏱ {fmtEta(j.etaSec)}</>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {j.status === "warning" && (
+                    <p className="text-[11px] text-amber-500">
+                      ⚠️ Está demorando mais que 2 minutos, mas continua tentando.
+                    </p>
+                  )}
+
+                  {j.status === "error" && j.errorMsg && (
+                    <p className="text-[11px] text-destructive">
+                      ❌ {j.errorMsg}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
