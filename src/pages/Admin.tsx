@@ -17,11 +17,17 @@ import AdminAccessLinks from "@/components/admin/AdminAccessLinks";
 import AdminSponsors from "@/components/admin/AdminSponsors";
 import AdminTelegramImport from "@/components/admin/AdminTelegramImport";
 import AdminVideoLibrary from "@/components/admin/AdminVideoLibrary";
+import AdminPlans from "@/components/admin/AdminPlans";
+import AdminReports from "@/components/admin/AdminReports";
+import AdminBranding from "@/components/admin/AdminBranding";
+import AdminNotifications from "@/components/admin/AdminNotifications";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
+  reports: { title: "Relatórios", subtitle: "Usuários, receita e vídeos mais assistidos" },
   movies: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   content: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
+  plans: { title: "Planos", subtitle: "Cadastre planos, defina preços e vincule conteúdos" },
   channels: { title: "Canais Ao Vivo", subtitle: "Cadastre emissoras com nome, logo e stream" },
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   library: { title: "Biblioteca de Vídeos", subtitle: "Pesquise e filtre vídeos por mês, canal e status" },
@@ -31,6 +37,8 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   purchases: { title: "Compras PIX", subtitle: "Pagamentos Mercado Pago e liberação automática" },
   links: { title: "Links de Acesso", subtitle: "Gere links mágicos para clientes assistirem sem login" },
   users: { title: "Usuários", subtitle: "Assinantes, planos e permissões" },
+  notifications: { title: "Notificações", subtitle: "Envie avisos para os usuários" },
+  branding: { title: "Identidade Visual", subtitle: "Nome, logo e cores do app" },
   audit: { title: "Log de Auditoria", subtitle: "Histórico completo de ações na plataforma" },
   settings: { title: "Configurações", subtitle: "Ajustes da plataforma e segurança" },
 };
@@ -113,8 +121,10 @@ const Admin = () => {
 
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
             {activeTab === "dashboard" && <AdminDashboard />}
+            {activeTab === "reports" && <AdminReports />}
             {activeTab === "movies" && <AdminMovies />}
             {activeTab === "content" && <AdminMovies />}
+            {activeTab === "plans" && <AdminPlans />}
             {activeTab === "channels" && <AdminChannels />}
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "library" && <AdminVideoLibrary />}
@@ -124,6 +134,8 @@ const Admin = () => {
             {activeTab === "purchases" && <AdminPurchases />}
             {activeTab === "links" && <AdminAccessLinks />}
             {activeTab === "users" && <AdminUsers />}
+            {activeTab === "notifications" && <AdminNotifications />}
+            {activeTab === "branding" && <AdminBranding />}
             {activeTab === "audit" && <AdminAuditLog />}
             {activeTab === "settings" && <AdminSettings />}
           </main>
