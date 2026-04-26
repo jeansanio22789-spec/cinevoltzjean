@@ -46,7 +46,7 @@ const App = () => (
               <Route path="/c/:slug" element={<ChannelView />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <LiveThumbnail />
+            
           </MaintenanceGate>
         </AuthProvider>
       </BrowserRouter>
