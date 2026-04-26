@@ -45,9 +45,54 @@ interface StartOptions {
  * - Permite pausar/continuar manualmente
  * - Persiste o URL do upload no localStorage para retomar entre reloads
  */
+/**
+ * MODO TURBO: upload direto via XHR (uma única requisição HTTP).
+ * Muito mais rápido que TUS porque não tem overhead de criar/finalizar
+ * múltiplos chunks. Usado por padrão; se falhar, cai pro TUS resumível.
+ */
+function tryTurboUpload(args: {
+  file: File;
+  bucket: string;
+  objectName: string;
+  accessToken: string;
+  xhrRef: { current: XMLHttpRequest | null };
+  onProgress: (bytesUploaded: number) => void;
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    args.xhrRef.current = xhr;
+    const url = `${SUPABASE_URL}/storage/v1/object/${args.bucket}/${args.objectName}`;
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("authorization", `Bearer ${args.accessToken}`);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("cache-control", "3600");
+    xhr.setRequestHeader(
+      "content-type",
+      args.file.type || "application/octet-stream",
+    );
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) args.onProgress(e.loaded);
+    };
+    xhr.onload = () => {
+      args.xhrRef.current = null;
+      resolve(xhr.status >= 200 && xhr.status < 300);
+    };
+    xhr.onerror = () => {
+      args.xhrRef.current = null;
+      resolve(false);
+    };
+    xhr.onabort = () => {
+      args.xhrRef.current = null;
+      resolve(false);
+    };
+    xhr.send(args.file);
+  });
+}
+
 export function useResumableUpload() {
   const [state, setState] = useState<UploadState>(initialState);
   const uploadRef = useRef<tus.Upload | null>(null);
+  const turboXhrRef = useRef<XMLHttpRequest | null>(null);
   const lastTickRef = useRef<{ time: number; bytes: number } | null>(null);
 
   const reset = useCallback(() => {
@@ -58,6 +103,14 @@ export function useResumableUpload() {
         /* noop */
       }
       uploadRef.current = null;
+    }
+    if (turboXhrRef.current) {
+      try {
+        turboXhrRef.current.abort();
+      } catch {
+        /* noop */
+      }
+      turboXhrRef.current = null;
     }
     lastTickRef.current = null;
     setState(initialState);
@@ -91,6 +144,65 @@ export function useResumableUpload() {
         bytesTotal: file.size,
         fileName: file.name,
       });
+
+      // ⚡⚡ MODO TURBO ⚡⚡
+      // Para arquivos até 4 GB tenta upload direto (uma única requisição
+      // HTTP, sem overhead de chunks/locking do TUS) — é 3-10x mais
+      // rápido. Se falhar, cai automaticamente pro TUS resumível.
+      const TURBO_LIMIT = 4 * 1024 * 1024 * 1024;
+      if (file.size <= TURBO_LIMIT) {
+        const turboOk = await tryTurboUpload({
+          file,
+          bucket,
+          objectName,
+          accessToken,
+          xhrRef: turboXhrRef,
+          onProgress: (bytesUploaded) => {
+            const now = Date.now();
+            const last = lastTickRef.current;
+            let speedKbps = 0;
+            if (last && now > last.time) {
+              const dt = (now - last.time) / 1000;
+              const db = bytesUploaded - last.bytes;
+              if (dt > 0.5) {
+                speedKbps = db / 1024 / dt;
+                lastTickRef.current = { time: now, bytes: bytesUploaded };
+              }
+            }
+            setState((s) => ({
+              ...s,
+              bytesUploaded,
+              bytesTotal: file.size,
+              progress: Math.round((bytesUploaded / file.size) * 100),
+              speedKbps: Math.max(0, Math.round(speedKbps)),
+              status: "uploading",
+            }));
+          },
+        });
+
+        if (turboOk) {
+          const { data } = supabase.storage.from(bucket).getPublicUrl(objectName);
+          setState((s) => ({
+            ...s,
+            uploading: false,
+            progress: 100,
+            status: "done",
+            publicUrl: data.publicUrl,
+          }));
+          onSuccess?.(data.publicUrl, objectName);
+          return;
+        }
+
+        // Turbo falhou — reseta e cai pro TUS resumível
+        lastTickRef.current = { time: Date.now(), bytes: 0 };
+        setState((s) => ({
+          ...s,
+          bytesUploaded: 0,
+          progress: 0,
+          status: "retrying",
+          error: "Modo turbo falhou, retomando em modo seguro...",
+        }));
+      }
 
       const upload = new tus.Upload(file, {
         endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
@@ -191,6 +303,7 @@ export function useResumableUpload() {
 
   const pause = useCallback(() => {
     uploadRef.current?.abort();
+    turboXhrRef.current?.abort();
     setState((s) => ({ ...s, status: "paused", uploading: false }));
   }, []);
 
