@@ -175,8 +175,8 @@ const AdminTelegramImport = () => {
             <h3 className="font-bold">Login MTProto</h3>
           </div>
 
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 text-xs text-yellow-200 flex gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="bg-destructive/10 border border-destructive/30 rounded p-3 text-xs text-foreground flex gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-destructive" />
             <p>
               Use uma <b>conta secundária</b> (chip extra). O Telegram pode banir contas que automatizam.
               Essa conta precisa estar dentro do canal/grupo dos filmes.

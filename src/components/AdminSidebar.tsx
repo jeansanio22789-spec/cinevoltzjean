@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
-  ShoppingBag, Link2, Radio, Megaphone,
+  ShoppingBag, Link2, Radio, Megaphone, Send,
 } from "lucide-react";
 import {
   Sidebar,
@@ -19,6 +19,7 @@ export type AdminTab =
   | "content"
   | "movies"
   | "channels"
+  | "telegram"
   | "users"
   | "videos"
   | "billing"
@@ -37,6 +38,7 @@ const sections = [
     label: "Conteúdo",
     items: [
       { title: "Catálogo", tab: "movies" as AdminTab, icon: Film },
+      { title: "Importar Telegram", tab: "telegram" as AdminTab, icon: Send },
       { title: "Canais Ao Vivo", tab: "channels" as AdminTab, icon: Radio },
       { title: "Envio de Vídeos", tab: "videos" as AdminTab, icon: Upload },
     ],

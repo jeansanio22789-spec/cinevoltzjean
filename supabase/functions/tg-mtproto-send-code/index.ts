@@ -1,8 +1,8 @@
-// Edge function: envia código MTProto pro telefone do admin
-// Passo 1 do login MTProto
+// Edge function: envia código MTProto pro telefone
+// Passo 1 do login MTProto - usando mtcute
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { TelegramClient } from "https://deno.land/x/grm@0.8.2/mod.ts";
-import { StringSession } from "https://deno.land/x/grm@0.8.2/sessions/mod.ts";
+import { BaseTelegramClient, sendCode } from "npm:@mtcute/core@0.29.6";
+import { MemoryStorage } from "npm:@mtcute/core@0.29.6/storage/memory.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,10 +33,7 @@ Deno.serve(async (req) => {
     if (!apiId || !apiHash) {
       return new Response(
         JSON.stringify({ error: "TELEGRAM_API_ID/HASH não configurados" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -44,28 +41,20 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(
-      token,
-    );
-    if (claimsErr || !claims?.claims) {
+    const { data: claims } = await userClient.auth.getClaims(token);
+    if (!claims?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     const userId = claims.claims.sub as string;
 
     const admin = createClient(supabaseUrl, supabaseService);
     const { data: roleRow } = await admin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
+      .from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
     if (!roleRow) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -74,63 +63,42 @@ Deno.serve(async (req) => {
     if (!phone || !phone.startsWith("+")) {
       return new Response(
         JSON.stringify({ error: "Telefone inválido (use formato +5511...)" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const session = new StringSession("");
-    const client = new TelegramClient(session, apiId, apiHash, {
-      connectionRetries: 3,
+    const storage = new MemoryStorage();
+    const tg = new BaseTelegramClient({
+      apiId, apiHash, storage,
     });
+    await tg.connect();
 
-    await client.connect();
-    const result = await client.sendCode(
-      { apiId, apiHash },
-      phone,
-    );
+    const sent = await sendCode(tg, { phone });
 
-    const tempSession = session.save();
-    await client.disconnect();
+    // Exporta sessão temporária pra reusar no signIn
+    const tempSession = await tg.exportSession();
+    await tg.close();
 
-    // Limpa pendentes antigos do mesmo user
-    await admin
-      .from("mtproto_pending_logins")
-      .delete()
-      .eq("user_id", userId);
-
+    await admin.from("mtproto_pending_logins").delete().eq("user_id", userId);
     const { data: pending, error: insertErr } = await admin
       .from("mtproto_pending_logins")
       .insert({
         user_id: userId,
         phone,
-        phone_code_hash: result.phoneCodeHash,
+        phone_code_hash: (sent as any).phoneCodeHash || (sent as any).phone_code_hash || "",
         temp_session: tempSession,
       })
-      .select()
-      .single();
-
+      .select().single();
     if (insertErr) throw insertErr;
 
-    return new Response(
-      JSON.stringify({ ok: true, pending_id: pending.id }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    return new Response(JSON.stringify({ ok: true, pending_id: pending.id }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("send-code error:", err);
     return new Response(
-      JSON.stringify({
-        error: err instanceof Error ? err.message : "Erro desconhecido",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ error: err instanceof Error ? err.message : "Erro desconhecido" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

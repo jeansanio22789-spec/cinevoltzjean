@@ -15,12 +15,14 @@ import AdminAuditLog from "@/components/admin/AdminAuditLog";
 import AdminPurchases from "@/components/admin/AdminPurchases";
 import AdminAccessLinks from "@/components/admin/AdminAccessLinks";
 import AdminSponsors from "@/components/admin/AdminSponsors";
+import AdminTelegramImport from "@/components/admin/AdminTelegramImport";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
   movies: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   content: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   channels: { title: "Canais Ao Vivo", subtitle: "Cadastre emissoras com nome, logo e stream" },
+  telegram: { title: "Importar do Telegram", subtitle: "Login MTProto e streaming sem download" },
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
   sponsors: { title: "Patrocinadores", subtitle: "Anunciantes pagos no player e na página Ao Vivo" },
@@ -112,6 +114,7 @@ const Admin = () => {
             {activeTab === "movies" && <AdminMovies />}
             {activeTab === "content" && <AdminMovies />}
             {activeTab === "channels" && <AdminChannels />}
+            {activeTab === "telegram" && <AdminTelegramImport />}
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "billing" && <AdminBilling />}
             {activeTab === "sponsors" && <AdminSponsors />}
