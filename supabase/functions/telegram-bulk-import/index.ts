@@ -290,19 +290,21 @@ Deno.serve(async (req) => {
           viaTelegramLink = true;
         }
 
-        // Upload pro storage (passa o stream direto)
-        const ext = (dl.path.split('.').pop() || 'mp4').toLowerCase();
-        const storagePath = `telegram/${chatId}/${row.message_id}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from('videos')
-          .upload(storagePath, dl.stream, {
-            contentType: row.mime_type || 'video/mp4',
-            upsert: true,
-          });
-        if (upErr) throw new Error(`Upload: ${upErr.message}`);
-        const { data: pub } = supabase.storage.from('videos').getPublicUrl(storagePath);
+        // Upload pro storage só quando temos stream (≤20MB Bot API).
+        if (!viaTelegramLink) {
+          const ext = ((dl as { stream: ReadableStream<Uint8Array>; path: string }).path.split('.').pop() || 'mp4').toLowerCase();
+          const storagePath = `telegram/${chatId}/${row.message_id}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from('videos')
+            .upload(storagePath, (dl as { stream: ReadableStream<Uint8Array> }).stream, {
+              contentType: row.mime_type || 'video/mp4',
+              upsert: true,
+            });
+          if (upErr) throw new Error(`Upload: ${upErr.message}`);
+          publicVideoUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl;
+        }
 
-        // Thumbnail (se houver)
+        // Thumbnail (se houver) — funciona sempre, thumb é pequena
         let thumbUrl: string | null = null;
         if (row.thumb_file_id) {
           const thumbBytes = await downloadTelegramFileBytes(row.thumb_file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
@@ -325,26 +327,26 @@ Deno.serve(async (req) => {
 
         if (dryRun) {
           // Modo preview: NÃO publica em movies, NÃO altera processing_status.
-          // Retorna URLs já carregadas no storage + metadados sugeridos.
           results.push({
             update_id: row.update_id,
             status: 'preview',
             title: fullTitle,
-            video_url: pub.publicUrl,
+            video_url: publicVideoUrl!,
             thumbnail_url: thumbUrl,
             duration_min: row.duration ? Math.round(row.duration / 60) : null,
             size_mb: row.file_size ? Math.round((row.file_size / 1024 / 1024) * 10) / 10 : null,
-            meta,
+            meta: { ...meta, ...(viaTelegramLink ? { synopsis: `${meta.synopsis}\n\n[Arquivo grande — reproduzido via Telegram]` } : {}) },
           });
           continue;
         }
 
-        // Modo publish direto (legado): cria movie e marca como imported.
+        // Modo publish direto (legado)
         const { data: movie, error: movieErr } = await supabase
           .from('movies')
           .insert({
             title: fullTitle,
-            video_url: pub.publicUrl,
+            video_url: publicVideoUrl!,
+            telegram_url: viaTelegramLink ? publicVideoUrl : null,
             thumbnail_url: thumbUrl,
             genre: meta.genre,
             year: meta.year || null,
