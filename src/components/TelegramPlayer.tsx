@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
+import { useMemo } from "react";
+import { ArrowLeft, ExternalLink, Play } from "lucide-react";
 
 interface TelegramPlayerProps {
   movie: {
@@ -24,18 +24,27 @@ const normalizeTelegramUrl = (url: string | null | undefined): string | null => 
   return clean.replace(/^https?:\/\/telegram\.me\//i, "https://t.me/");
 };
 
+const buildTelegramAppUrl = (url: string): string => {
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts.length >= 2) {
+      return `tg://resolve?domain=${parts[0]}&post=${parts[1]}`;
+    }
+    if (parts.length === 1) {
+      return `tg://resolve?domain=${parts[0]}`;
+    }
+  } catch {
+    // mantém fallback web
+  }
+  return url;
+};
+
 const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
   const telegramUrl = useMemo(() => normalizeTelegramUrl(movie.telegram_url), [movie.telegram_url]);
+  const appUrl = useMemo(() => (telegramUrl ? buildTelegramAppUrl(telegramUrl) : null), [telegramUrl]);
 
-  useEffect(() => {
-    if (!telegramUrl) return;
-    const timer = window.setTimeout(() => {
-      window.location.assign(telegramUrl);
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [telegramUrl]);
-
-  if (!telegramUrl) {
+  if (!telegramUrl || !appUrl) {
     return (
       <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-4 px-6 text-center">
         <p className="text-lg font-bold">Link do Telegram inválido</p>
@@ -61,9 +70,10 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
         <h1 className="max-w-[58%] truncate text-sm font-bold md:text-base">{movie.title}</h1>
         <a
           href={telegramUrl}
+          target="_blank"
           rel="noopener noreferrer"
           className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground"
-          aria-label="Abrir filme"
+          aria-label="Abrir no Telegram"
         >
           <ExternalLink className="h-5 w-5" />
         </a>
@@ -74,22 +84,30 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
           <img
             src={movie.thumbnail_url}
             alt={movie.title}
-            className="h-56 w-40 rounded-lg object-cover shadow-2xl"
+            className="h-60 w-44 rounded-lg object-cover shadow-2xl"
           />
         )}
-        <Loader2 className="h-9 w-9 animate-spin text-primary" />
         <div className="space-y-2">
-          <p className="text-xl font-black">Abrindo o filme agora...</p>
+          <p className="text-2xl font-black">Abrir filme</p>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Se não abrir automaticamente, toque no botão abaixo.
+            O Telegram bloqueia esse vídeo dentro do iframe. Toque abaixo para abrir direto no Telegram.
           </p>
         </div>
         <a
-          href={telegramUrl}
+          href={appUrl}
+          target="_blank"
           rel="noopener noreferrer"
           className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-md bg-primary px-6 py-4 text-sm font-black text-primary-foreground"
         >
-          <ExternalLink className="h-4 w-4" /> Abrir filme
+          <Play className="h-5 w-5 fill-current" /> Abrir no app Telegram
+        </a>
+        <a
+          href={telegramUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-md bg-muted px-6 py-3 text-sm font-bold text-foreground"
+        >
+          <ExternalLink className="h-4 w-4" /> Abrir no navegador
         </a>
       </div>
     </div>
