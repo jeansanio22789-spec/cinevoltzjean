@@ -446,13 +446,16 @@ const AdminVideos = () => {
                         value={j.progress}
                         className={`h-2 ${j.status === "warning" ? "[&>div]:bg-amber-500" : ""}`}
                       />
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono gap-2 flex-wrap">
                         <span>{j.progress.toFixed(1)}%</span>
                         {j.speedMBs > 0 && (
-                          <span>
+                          <span className="text-right">
                             ⚡ {j.speedMBs.toFixed(1)} MB/s
                             {j.etaSec > 0 && j.etaSec < 99999 && (
-                              <> • ⏱ {fmtEta(j.etaSec)}</>
+                              <>
+                                {" "}• ⏱ falta {fmtEta(j.etaSec)}
+                                {" "}• 🕒 termina às <b className="text-foreground">{fmtEndTime(j.etaSec)}</b>
+                              </>
                             )}
                           </span>
                         )}
