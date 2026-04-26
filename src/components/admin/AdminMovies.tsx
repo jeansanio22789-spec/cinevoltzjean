@@ -501,6 +501,13 @@ const AdminMovies = () => {
           </div>
         </div>
       )}
+
+      {accessFor && (
+        <MovieAccessManager
+          movie={{ id: accessFor.id, title: accessFor.title }}
+          onClose={() => setAccessFor(null)}
+        />
+      )}
     </div>
   );
 };
