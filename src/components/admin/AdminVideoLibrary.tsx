@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2, Search, RefreshCcw, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ChannelVideosDialog from "./ChannelVideosDialog";
 
 interface TgRow {
   update_id: number;
@@ -84,6 +85,7 @@ const AdminVideoLibrary = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [chatFilter, setChatFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all"); // YYYY-MM
+  const [openChat, setOpenChat] = useState<{ id: number; title: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -296,8 +298,21 @@ const AdminVideoLibrary = () => {
                             )}
                           </TableCell>
                           <TableCell className="text-xs">
-                            <div className="font-medium truncate max-w-[140px]">{chatLabel(String(r.chat_id))}</div>
-                            <div className="text-[10px] font-mono text-muted-foreground truncate">{r.chat_id}</div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenChat({ id: r.chat_id, title: chatLabel(String(r.chat_id)) })
+                              }
+                              className="text-left hover:text-primary transition-colors"
+                              title="Abrir todos os vídeos deste grupo"
+                            >
+                              <div className="font-medium truncate max-w-[140px] underline-offset-2 hover:underline">
+                                {chatLabel(String(r.chat_id))}
+                              </div>
+                              <div className="text-[10px] font-mono text-muted-foreground truncate">
+                                {r.chat_id}
+                              </div>
+                            </button>
                           </TableCell>
                           <TableCell className="text-xs">{formatDuration(r.duration)}</TableCell>
                           <TableCell className="text-xs">{formatBytes(r.file_size)}</TableCell>
@@ -316,6 +331,13 @@ const AdminVideoLibrary = () => {
           ))}
         </div>
       )}
+
+      <ChannelVideosDialog
+        open={!!openChat}
+        onOpenChange={(v) => !v && setOpenChat(null)}
+        chatId={openChat?.id ?? null}
+        chatTitle={openChat?.title ?? ""}
+      />
     </div>
   );
 };
