@@ -139,13 +139,13 @@ const AdminVideos = () => {
       return;
     }
 
-    // Para múltiplos arquivos, anexa numeração ao título (ex.: "Meu Filme (2)")
-    const items = selectedFiles.map((file, idx) => ({
+    // Todos os vídeos usam o mesmo título digitado (ou o reconhecido da capa).
+    // Mesma capa pra todos os arquivos do lote.
+    const items = selectedFiles.map((file) => ({
       file,
-      thumbnail: idx === 0 ? thumbnailFile : null, // só o 1º herda a thumb
+      thumbnail: thumbnailFile,
       meta: {
-        title:
-          selectedFiles.length === 1 ? form.title : `${form.title} (${idx + 1})`,
+        title: form.title,
         genre: form.genre,
         description: form.description,
       },
@@ -265,7 +265,7 @@ const AdminVideos = () => {
               <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Type className="w-3.5 h-3.5" /> Título</label>
               <input
                 className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={selectedFiles.length > 1 ? "Título base (vai virar 'Título (1)', 'Título (2)'…)" : "Nome do filme ou série"}
+                placeholder="Nome do filme ou série"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
