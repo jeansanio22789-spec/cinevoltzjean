@@ -217,18 +217,16 @@ const AdminVideos = () => {
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const arr = Array.from(files);
-    setSelectedFiles((prev) => {
-      const next = [...prev, ...arr];
-      // Auto-detecta a faixa de áudio se ainda estiver no padrão "Original"
-      // (não sobrescreve se o usuário já escolheu manualmente)
-      setForm((f) => {
-        if (f.audio !== "Original") return f;
-        const detected = detectAudioFromFiles(arr);
-        if (!detected) return f;
-        toast.success(`Áudio detectado: ${detected}`);
-        return { ...f, audio: detected };
-      });
-      return next;
+    setSelectedFiles((prev) => [...prev, ...arr]);
+    // Se o título já tiver sido lido da capa e ainda não tiver tag de áudio,
+    // tenta inferir pelo nome do arquivo e anexa
+    setForm((f) => {
+      if (!f.title) return f;
+      if (/\b(DUBLADO|LEGENDADO|DUAL)\b/.test(f.title)) return f;
+      const detected = detectAudioFromFiles(arr);
+      if (!detected) return f;
+      toast.success(`Áudio detectado: ${detected}`);
+      return { ...f, title: buildTitleWithAudio(f.title, detected) };
     });
   };
 
@@ -255,7 +253,6 @@ const AdminVideos = () => {
         title: form.title,
         genre: form.genre,
         description: form.description,
-        audio: form.audio,
       },
     }));
 
@@ -273,7 +270,6 @@ const AdminVideos = () => {
       genre: "Ação",
       type: "Filme",
       description: "",
-      audio: "Original",
     });
   };
 
