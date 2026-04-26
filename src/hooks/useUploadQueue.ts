@@ -296,7 +296,11 @@ const uploadFileFast = async (
 // ---------------------------------------------------------------------------
 // Execução do job (continua rodando mesmo se o componente desmontar)
 // ---------------------------------------------------------------------------
+const runningJobIds = new Set<string>();
+
 const runJob = async (job: UploadJob) => {
+  if (runningJobIds.has(job.id)) return;
+  runningJobIds.add(job.id);
   // Pede pra tela ficar acordada — ajuda muito em mobile
   void requestWakeLock();
 
