@@ -22,7 +22,6 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   content: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   channels: { title: "Canais Ao Vivo", subtitle: "Cadastre emissoras com nome, logo e stream" },
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
-  videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
   sponsors: { title: "Patrocinadores", subtitle: "Anunciantes pagos no player e na página Ao Vivo" },
   purchases: { title: "Compras PIX", subtitle: "Pagamentos Mercado Pago e liberação automática" },
