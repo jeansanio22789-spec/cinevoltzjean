@@ -3,6 +3,7 @@ import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import Footer from "@/components/Footer";
 import ContentRail from "@/components/ContentRail";
+import UpcomingPremieres from "@/components/UpcomingPremieres";
 import { useMovies } from "@/hooks/useMovies";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
@@ -37,6 +38,8 @@ const Index = () => {
       <HeroSection movie={movies[0] ?? null} />
 
       <div className="relative z-10 py-6">
+        <UpcomingPremieres />
+
         <div className="px-4 md:px-12 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl font-bold">Catálogo</h1>
