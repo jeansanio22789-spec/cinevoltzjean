@@ -203,11 +203,11 @@ Deno.serve(async (req) => {
         .like('mime_type', 'video/%');
     }
 
-    // 2b) Busca mensagens pendentes com vídeo
+    // 2b) Busca mensagens pendentes com vídeo (de QUALQUER chat — inclui
+    //     testes em DM com o bot além do canal cadastrado).
     const { data: pending, error: pendingErr } = await supabase
       .from('telegram_messages')
       .select('*')
-      .eq('chat_id', chatId)
       .eq('processing_status', 'pending')
       .not('file_id', 'is', null)
       .like('mime_type', 'video/%')
