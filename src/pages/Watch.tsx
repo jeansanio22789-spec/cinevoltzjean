@@ -249,9 +249,9 @@ const Watch = () => {
           ) : localMissing || !localBlobUrl ? (
             <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white gap-4">
               <Lock className="w-10 h-10 text-muted-foreground" />
-              <p className="font-semibold">Este vídeo está salvo localmente em outro dispositivo</p>
+              <p className="font-semibold">Este vídeo precisa ser reenviado</p>
               <p className="text-sm text-white/70 max-w-sm">
-                Vídeos no modo "Local" só tocam no aparelho que os importou — abra no celular onde você adicionou o arquivo.
+                Esse cadastro antigo foi salvo só no aparelho onde o arquivo foi importado. Exclua este item no painel e publique novamente usando Enviar e Publicar ou Salvar Link.
               </p>
               <button
                 onClick={() => navigate(-1)}
