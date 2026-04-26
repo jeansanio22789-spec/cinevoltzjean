@@ -186,11 +186,27 @@ Deno.serve(async (req) => {
     }
     const chatId = Number(chatIdStr);
 
-    // 2) Busca mensagens pendentes com vídeo
+    // 2a) Reset: traz de volta pra fila qualquer mensagem que falhou antes
+    //     (download_failed / error / file_too_big), de qualquer chat — o
+    //     usuário pediu pra reprocessar TUDO sem barreira de tamanho.
+    if (dryRun) {
+      await supabase
+        .from('telegram_messages')
+        .update({
+          processing_status: 'pending',
+          processing_error: null,
+          processed_at: null,
+        })
+        .in('processing_status', ['download_failed', 'error', 'file_too_big'])
+        .not('file_id', 'is', null)
+        .like('mime_type', 'video/%');
+    }
+
+    // 2b) Busca mensagens pendentes com vídeo (de QUALQUER chat — inclui
+    //     testes em DM com o bot além do canal cadastrado).
     const { data: pending, error: pendingErr } = await supabase
       .from('telegram_messages')
       .select('*')
-      .eq('chat_id', chatId)
       .eq('processing_status', 'pending')
       .not('file_id', 'is', null)
       .like('mime_type', 'video/%')
@@ -201,11 +217,20 @@ Deno.serve(async (req) => {
 
     const results: ProcessResult[] = [];
 
+    // Helper: monta link público do Telegram pra vídeos que não conseguimos
+    // baixar via Bot API (limite duro de 20MB). Usuário aprova mesmo assim e
+    // o player abre via Telegram.
+    const buildTelegramLink = (cId: number, mId: number) => {
+      // Canais privados: -100xxxxxxxxxx → t.me/c/xxxxxxxxxx/<msg>
+      const idStr = String(cId);
+      if (idStr.startsWith('-100')) {
+        return `https://t.me/c/${idStr.slice(4)}/${mId}`;
+      }
+      return `https://t.me/c/${Math.abs(cId)}/${mId}`;
+    };
+
     for (const row of pending ?? []) {
       try {
-        // Sem mais bloqueio por tamanho — tenta baixar tudo. Se o Telegram
-        // recusar (arquivo > limite da Bot API), o catch grava o erro real.
-
         const caption = row.caption || row.text || '';
         if (!caption.trim()) {
           await supabase
@@ -223,36 +248,62 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Download vídeo (em stream — funciona pra arquivos de qualquer tamanho
-        // dentro do limite que a Bot API permitir; passa o stream direto pro
-        // upload, sem carregar tudo em memória).
+        // Tenta baixar o vídeo. Se o Telegram recusar por tamanho (>20MB,
+        // limite duro da Bot API), seguimos com o link do Telegram.
+        let publicVideoUrl: string | null = null;
+        let viaTelegramLink = false;
+
         const dl = await downloadTelegramFileStream(row.file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
         if ('error' in dl) {
-          await supabase
-            .from('telegram_messages')
-            .update({
-              processing_status: 'download_failed',
-              processing_error: dl.error.slice(0, 500),
-              processed_at: new Date().toISOString(),
-            })
-            .eq('update_id', row.update_id);
-          results.push({ update_id: row.update_id, status: 'error', reason: dl.error });
-          continue;
+          const isTooBig = /too big|file is too big|413|larger than/i.test(dl.error);
+          if (!isTooBig) {
+            await supabase
+              .from('telegram_messages')
+              .update({
+                processing_status: 'download_failed',
+                processing_error: dl.error.slice(0, 500),
+                processed_at: new Date().toISOString(),
+              })
+              .eq('update_id', row.update_id);
+            results.push({ update_id: row.update_id, status: 'error', reason: dl.error });
+            continue;
+          }
+          // Fallback: usa o link direto do Telegram
+          if (!row.message_id) {
+            await supabase
+              .from('telegram_messages')
+              .update({
+                processing_status: 'error',
+                processing_error: 'Arquivo grande sem message_id pra link',
+                processed_at: new Date().toISOString(),
+              })
+              .eq('update_id', row.update_id);
+            results.push({
+              update_id: row.update_id,
+              status: 'error',
+              reason: 'sem message_id',
+            });
+            continue;
+          }
+          publicVideoUrl = buildTelegramLink(row.chat_id, row.message_id);
+          viaTelegramLink = true;
         }
 
-        // Upload pro storage (passa o stream direto)
-        const ext = (dl.path.split('.').pop() || 'mp4').toLowerCase();
-        const storagePath = `telegram/${chatId}/${row.message_id}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from('videos')
-          .upload(storagePath, dl.stream, {
-            contentType: row.mime_type || 'video/mp4',
-            upsert: true,
-          });
-        if (upErr) throw new Error(`Upload: ${upErr.message}`);
-        const { data: pub } = supabase.storage.from('videos').getPublicUrl(storagePath);
+        // Upload pro storage só quando temos stream (≤20MB Bot API).
+        if (!viaTelegramLink) {
+          const ext = ((dl as { stream: ReadableStream<Uint8Array>; path: string }).path.split('.').pop() || 'mp4').toLowerCase();
+          const storagePath = `telegram/${chatId}/${row.message_id}.${ext}`;
+          const { error: upErr } = await supabase.storage
+            .from('videos')
+            .upload(storagePath, (dl as { stream: ReadableStream<Uint8Array> }).stream, {
+              contentType: row.mime_type || 'video/mp4',
+              upsert: true,
+            });
+          if (upErr) throw new Error(`Upload: ${upErr.message}`);
+          publicVideoUrl = supabase.storage.from('videos').getPublicUrl(storagePath).data.publicUrl;
+        }
 
-        // Thumbnail (se houver)
+        // Thumbnail (se houver) — funciona sempre, thumb é pequena
         let thumbUrl: string | null = null;
         if (row.thumb_file_id) {
           const thumbBytes = await downloadTelegramFileBytes(row.thumb_file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
@@ -275,26 +326,26 @@ Deno.serve(async (req) => {
 
         if (dryRun) {
           // Modo preview: NÃO publica em movies, NÃO altera processing_status.
-          // Retorna URLs já carregadas no storage + metadados sugeridos.
           results.push({
             update_id: row.update_id,
             status: 'preview',
             title: fullTitle,
-            video_url: pub.publicUrl,
+            video_url: publicVideoUrl!,
             thumbnail_url: thumbUrl,
             duration_min: row.duration ? Math.round(row.duration / 60) : null,
             size_mb: row.file_size ? Math.round((row.file_size / 1024 / 1024) * 10) / 10 : null,
-            meta,
+            meta: { ...meta, ...(viaTelegramLink ? { synopsis: `${meta.synopsis}\n\n[Arquivo grande — reproduzido via Telegram]` } : {}) },
           });
           continue;
         }
 
-        // Modo publish direto (legado): cria movie e marca como imported.
+        // Modo publish direto (legado)
         const { data: movie, error: movieErr } = await supabase
           .from('movies')
           .insert({
             title: fullTitle,
-            video_url: pub.publicUrl,
+            video_url: publicVideoUrl!,
+            telegram_url: viaTelegramLink ? publicVideoUrl : null,
             thumbnail_url: thumbUrl,
             genre: meta.genre,
             year: meta.year || null,
@@ -338,11 +389,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Conta o que ainda falta
+    // Conta o que ainda falta (qualquer chat)
     const { count: stillPending } = await supabase
       .from('telegram_messages')
       .select('*', { count: 'exact', head: true })
-      .eq('chat_id', chatId)
       .eq('processing_status', 'pending')
       .not('file_id', 'is', null)
       .like('mime_type', 'video/%');
