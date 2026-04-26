@@ -18,7 +18,6 @@ import ExternalView from "./pages/ExternalView.tsx";
 import TestChannels from "./pages/TestChannels.tsx";
 import ChannelView from "./pages/ChannelView.tsx";
 import MaintenanceGate from "@/components/MaintenanceGate";
-import LiveThumbnail from "@/components/LiveThumbnail";
 
 
 const queryClient = new QueryClient();
@@ -47,7 +46,7 @@ const App = () => (
               <Route path="/c/:slug" element={<ChannelView />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <LiveThumbnail />
+            
           </MaintenanceGate>
         </AuthProvider>
       </BrowserRouter>
