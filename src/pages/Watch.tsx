@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Loader2, Lock, Play, Send } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
+import TelegramPlayer from "@/components/TelegramPlayer";
 
 interface WatchMovie {
   id: string;
@@ -174,58 +175,9 @@ const Watch = () => {
     );
   }
 
-  // ✅ Tem acesso. Se há link do Telegram, prioriza ele.
+  // ✅ Tem acesso. Se há link do Telegram, abre direto.
   if (movie.telegram_url) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="flex items-center justify-between p-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-foreground text-sm font-medium hover:opacity-80"
-          >
-            <ArrowLeft className="w-5 h-5" /> Voltar
-          </button>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-5 max-w-md mx-auto pb-12">
-          {movie.thumbnail_url && (
-            <img
-              src={movie.thumbnail_url}
-              alt={movie.title}
-              className="w-44 h-64 object-cover rounded-xl shadow-2xl"
-            />
-          )}
-          <div>
-            <h1 className="text-2xl md:text-3xl font-black mb-2">{movie.title}</h1>
-            {movie.description && (
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                {movie.description}
-              </p>
-            )}
-          </div>
-          <div className="text-xs text-muted-foreground flex items-center gap-3 flex-wrap justify-center">
-            {movie.year && <span>{movie.year}</span>}
-            {movie.duration && <span>• {movie.duration}</span>}
-            {movie.rating && <span>• {movie.rating}</span>}
-            {movie.genre && <span>• {movie.genre}</span>}
-          </div>
-
-          <a
-            href={movie.telegram_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-primary text-primary-foreground px-6 py-4 rounded-xl font-black text-base flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors shadow-lg"
-          >
-            <Send className="w-5 h-5" /> Assistir no Telegram
-          </a>
-
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            O conteúdo abre direto no app do Telegram. Você precisa estar no canal
-            para assistir.
-          </p>
-        </div>
-      </div>
-    );
+    return <TelegramPlayer movie={movie} onBack={() => navigate(-1)} />;
   }
 
   const source = resolveVideoSource(movie.video_url);
