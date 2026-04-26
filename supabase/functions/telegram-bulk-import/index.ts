@@ -12,7 +12,8 @@ const corsHeaders = {
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 const AI_GATEWAY = 'https://ai.gateway.lovable.dev/v1/chat/completions';
-const MAX_TG_FILE_BYTES = 20 * 1024 * 1024; // Bot API hard limit
+// Sem limite local de tamanho — tenta baixar qualquer arquivo. O Telegram pode
+// recusar arquivos > 20MB via Bot API, e nesse caso o erro é registrado.
 const DORAMAS_CHAT_KEY = 'telegram_doramas_chat_id';
 
 interface ProcessResult {
@@ -104,11 +105,11 @@ async function extractMetadata(
   return JSON.parse(args);
 }
 
-async function downloadTelegramFile(
+async function downloadTelegramFileStream(
   fileId: string,
   lovableKey: string,
   tgKey: string,
-): Promise<{ bytes: ArrayBuffer; path: string } | null> {
+): Promise<{ stream: ReadableStream<Uint8Array>; path: string } | { error: string }> {
   const fileRes = await fetch(`${GATEWAY_URL}/getFile`, {
     method: 'POST',
     headers: {
@@ -119,7 +120,10 @@ async function downloadTelegramFile(
     body: JSON.stringify({ file_id: fileId }),
   });
   const fileData = await fileRes.json().catch(() => null);
-  if (!fileRes.ok || !fileData?.ok) return null;
+  if (!fileRes.ok || !fileData?.ok) {
+    const desc = fileData?.description || `getFile HTTP ${fileRes.status}`;
+    return { error: desc };
+  }
 
   const path = fileData.result.file_path;
   const dl = await fetch(`${GATEWAY_URL}/file/${path}`, {
@@ -128,8 +132,21 @@ async function downloadTelegramFile(
       'X-Connection-Api-Key': tgKey,
     },
   });
-  if (!dl.ok) return null;
-  return { bytes: await dl.arrayBuffer(), path };
+  if (!dl.ok || !dl.body) {
+    return { error: `download HTTP ${dl.status}` };
+  }
+  return { stream: dl.body, path };
+}
+
+// Thumbnails são pequenas — baixa em memória.
+async function downloadTelegramFileBytes(
+  fileId: string,
+  lovableKey: string,
+  tgKey: string,
+): Promise<ArrayBuffer | null> {
+  const r = await downloadTelegramFileStream(fileId, lovableKey, tgKey);
+  if ('error' in r) return null;
+  return await new Response(r.stream).arrayBuffer();
 }
 
 Deno.serve(async (req) => {
@@ -186,23 +203,8 @@ Deno.serve(async (req) => {
 
     for (const row of pending ?? []) {
       try {
-        const fileSize = row.file_size ?? 0;
-        if (fileSize > MAX_TG_FILE_BYTES) {
-          await supabase
-            .from('telegram_messages')
-            .update({
-              processing_status: 'too_large',
-              processing_error: `Arquivo de ${(fileSize / 1024 / 1024).toFixed(1)}MB excede limite de 20MB da Bot API. Use Worker MTProto.`,
-              processed_at: new Date().toISOString(),
-            })
-            .eq('update_id', row.update_id);
-          results.push({
-            update_id: row.update_id,
-            status: 'skipped',
-            reason: `Arquivo > 20MB (${(fileSize / 1024 / 1024).toFixed(1)}MB)`,
-          });
-          continue;
-        }
+        // Sem mais bloqueio por tamanho — tenta baixar tudo. Se o Telegram
+        // recusar (arquivo > limite da Bot API), o catch grava o erro real.
 
         const caption = row.caption || row.text || '';
         if (!caption.trim()) {
@@ -221,27 +223,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Download vídeo
-        const dl = await downloadTelegramFile(row.file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
-        if (!dl) {
+        // Download vídeo (em stream — funciona pra arquivos de qualquer tamanho
+        // dentro do limite que a Bot API permitir; passa o stream direto pro
+        // upload, sem carregar tudo em memória).
+        const dl = await downloadTelegramFileStream(row.file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
+        if ('error' in dl) {
           await supabase
             .from('telegram_messages')
             .update({
               processing_status: 'download_failed',
-              processing_error: 'getFile/download falhou',
+              processing_error: dl.error.slice(0, 500),
               processed_at: new Date().toISOString(),
             })
             .eq('update_id', row.update_id);
-          results.push({ update_id: row.update_id, status: 'error', reason: 'Download falhou' });
+          results.push({ update_id: row.update_id, status: 'error', reason: dl.error });
           continue;
         }
 
-        // Upload pro storage
+        // Upload pro storage (passa o stream direto)
         const ext = (dl.path.split('.').pop() || 'mp4').toLowerCase();
         const storagePath = `telegram/${chatId}/${row.message_id}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from('videos')
-          .upload(storagePath, dl.bytes, {
+          .upload(storagePath, dl.stream, {
             contentType: row.mime_type || 'video/mp4',
             upsert: true,
           });
@@ -251,10 +255,10 @@ Deno.serve(async (req) => {
         // Thumbnail (se houver)
         let thumbUrl: string | null = null;
         if (row.thumb_file_id) {
-          const thumbDl = await downloadTelegramFile(row.thumb_file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
-          if (thumbDl) {
+          const thumbBytes = await downloadTelegramFileBytes(row.thumb_file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
+          if (thumbBytes) {
             const thumbPath = `telegram/${chatId}/${row.message_id}_thumb.jpg`;
-            await supabase.storage.from('thumbnails').upload(thumbPath, thumbDl.bytes, {
+            await supabase.storage.from('thumbnails').upload(thumbPath, thumbBytes, {
               contentType: 'image/jpeg',
               upsert: true,
             });
