@@ -317,7 +317,7 @@ const runJob = async (job: UploadJob) => {
     const ext = job.file.name.split(".").pop() || "mp4";
     const path = `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
 
-    const videoUrl = await uploadFileTus(
+    const videoUrl = await uploadFileFast(
       "videos",
       path,
       job.file,
