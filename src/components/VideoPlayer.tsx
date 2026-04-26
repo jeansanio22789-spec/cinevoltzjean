@@ -237,7 +237,11 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onTime = () => setCurrent(v.currentTime);
-    const onMeta = () => setDuration(v.duration || 0);
+    const onMeta = () => {
+      setDuration(v.duration || 0);
+      // Detecta resolução nativa do arquivo (para MP4 popular menu de qualidade)
+      if (v.videoHeight) setNativeHeight(v.videoHeight);
+    };
     const onWait = () => setWaiting(true);
     const onPlaying = () => setWaiting(false);
     const onProgress = () => {
