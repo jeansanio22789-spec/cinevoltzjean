@@ -175,12 +175,20 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
           </div>
         )}
 
-        {/* Botão flutuante: importa o vídeo do Telegram pro storage e toca aqui */}
+        {loadTimedOut && !importing && (
+          <div className="absolute inset-x-4 bottom-24 z-30 rounded-lg bg-card/95 p-4 text-card-foreground shadow-2xl backdrop-blur">
+            <p className="text-sm font-bold">O Telegram bloqueou o player interno.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tente importar para tocar no player do app. Se o arquivo for grande, envie o MP4 pelo painel admin.
+            </p>
+          </div>
+        )}
+
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
           <button
             onClick={handleImport}
             disabled={importing}
-            className="bg-primary text-primary-foreground px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-2xl disabled:opacity-60"
+            className="bg-primary text-primary-foreground px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-2xl disabled:opacity-60 whitespace-nowrap"
           >
             {importing ? (
               <>
