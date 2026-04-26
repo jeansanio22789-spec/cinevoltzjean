@@ -253,60 +253,6 @@ export type Database = {
         }
         Relationships: []
       }
-      mtproto_pending_logins: {
-        Row: {
-          created_at: string
-          expires_at: string
-          id: string
-          phone: string
-          phone_code_hash: string
-          temp_session: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          expires_at?: string
-          id?: string
-          phone: string
-          phone_code_hash: string
-          temp_session?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          expires_at?: string
-          id?: string
-          phone?: string
-          phone_code_hash?: string
-          temp_session?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      mtproto_sessions: {
-        Row: {
-          id: number
-          phone: string | null
-          string_session: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          id?: number
-          phone?: string | null
-          string_session: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          id?: number
-          phone?: string | null
-          string_session?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
       platform_settings: {
         Row: {
           id: string
