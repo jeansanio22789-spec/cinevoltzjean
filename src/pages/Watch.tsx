@@ -197,13 +197,6 @@ const Watch = () => {
     return <TelegramPlayer movie={movieForTg} onBack={() => navigate(-1)} />;
   }
 
-  const source = resolveVideoSource(movie.video_url);
-
-  // Se for vídeo "local://", resolve do IndexedDB pra um blob: URL tocável
-  const isLocal = source?.kind === "local";
-  const { resolvedUrl: localBlobUrl, missing: localMissing, loading: localLoading } =
-    useLocalVideoSrc(isLocal ? source.url : null);
-
   // Mostra a vinheta de abertura (estilo Netflix) só quando há vídeo de fato
   const hasPlayableVideo = source && source.kind !== "unknown";
   const showIntro = hasPlayableVideo && !introDone && !localLoading;
