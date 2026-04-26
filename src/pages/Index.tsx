@@ -4,6 +4,7 @@ import HeroSection from "@/components/HeroSection";
 import Footer from "@/components/Footer";
 import ContentRail from "@/components/ContentRail";
 import UpcomingPremieres from "@/components/UpcomingPremieres";
+import AdminUploadsRail from "@/components/AdminUploadsRail";
 import { useMovies } from "@/hooks/useMovies";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
@@ -38,6 +39,7 @@ const Index = () => {
       <HeroSection movie={movies[0] ?? null} />
 
       <div className="relative z-10 py-6">
+        <AdminUploadsRail />
         <UpcomingPremieres />
 
         <div className="px-4 md:px-12 mb-6">
