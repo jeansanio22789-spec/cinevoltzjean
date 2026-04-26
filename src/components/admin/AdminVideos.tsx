@@ -130,18 +130,24 @@ const AdminVideos = () => {
       if (data?.error) throw new Error(data.error);
 
       const title = (data?.title || "").trim();
+      const audio = data?.audio as AudioTrack | undefined;
       if (!title) {
         toast.warning("Não consegui ler nenhum título nessa capa.");
         return;
       }
-      setForm((prev) => {
-        if (prev.title.trim()) return prev; // não sobrescreve digitado
-        return { ...prev, title };
-      });
+      // Trocar capa = trocar nome (sobrescreve) e atualiza áudio se a capa indicou
+      setForm((prev) => ({
+        ...prev,
+        title,
+        audio: audio && audio !== "Original" ? audio : prev.audio,
+      }));
+
+      const audioMsg =
+        audio && audio !== "Original" ? ` • áudio: ${audio}` : "";
       toast.success(
         data?.confidence === "high"
-          ? `Título lido da capa: "${title}"`
-          : `Título lido (confiança ${data?.confidence}): "${title}" — confira`,
+          ? `Lido da capa: "${title}"${audioMsg}`
+          : `Lido (confiança ${data?.confidence}): "${title}"${audioMsg} — confira`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao ler capa";
