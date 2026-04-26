@@ -187,8 +187,8 @@ Deno.serve(async (req) => {
     const chatId = Number(chatIdStr);
 
     // 2a) Reset: traz de volta pra fila qualquer mensagem que falhou antes
-    //     (download_failed / error / file_too_big) — o usuário pediu pra
-    //     reprocessar TUDO do canal cadastrado.
+    //     (download_failed / error / file_too_big), de qualquer chat — o
+    //     usuário pediu pra reprocessar TUDO sem barreira de tamanho.
     if (dryRun) {
       await supabase
         .from('telegram_messages')
@@ -197,7 +197,6 @@ Deno.serve(async (req) => {
           processing_error: null,
           processed_at: null,
         })
-        .eq('chat_id', chatId)
         .in('processing_status', ['download_failed', 'error', 'file_too_big'])
         .not('file_id', 'is', null)
         .like('mime_type', 'video/%');
