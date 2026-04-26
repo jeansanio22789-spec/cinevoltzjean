@@ -37,7 +37,6 @@ const sections = [
     label: "Conteúdo",
     items: [
       { title: "Catálogo", tab: "movies" as AdminTab, icon: Film },
-      { title: "Importar Telegram", tab: "telegram" as AdminTab, icon: Send },
       { title: "Canais Ao Vivo", tab: "channels" as AdminTab, icon: Radio },
       { title: "Envio de Vídeos", tab: "videos" as AdminTab, icon: Upload },
     ],
