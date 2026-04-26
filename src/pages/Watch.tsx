@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
 import TelegramPlayer from "@/components/TelegramPlayer";
 import VideoPlayer from "@/components/VideoPlayer";
+import IntroVignette from "@/components/IntroVignette";
 
 interface WatchMovie {
   id: string;
