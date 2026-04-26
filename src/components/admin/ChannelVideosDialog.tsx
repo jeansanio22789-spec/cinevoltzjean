@@ -172,7 +172,7 @@ const ChannelVideosDialog = ({ open, onOpenChange, chatId, chatTitle }: Props) =
     let fail = 0;
     for (const v of pending) {
       try {
-        const { data, error } = await supabase.functions.invoke("telegram-publish-one", {
+        const { data, error } = await supabase.functions.invoke("telegram-reprocess-one", {
           body: { update_id: v.update_id },
         });
         if (error || (data as any)?.error) {
