@@ -14,6 +14,8 @@ export interface UploadJob {
   id: string;
   file: File;
   thumbnail?: File | null;
+  // URL local (object URL) da capa, pra mostrar preview na fila
+  thumbPreviewUrl?: string | null;
   meta: {
     title: string;
     genre: string;
