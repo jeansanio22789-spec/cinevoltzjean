@@ -100,11 +100,18 @@ const AdminVideos = () => {
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    genre: string;
+    type: string;
+    description: string;
+    audio: AudioTrack;
+  }>({
     title: "",
     genre: "Ação",
     type: "Filme",
     description: "",
+    audio: "Original",
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
