@@ -53,7 +53,7 @@ const App = () => {
               <Route path="/c/:slug" element={<ChannelView />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-            
+            <InstallAppPrompt />
           </MaintenanceGate>
         </AuthProvider>
       </BrowserRouter>
