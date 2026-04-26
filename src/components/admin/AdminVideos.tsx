@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Languages,
+  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
