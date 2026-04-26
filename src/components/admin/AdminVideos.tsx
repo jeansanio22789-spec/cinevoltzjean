@@ -31,27 +31,18 @@ const fmtEndTime = (etaSec: number) => {
   });
 };
 
-// Tira nome "limpo" de série/filme a partir do nome do arquivo de capa
-// Ex.: "Breaking.Bad.S01.1080p.jpg" -> "Breaking Bad"
-const guessTitleFromFilename = (filename: string): string => {
-  let name = filename.replace(/\.[^/.]+$/, ""); // remove extensão
-  // remove tags técnicas comuns
-  name = name.replace(
-    /\b(1080p|720p|480p|2160p|4k|webrip|web-dl|webdl|bluray|brrip|hdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|dublado|legendado|nacional|completo|temporada|season|s\d{1,2}(e\d{1,2})?|ep?\d{1,3}|t\d{1,2})\b/gi,
-    " ",
-  );
-  // remove ano isolado (1900-2099)
-  name = name.replace(/\b(19|20)\d{2}\b/g, " ");
-  // separadores -> espaço
-  name = name.replace(/[._\-\[\](){}]/g, " ");
-  // colapsa espaços
-  name = name.replace(/\s+/g, " ").trim();
-  // capitaliza palavras
-  return name
-    .split(" ")
-    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w.toLowerCase()))
-    .join(" ");
-};
+// Lê arquivo como base64 puro (sem o prefixo data:)
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
