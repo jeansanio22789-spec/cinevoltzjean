@@ -32,6 +32,7 @@ const Watch = () => {
   const [hasAccess, setHasAccess] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [tokenAccess, setTokenAccess] = useState(false);
+  const [introDone, setIntroDone] = useState(false);
 
   const token = params.get("token");
 
