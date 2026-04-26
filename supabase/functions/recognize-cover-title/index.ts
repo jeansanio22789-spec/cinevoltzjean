@@ -14,6 +14,9 @@ Sua tarefa: LER o que está escrito na imagem e devolver o título e a faixa de 
 Regras:
 - "title": apenas o nome principal da obra como aparece na capa (em qualquer idioma).
   Sem ano, sem "Temporada 1", sem "S01E02", sem "1080p", sem nome do estúdio.
+  NUNCA inclua no título palavras como "Dublado", "Legendado", "Dual", "DUB", "LEG",
+  "Nacional", "PT-BR", "SUB" — essas informações vão SOMENTE no campo "audio".
+  O título deve ser só o nome do filme/série, limpo.
 - "original_title": se houver dois títulos visíveis (ex.: original em japonês + traduzido),
   coloque o original aqui. Senão null.
 - "audio": leia se a capa indica a faixa de áudio. Procure por selos/textos como:

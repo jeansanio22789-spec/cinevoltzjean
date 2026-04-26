@@ -129,7 +129,28 @@ const AdminVideos = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const title = (data?.title || "").trim();
+      // Limpa qualquer marcação de áudio que a IA possa ter colado no título
+      // Ex.: "Vingadores Dublado", "Matrix [LEG]", "One Piece - DUAL ÁUDIO"
+      const stripAudioFromTitle = (raw: string) => {
+        let t = raw;
+        // Remove blocos entre [], () ou {} contendo dub/leg/dual
+        t = t.replace(
+          /[\[\(\{][^\]\)\}]*\b(dub(lad[oa])?|leg(endad[oa])?|dual|nacional|pt[\s._-]?br|sub(title[ds]?)?)\b[^\]\)\}]*[\]\)\}]/gi,
+          "",
+        );
+        // Remove sufixos soltos no fim/meio: " - Dublado", " • LEG", " | DUAL"
+        t = t.replace(
+          /[\s\-\|•·:]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br|sub(?:title[ds]?)?)\b\.?\s*$/gi,
+          "",
+        );
+        // Remove a mesma palavra solta no meio cercada por separadores
+        t = t.replace(
+          /[\s\-\|•·]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br)\b[\s\-\|•·]+/gi,
+          " ",
+        );
+        return t.replace(/\s{2,}/g, " ").trim();
+      };
+      const title = stripAudioFromTitle((data?.title || "").trim());
       const audio = data?.audio as AudioTrack | undefined;
       if (!title) {
         toast.warning("Não consegui ler nenhum título nessa capa.");
