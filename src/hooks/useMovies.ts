@@ -12,6 +12,7 @@ export interface DbMovie {
   rating: string | null;
   status: string | null;
   video_url: string | null;
+  telegram_url: string | null;
 }
 
 export const useMovies = () => {
@@ -25,7 +26,7 @@ export const useMovies = () => {
         .select("*")
         .eq("status", "published")
         .order("created_at", { ascending: false });
-      setMovies(data || []);
+      setMovies((data as DbMovie[]) || []);
       setLoading(false);
     };
     fetch();

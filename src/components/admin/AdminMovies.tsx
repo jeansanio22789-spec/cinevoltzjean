@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2, Send, Users } from "lucide-react";
+import MovieAccessManager from "./MovieAccessManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { buildShareLink } from "@/lib/videoUrl";
@@ -9,6 +10,7 @@ interface Movie {
   id: string;
   title: string;
   video_url: string | null;
+  telegram_url: string | null;
   thumbnail_url: string | null;
   description: string | null;
   genre: string | null;
@@ -23,6 +25,7 @@ const AdminMovies = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Movie | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [accessFor, setAccessFor] = useState<Movie | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [importingTg, setImportingTg] = useState(false);
@@ -30,6 +33,7 @@ const AdminMovies = () => {
   const [form, setForm] = useState({
     title: "",
     video_url: "",
+    telegram_url: "",
     thumbnail_url: "",
     description: "",
     genre: "Ação",
@@ -59,7 +63,7 @@ const AdminMovies = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", video_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft" });
+    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft" });
     setShowForm(true);
   };
 
@@ -68,6 +72,7 @@ const AdminMovies = () => {
     setForm({
       title: movie.title,
       video_url: movie.video_url || "",
+      telegram_url: movie.telegram_url || "",
       thumbnail_url: movie.thumbnail_url || "",
       description: movie.description || "",
       genre: movie.genre || "Ação",
@@ -213,21 +218,29 @@ const AdminMovies = () => {
                   </p>
                 )}
                 <div className="flex items-center justify-between gap-1 mt-3">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const link = buildShareLink(movie.id);
-                      try {
-                        await navigator.clipboard.writeText(link);
-                        toast.success("Link copiado!", { description: link });
-                      } catch {
-                        toast.error("Não foi possível copiar");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded transition-colors"
-                  >
-                    <Share2 className="w-3.5 h-3.5" /> Copiar link
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const link = buildShareLink(movie.id);
+                        try {
+                          await navigator.clipboard.writeText(link);
+                          toast.success("Link copiado!", { description: link });
+                        } catch {
+                          toast.error("Não foi possível copiar");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded transition-colors"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Link
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAccessFor(movie); }}
+                      className="flex items-center gap-1.5 text-xs text-accent hover:bg-accent/10 px-2 py-1 rounded transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5" /> Acessos
+                    </button>
+                  </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => { e.stopPropagation(); openEdit(movie); }}
@@ -314,6 +327,22 @@ const AdminMovies = () => {
                     Importar vídeo do Telegram
                   </button>
                 )}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-primary" /> Link do Telegram (canal/grupo)
+                </label>
+                <input
+                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="https://t.me/+xxxxx ou https://t.me/seucanal/123"
+                  value={form.telegram_url}
+                  onChange={(e) => setForm({ ...form, telegram_url: e.target.value })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                  Quando preenchido, o botão "Assistir" abre essa mensagem direto no Telegram (em vez do player).
+                  Use o link da mensagem do filme/série dentro do seu canal privado.
+                </p>
               </div>
 
               <div>
@@ -471,6 +500,13 @@ const AdminMovies = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {accessFor && (
+        <MovieAccessManager
+          movie={{ id: accessFor.id, title: accessFor.title }}
+          onClose={() => setAccessFor(null)}
+        />
       )}
     </div>
   );
