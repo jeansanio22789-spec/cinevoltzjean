@@ -238,8 +238,17 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("canplay", onPlaying);
       v.removeEventListener("progress", onProgress);
       v.removeEventListener("volumechange", onVol);
-    };
   }, []);
+
+  // ---- Aplica preferências (volume/velocidade) ao trocar de filme ----
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const prefs = getPlayerPrefs();
+    if (typeof prefs.volume === "number") v.volume = prefs.volume;
+    if (typeof prefs.muted === "boolean") v.muted = prefs.muted;
+    if (typeof prefs.speed === "number") v.playbackRate = prefs.speed;
+  }, [src]);
 
   // ---- HLS: streams adaptativos com qualidade até 4K + faixas de áudio/legendas ----
   useEffect(() => {
