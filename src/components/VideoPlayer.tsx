@@ -223,6 +223,101 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     };
   }, []);
 
+  // ---- HLS: streams adaptativos com qualidade até 4K + faixas de áudio/legendas ----
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    // Limpa instância anterior
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    setQualities([]);
+    setAudioTracks([]);
+    setSubTracks([]);
+    setCurrentQuality(-1);
+    setCurrentAudio(-1);
+    setCurrentSub(-1);
+    setAutoActiveHeight(0);
+
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({
+        // ⚡ Configurações para máxima qualidade + carregamento rápido
+        capLevelToPlayerSize: false, // permite escolher 4K mesmo em janela menor
+        startLevel: -1, // começa em Auto
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 60,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 120,
+      });
+      hlsRef.current = hls;
+      hls.loadSource(src);
+      hls.attachMedia(v);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const levels: QualityLevel[] = hls.levels.map((lvl, i) => ({
+          index: i,
+          height: lvl.height,
+          bitrate: lvl.bitrate,
+          label: labelForHeight(lvl.height, lvl.bitrate),
+        }));
+        // Ordena do maior para o menor
+        levels.sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
+        setQualities(levels);
+
+        const audios: AudioTrack[] = hls.audioTracks.map((a, i) => ({
+          id: i,
+          name: a.name || a.lang || `Faixa ${i + 1}`,
+          lang: a.lang,
+        }));
+        setAudioTracks(audios);
+        setCurrentAudio(hls.audioTrack);
+
+        const subs: SubtitleTrack[] = hls.subtitleTracks.map((s, i) => ({
+          id: i,
+          name: s.name || s.lang || `Legenda ${i + 1}`,
+          lang: s.lang,
+        }));
+        setSubTracks(subs);
+        setCurrentSub(hls.subtitleTrack);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
+        const lvl = hls.levels[data.level];
+        if (lvl) setAutoActiveHeight(lvl.height);
+      });
+
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_e, data) => {
+        setCurrentAudio(data.id);
+      });
+
+      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_e, data) => {
+        setCurrentSub(data.id);
+      });
+
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) {
+          console.warn("HLS fatal error:", data);
+          // Tenta recuperar
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        }
+      });
+    } else {
+      // Vídeo regular (mp4/webm/etc) ou HLS nativo (Safari)
+      v.src = src;
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [src, isHls]);
+
   // ---- Fullscreen ----
   useEffect(() => {
     const onFs = () => setFs(!!document.fullscreenElement);
