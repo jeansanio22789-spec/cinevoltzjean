@@ -19,7 +19,6 @@ export type AdminTab =
   | "content"
   | "movies"
   | "channels"
-  | "telegram"
   | "users"
   | "videos"
   | "billing"
