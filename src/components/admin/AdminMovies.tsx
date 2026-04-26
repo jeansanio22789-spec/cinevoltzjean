@@ -331,7 +331,7 @@ const AdminMovies = () => {
 
               <div>
                 <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
-                  <Send className="w-3.5 h-3.5 text-sky-500" /> Link do Telegram (canal/grupo)
+                  <Send className="w-3.5 h-3.5 text-primary" /> Link do Telegram (canal/grupo)
                 </label>
                 <input
                   className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
