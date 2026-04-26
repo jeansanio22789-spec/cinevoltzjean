@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import Hls from "hls.js";
 import { cn } from "@/lib/utils";
+import {
+  getPlayerPrefs,
+  updatePlayerPrefs,
+  pickQualityIndex,
+  pickTrackId,
+} from "@/lib/playerPrefs";
 
 interface QualityLevel {
   index: number; // -1 = auto
@@ -164,14 +170,14 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(() => getPlayerPrefs().volume ?? 1);
+  const [muted, setMuted] = useState(() => getPlayerPrefs().muted ?? false);
   const [fs, setFs] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [settingsTab, setSettingsTab] = useState<
     null | "main" | "speed" | "quality" | "audio" | "subs"
   >(null);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(() => getPlayerPrefs().speed ?? 1);
   const [seeking, setSeeking] = useState(false);
   const [centerHint, setCenterHint] = useState<null | "play" | "pause" | "back" | "forward">(null);
 
@@ -209,9 +215,15 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     const onProgress = () => {
       if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1));
     };
+    let volSaveTimer: number | null = null;
     const onVol = () => {
       setVolume(v.volume);
       setMuted(v.muted);
+      // Salva com debounce para não escrever no localStorage a cada frame do slider
+      if (volSaveTimer) window.clearTimeout(volSaveTimer);
+      volSaveTimer = window.setTimeout(() => {
+        updatePlayerPrefs({ volume: v.volume, muted: v.muted });
+      }, 300);
     };
     v.addEventListener("play", onPlay);
     v.addEventListener("pause", onPause);
@@ -234,6 +246,16 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("volumechange", onVol);
     };
   }, []);
+
+  // ---- Aplica preferências (volume/velocidade) ao trocar de filme ----
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const prefs = getPlayerPrefs();
+    if (typeof prefs.volume === "number") v.volume = prefs.volume;
+    if (typeof prefs.muted === "boolean") v.muted = prefs.muted;
+    if (typeof prefs.speed === "number") v.playbackRate = prefs.speed;
+  }, [src]);
 
   // ---- HLS: streams adaptativos com qualidade até 4K + faixas de áudio/legendas ----
   useEffect(() => {
@@ -269,6 +291,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       hls.attachMedia(v);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const prefs = getPlayerPrefs();
+
         const levels: QualityLevel[] = hls.levels.map((lvl, i) => ({
           index: i,
           height: lvl.height,
@@ -279,13 +303,28 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
         levels.sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
         setQualities(levels);
 
+        // 🎯 Aplica qualidade preferida (se houver e bater com algum nível)
+        const preferredQ = pickQualityIndex(levels, prefs.qualityHeight);
+        if (preferredQ !== -1) {
+          hls.currentLevel = preferredQ;
+          setCurrentQuality(preferredQ);
+        }
+
         const audios: AudioTrack[] = hls.audioTracks.map((a, i) => ({
           id: i,
           name: a.name || a.lang || `Faixa ${i + 1}`,
           lang: a.lang,
         }));
         setAudioTracks(audios);
-        setCurrentAudio(hls.audioTrack);
+
+        // 🎯 Aplica faixa de áudio preferida (por idioma)
+        const preferredA = pickTrackId(audios, prefs.audioLang, prefs.audioName);
+        if (preferredA !== -1 && preferredA !== hls.audioTrack) {
+          hls.audioTrack = preferredA;
+          setCurrentAudio(preferredA);
+        } else {
+          setCurrentAudio(hls.audioTrack);
+        }
 
         const subs: SubtitleTrack[] = hls.subtitleTracks.map((s, i) => ({
           id: i,
@@ -293,7 +332,22 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
           lang: s.lang,
         }));
         setSubTracks(subs);
-        setCurrentSub(hls.subtitleTrack);
+
+        // 🎯 Aplica legenda preferida ("off" desliga; idioma seleciona)
+        if (prefs.subLang === "off") {
+          hls.subtitleTrack = -1;
+          setCurrentSub(-1);
+        } else if (prefs.subLang) {
+          const preferredS = pickTrackId(subs, prefs.subLang, prefs.subName);
+          if (preferredS !== -1) {
+            hls.subtitleTrack = preferredS;
+            setCurrentSub(preferredS);
+          } else {
+            setCurrentSub(hls.subtitleTrack);
+          }
+        } else {
+          setCurrentSub(hls.subtitleTrack);
+        }
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
@@ -398,6 +452,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     if (!v) return;
     v.playbackRate = r;
     setSpeed(r);
+    updatePlayerPrefs({ speed: r });
     setSettingsTab(null);
   };
 
@@ -740,6 +795,9 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                       onPick={(id) => {
                         setCurrentQuality(id);
                         if (hlsRef.current) hlsRef.current.currentLevel = id;
+                        // 💾 Salva preferência (altura ou 0 = Auto)
+                        const h = id === -1 ? 0 : qualities.find((q) => q.index === id)?.height ?? 0;
+                        updatePlayerPrefs({ qualityHeight: h });
                         setSettingsTab(null);
                       }}
                     />
@@ -758,6 +816,9 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                       onPick={(id) => {
                         setCurrentAudio(id);
                         if (hlsRef.current) hlsRef.current.audioTrack = id;
+                        // 💾 Salva por idioma (mais portável entre filmes)
+                        const t = audioTracks.find((tr) => tr.id === id);
+                        updatePlayerPrefs({ audioLang: t?.lang, audioName: t?.name });
                         setSettingsTab(null);
                       }}
                     />
@@ -779,6 +840,13 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                       onPick={(id) => {
                         setCurrentSub(id);
                         if (hlsRef.current) hlsRef.current.subtitleTrack = id;
+                        // 💾 Salva preferência ("off" ou idioma)
+                        if (id === -1) {
+                          updatePlayerPrefs({ subLang: "off", subName: undefined });
+                        } else {
+                          const t = subTracks.find((tr) => tr.id === id);
+                          updatePlayerPrefs({ subLang: t?.lang, subName: t?.name });
+                        }
                         setSettingsTab(null);
                       }}
                     />
