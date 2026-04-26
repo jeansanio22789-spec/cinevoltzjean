@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Eye, Loader2
+  FileVideo, Image, Type, Tag, Trash2, Eye, Loader2, Zap
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 interface Video {
   id: string;
@@ -23,7 +24,10 @@ const AdminVideos = () => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState("");
+  const [uploadSpeed, setUploadSpeed] = useState("");
+  const [uploadEta, setUploadEta] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -55,6 +59,49 @@ const AdminVideos = () => {
     }
   };
 
+  // Upload file via XHR to Supabase Storage REST API with real progress tracking
+  const uploadFileWithProgress = async (
+    bucket: string,
+    path: string,
+    file: File,
+    onProgress: (pct: number, speedMBs: number, etaSec: number) => void
+  ): Promise<string> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const startTime = Date.now();
+
+      xhr.open("POST", url, true);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("x-upsert", "true");
+      if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+
+      xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const pct = (e.loaded / e.total) * 100;
+        const elapsed = (Date.now() - startTime) / 1000;
+        const speedMBs = e.loaded / 1024 / 1024 / Math.max(elapsed, 0.1);
+        const remaining = (e.total - e.loaded) / 1024 / 1024;
+        const etaSec = remaining / Math.max(speedMBs, 0.01);
+        onProgress(pct, speedMBs, etaSec);
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+          resolve(data.publicUrl);
+        } else {
+          reject(new Error(`Upload falhou (${xhr.status}): ${xhr.responseText}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Erro de rede no upload"));
+      xhr.send(file);
+    });
+  };
+
   const handleUpload = async () => {
     if (!form.title.trim()) {
       toast.error("Título é obrigatório");
@@ -62,34 +109,44 @@ const AdminVideos = () => {
     }
 
     setUploading(true);
+    setUploadProgress(0);
     let videoUrl = "";
     let thumbnailUrl = "";
 
     try {
-      // Upload video file
+      // Upload video file with real progress
       if (selectedFile) {
-        setUploadProgress("Enviando vídeo...");
+        setUploadStage("Enviando vídeo");
         const ext = selectedFile.name.split(".").pop();
         const path = `videos/${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from("videos").upload(path, selectedFile);
-        if (error) throw error;
-        const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
-        videoUrl = urlData.publicUrl;
+        videoUrl = await uploadFileWithProgress(
+          "videos",
+          path,
+          selectedFile,
+          (pct, speed, eta) => {
+            setUploadProgress(pct);
+            setUploadSpeed(`${speed.toFixed(1)} MB/s`);
+            setUploadEta(eta > 60 ? `${Math.ceil(eta / 60)}min` : `${Math.ceil(eta)}s`);
+          }
+        );
       }
 
       // Upload thumbnail
       if (thumbnailFile) {
-        setUploadProgress("Enviando thumbnail...");
+        setUploadStage("Enviando thumbnail");
         const ext = thumbnailFile.name.split(".").pop();
         const path = `thumbnails/${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from("videos").upload(path, thumbnailFile);
-        if (error) throw error;
-        const { data: urlData } = supabase.storage.from("videos").getPublicUrl(path);
-        thumbnailUrl = urlData.publicUrl;
+        thumbnailUrl = await uploadFileWithProgress(
+          "videos",
+          path,
+          thumbnailFile,
+          (pct) => setUploadProgress(pct)
+        );
       }
 
       // Save to DB
-      setUploadProgress("Salvando...");
+      setUploadStage("Salvando no catálogo");
+      setUploadProgress(99);
       const { error } = await supabase.from("movies").insert({
         title: form.title,
         video_url: videoUrl || null,
@@ -101,7 +158,8 @@ const AdminVideos = () => {
 
       if (error) throw error;
 
-      toast.success("Vídeo enviado com sucesso!");
+      setUploadProgress(100);
+      toast.success("✅ Vídeo publicado com sucesso!");
       setShowUpload(false);
       setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
       setSelectedFile(null);
@@ -112,7 +170,10 @@ const AdminVideos = () => {
     }
 
     setUploading(false);
-    setUploadProgress("");
+    setUploadProgress(0);
+    setUploadStage("");
+    setUploadSpeed("");
+    setUploadEta("");
   };
 
   const handleDelete = async (id: string) => {
@@ -242,14 +303,33 @@ const AdminVideos = () => {
             />
           </div>
 
+          {uploading && (
+            <div className="mt-4 p-4 bg-background border border-border rounded-lg space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-primary" />
+                  {uploadStage}
+                </span>
+                <span className="font-mono text-primary font-bold">{uploadProgress.toFixed(1)}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+              {uploadSpeed && (
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>⚡ {uploadSpeed}</span>
+                  {uploadEta && <span>⏱ Faltam ~{uploadEta}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3 mt-4">
             <button
               onClick={handleUpload}
-              disabled={uploading}
+              disabled={uploading || !selectedFile}
               className="px-6 py-2 bg-primary text-primary-foreground rounded text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {uploading ? uploadProgress : "Enviar e Publicar"}
+              {uploading ? `${uploadStage}...` : "Enviar e Publicar"}
             </button>
           </div>
         </div>
