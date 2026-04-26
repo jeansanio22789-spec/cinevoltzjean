@@ -4,11 +4,22 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import {
   Loader2, Save, Download, Server, ExternalLink, CheckCircle2,
-  Sparkles, Search, Film, Tv, Bot, Cpu,
+  Sparkles, Search, Film, Tv, Bot, Cpu, Radar, Copy,
 } from "lucide-react";
 
 const WORKER_URL_KEY = "telegram_worker_url";
 const WORKER_TOKEN_KEY = "telegram_worker_token";
+const DORAMAS_CHAT_KEY = "telegram_doramas_chat_id";
+const DORAMAS_CHAT_TITLE_KEY = "telegram_doramas_chat_title";
+
+interface DiscoveredChat {
+  chat_id: number;
+  title: string;
+  type: string;
+  username?: string;
+  last_message_preview?: string;
+  last_message_date?: number;
+}
 
 type ImportMode = "bot" | "worker";
 
