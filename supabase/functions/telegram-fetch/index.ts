@@ -110,7 +110,11 @@ Deno.serve(async (req) => {
     if (!url) throw new Error("Parâmetro `url` ausente");
 
     const parsed = parseTelegramLink(url);
-    if (!parsed) throw new Error("Link inválido. Use t.me/c/<canal>/<msg>");
+    if (!parsed) {
+      throw new Error(
+        `Link inválido: "${String(url).slice(0, 120)}". Use https://t.me/c/<canal>/<msg> (canal privado) ou https://t.me/<username>/<msg>.`,
+      );
+    }
 
     // 1. forwardMessage → bot encaminha pro grupo de armazenamento e recebe o objeto Message
     const fwd = await tg(
