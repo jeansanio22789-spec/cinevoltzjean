@@ -582,6 +582,17 @@ const AdminVideos = () => {
           </div>
 
           <div className="mt-4">
+            <label className="text-sm font-medium mb-1.5 block">Descrição</label>
+            <textarea
+              className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+              rows={3}
+              placeholder="Sinopse do conteúdo..."
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            />
+          </div>
+
+          <div className="mt-4">
             <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
               <Link2 className="w-3.5 h-3.5" /> Link do vídeo (opcional — sem precisar de upload)
             </label>
