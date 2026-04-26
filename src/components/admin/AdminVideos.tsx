@@ -411,7 +411,120 @@ const AdminVideos = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  // 📥 Baixar link e salvar no aparelho: faz fetch da URL e guarda o arquivo
+  // no IndexedDB. Depois toca offline (sem internet, direto do celular).
+  const handleDownloadLinkLocal = async () => {
+    const url = linkUrl.trim();
+    if (!url) {
+      toast.error("Cole o link do vídeo");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      toast.error("Link inválido — precisa começar com http:// ou https://");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Título é obrigatório");
+      return;
+    }
+
+    setDownloadingLink(true);
+    setDownloadProgress({ loaded: 0, total: 0 });
+    const tId = toast.loading("Baixando link no aparelho…");
+    try {
+      const resp = await fetch(url, { mode: "cors" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const total = Number(resp.headers.get("content-length") || 0);
+
+      // Lê em stream pra mostrar progresso
+      let blob: Blob;
+      if (resp.body && typeof ReadableStream !== "undefined") {
+        const reader = resp.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let loaded = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value);
+            loaded += value.byteLength;
+            setDownloadProgress({ loaded, total });
+          }
+        }
+        blob = new Blob(chunks as BlobPart[], {
+          type: resp.headers.get("content-type") || "video/mp4",
+        });
+      } else {
+        blob = await resp.blob();
+      }
+
+      // Checa espaço livre
+      const est = await getStorageEstimate();
+      const sizeMB = blob.size / 1024 / 1024;
+      if (est && est.quotaMB - est.usageMB < sizeMB) {
+        throw new Error(
+          `Espaço local insuficiente: precisa de ${sizeMB.toFixed(0)} MB, livre ${(est.quotaMB - est.usageMB).toFixed(0)} MB`,
+        );
+      }
+
+      // Tenta inferir nome de arquivo da URL
+      const filename = (() => {
+        try {
+          const u = new URL(url);
+          const last = u.pathname.split("/").pop() || "video.mp4";
+          return last.includes(".") ? last : `${last}.mp4`;
+        } catch {
+          return "video.mp4";
+        }
+      })();
+      const localUrl = await saveLocalBlob(blob, filename, blob.type);
+
+      // Sobe a thumbnail se houver
+      let thumbnailUrl: string | null = null;
+      if (thumbnailFile) {
+        const ext = thumbnailFile.name.split(".").pop() || "jpg";
+        const path = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+        const { error: thErr } = await supabase.storage
+          .from("videos")
+          .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
+        if (!thErr) {
+          const { data } = supabase.storage.from("videos").getPublicUrl(path);
+          thumbnailUrl = data.publicUrl;
+        }
+      }
+
+      const { error } = await supabase.from("movies").insert({
+        title: form.title,
+        video_url: localUrl,
+        thumbnail_url: thumbnailUrl,
+        genre: form.genre,
+        description: form.description,
+        status: "published",
+      });
+      if (error) throw error;
+
+      toast.dismiss(tId);
+      toast.success(`📥 Baixado e salvo no aparelho (${sizeMB.toFixed(1)} MB)`);
+      setLinkUrl("");
+      setThumbnailFile(null);
+      setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+      fetchVideos();
+    } catch (e) {
+      toast.dismiss(tId);
+      const msg = e instanceof Error ? e.message : "Falha ao baixar link";
+      // CORS é o erro mais comum aqui — explica pro usuário
+      if (msg.includes("Failed to fetch") || msg.toLowerCase().includes("cors")) {
+        toast.error("O servidor do link bloqueou o download (CORS). Use 'Salvar Link' ou baixe o arquivo manualmente e use 'Salvar Local'.");
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setDownloadingLink(false);
+      setDownloadProgress(null);
+    }
+  };
+
+
     if (!confirm("Excluir este vídeo?")) return;
     // Se for vídeo local, limpa o IndexedDB também
     const target = videos.find((v) => v.id === id);
