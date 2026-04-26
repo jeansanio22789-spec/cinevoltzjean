@@ -376,6 +376,7 @@ const runJob = async (job: UploadJob) => {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
     store.update(job.id, { status: "error", errorMsg: msg });
   } finally {
+    runningJobIds.delete(job.id);
     window.clearTimeout(timeoutTimer);
     // Libera o wake lock se não tem mais nada rolando
     if (!hasActiveUploads()) void releaseWakeLock();
