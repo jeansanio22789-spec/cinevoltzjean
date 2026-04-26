@@ -306,6 +306,45 @@ const AdminMovies = () => {
                       setImportingTg(true);
                       const tId = toast.loading("Buscando vídeo no Telegram...");
                       try {
+                        // 1) Tenta achar a mensagem já capturada pelo bot (DM ou canal monitorado)
+                        // Aceita formatos t.me/c/<chat>/<msg> e t.me/<user>/<msg>
+                        const m = form.video_url.match(/t\.me\/(?:c\/)?([^/]+)\/(?:\d+\/)?(\d+)/i);
+                        if (m) {
+                          const rawChat = m[1];
+                          const messageId = parseInt(m[2], 10);
+                          // Para t.me/c/<id> o chat real é -100<id>; para username não dá pra resolver pelo id direto.
+                          const numericChat = /^\d+$/.test(rawChat) ? Number(`-100${rawChat}`) : null;
+                          let q = supabase
+                            .from("telegram_messages")
+                            .select("update_id,chat_id,mime_type,movie_id")
+                            .eq("message_id", messageId)
+                            .limit(5);
+                          if (numericChat !== null) q = q.eq("chat_id", numericChat);
+                          // Também aceita DM: chat_id positivo igual ao "<id>" colado
+                          const { data: matches } = await q;
+                          const hit = (matches || []).find(
+                            (r) => r.mime_type?.startsWith("video") || r.movie_id,
+                          ) || (matches || [])[0];
+                          if (hit?.update_id) {
+                            const { data: r, error: rErr } = await supabase.functions.invoke(
+                              "telegram-reprocess-one",
+                              { body: { update_id: hit.update_id } },
+                            );
+                            if (rErr) throw rErr;
+                            if ((r as any)?.error) throw new Error((r as any).error);
+                            const videoUrl = (r as any)?.video_url || (r as any)?.movie?.video_url;
+                            const thumbUrl = (r as any)?.thumbnail_url || (r as any)?.movie?.thumbnail_url;
+                            setForm((f) => ({
+                              ...f,
+                              video_url: videoUrl || f.video_url,
+                              thumbnail_url: thumbUrl || f.thumbnail_url,
+                            }));
+                            toast.success("Vídeo importado da fila do bot!", { id: tId });
+                            return;
+                          }
+                        }
+
+                        // 2) Fallback: telegram-fetch (precisa de storage chat configurado)
                         const { data, error } = await supabase.functions.invoke("telegram-fetch", {
                           body: { url: form.video_url },
                         });
