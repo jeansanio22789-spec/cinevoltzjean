@@ -91,17 +91,46 @@ const AdminVideoLibrary = () => {
   const [chatFilter, setChatFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all"); // YYYY-MM
   const [openChat, setOpenChat] = useState<{ id: number; title: string } | null>(null);
+  const [featured, setFeatured] = useState<FeaturedChannel[]>([]);
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("telegram_messages")
-      .select(
-        "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id,raw_update",
-      )
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    const [{ data, error }, { data: settings }] = await Promise.all([
+      supabase
+        .from("telegram_messages")
+        .select(
+          "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id,raw_update",
+        )
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      supabase
+        .from("platform_settings")
+        .select("key,value")
+        .like("key", "telegram_%_chat_id"),
+    ]);
     if (!error) setRows((data as TgRow[]) || []);
+
+    // Build featured channels list from platform_settings keys like
+    // telegram_doramas_chat_id + telegram_doramas_chat_title
+    if (settings) {
+      const idRows = settings as { key: string; value: string | null }[];
+      const titleKeys = idRows.map((r) => r.key.replace("_chat_id", "_chat_title"));
+      const { data: titles } = await supabase
+        .from("platform_settings")
+        .select("key,value")
+        .in("key", titleKeys);
+      const titleMap = new Map<string, string>();
+      (titles ?? []).forEach((t: any) => titleMap.set(t.key, t.value ?? ""));
+      const list: FeaturedChannel[] = idRows
+        .filter((r) => r.value && /^-?\d+$/.test(r.value))
+        .map((r) => ({
+          id: Number(r.value),
+          title:
+            titleMap.get(r.key.replace("_chat_id", "_chat_title")) ||
+            `Canal ${r.value}`,
+        }));
+      setFeatured(list);
+    }
     setLoading(false);
   };
 
