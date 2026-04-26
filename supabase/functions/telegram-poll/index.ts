@@ -62,6 +62,22 @@ const extractPhoto = (msg: any): { file_id: string } | null => {
   return null;
 };
 
+// Detecta URL de vídeo na legenda/texto. Aceita .mp4, .m3u8, .mkv, .webm, .mov,
+// e também links genéricos http(s) (drive, dropbox, etc — confia no usuário).
+const URL_REGEX = /https?:\/\/[^\s<>"']+/gi;
+const extractVideoUrl = (text: string | null | undefined): string | null => {
+  if (!text) return null;
+  const matches = text.match(URL_REGEX);
+  if (!matches) return null;
+  // Prioriza URLs com extensão de vídeo conhecida
+  const videoExt = matches.find((u) =>
+    /\.(mp4|m3u8|mkv|webm|mov|avi|ts)(\?|#|$)/i.test(u)
+  );
+  return videoExt || matches[0];
+};
+
+const TELEGRAM_DOWNLOAD_LIMIT = 20 * 1024 * 1024; // 20 MB
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
