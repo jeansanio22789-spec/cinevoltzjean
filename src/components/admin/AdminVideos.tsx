@@ -412,28 +412,6 @@ const AdminVideos = () => {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
-                <Languages className="w-3.5 h-3.5" /> Áudio
-                {form.audio !== "Original" && (
-                  <span className="text-[10px] text-accent font-normal">
-                    (detectado pelo nome do arquivo)
-                  </span>
-                )}
-              </label>
-              <select
-                className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                value={form.audio}
-                onChange={(e) =>
-                  setForm({ ...form, audio: e.target.value as AudioTrack })
-                }
-              >
-                <option value="Original">Original</option>
-                <option value="Dublado">Dublado</option>
-                <option value="Legendado">Legendado</option>
-                <option value="Dual">Dual (Dub + Leg)</option>
-              </select>
-            </div>
-            <div>
               <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Image className="w-3.5 h-3.5" /> Thumbnail (capa)</label>
               <input
                 type="file"
