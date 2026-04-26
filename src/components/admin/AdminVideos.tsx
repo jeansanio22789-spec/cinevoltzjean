@@ -44,33 +44,55 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-// Detecta faixa de áudio pelo nome do arquivo
-// "Filme.DUAL.1080p.mkv" -> "Dual"   |   "Serie.LEG.mp4" -> "Legendado"
-type AudioTrack = "Dublado" | "Legendado" | "Dual" | "Original";
-const detectAudioFromFilename = (name: string): AudioTrack | null => {
+// Detecta faixa de áudio pelo nome do arquivo (usado p/ anexar ao TÍTULO em MAIÚSCULAS)
+// "Filme.DUAL.1080p.mkv" -> "DUAL"   |   "Serie.LEG.mp4" -> "LEGENDADO"
+type AudioTag = "DUBLADO" | "LEGENDADO" | "DUAL";
+const detectAudioFromFilename = (name: string): AudioTag | null => {
   const n = name.toLowerCase();
-  // Dual primeiro (tem prioridade — quer dizer que tem dublado E legendado)
   if (/\b(dual|dual[\s._-]?audio|multi[\s._-]?audio|2audios?)\b/.test(n))
-    return "Dual";
+    return "DUAL";
   if (
     /\b(dub|dubl|dublad[oa]|dublagem|nacional|português|portugues|pt[\s._-]?br|ptbr|brazilian)\b/.test(
       n,
     )
   )
-    return "Dublado";
+    return "DUBLADO";
   if (/\b(leg|legend|legendad[oa]|sub|subbed|subtitle[ds]?|vose)\b/.test(n))
-    return "Legendado";
+    return "LEGENDADO";
   return null;
 };
 
-// Detecta a primeira faixa que aparecer numa lista de arquivos (consenso simples)
-const detectAudioFromFiles = (files: File[]): AudioTrack | null => {
+const detectAudioFromFiles = (files: File[]): AudioTag | null => {
   for (const f of files) {
     const a = detectAudioFromFilename(f.name);
     if (a) return a;
   }
   return null;
 };
+
+// Tira sufixo de áudio que já esteja no título (pra não duplicar)
+const stripAudioSuffix = (raw: string): string => {
+  let t = raw;
+  t = t.replace(
+    /[\[\(\{][^\]\)\}]*\b(dub(lad[oa])?|leg(endad[oa])?|dual|nacional|pt[\s._-]?br|sub(title[ds]?)?)\b[^\]\)\}]*[\]\)\}]/gi,
+    "",
+  );
+  t = t.replace(
+    /[\s\-\|•·:]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br|sub(?:title[ds]?)?)\b\.?\s*$/gi,
+    "",
+  );
+  return t.replace(/\s{2,}/g, " ").trim();
+};
+
+// Junta o título + tag de áudio, tudo em MAIÚSCULAS
+const buildTitleWithAudio = (title: string, audio: AudioTag | null): string => {
+  const clean = stripAudioSuffix(title).toUpperCase();
+  if (!audio) return clean;
+  // Evita duplicar se a palavra já estiver lá
+  if (new RegExp(`\\b${audio}\\b`).test(clean)) return clean;
+  return `${clean} ${audio}`.trim();
+};
+
 
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
