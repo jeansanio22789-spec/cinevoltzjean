@@ -340,7 +340,7 @@ const runJob = async (job: UploadJob) => {
       const thPath = `thumbnails/${Date.now()}-${Math.random()
         .toString(36)
         .slice(2, 7)}.${thExt}`;
-      thumbnailUrl = await uploadFileTus(
+      thumbnailUrl = await uploadFileFast(
         "videos",
         thPath,
         job.thumbnail,
