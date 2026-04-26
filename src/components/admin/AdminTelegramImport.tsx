@@ -218,6 +218,43 @@ const AdminTelegramImport = () => {
     }
   };
 
+  // Bulk import
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResults, setBulkResults] = useState<{
+    imported: number;
+    skipped: number;
+    errors: number;
+    still_pending: number;
+    results: Array<{ status: string; reason?: string; title?: string }>;
+  } | null>(null);
+
+  const runBulkImport = async () => {
+    setBulkRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-bulk-import", {
+        body: { limit: 5 },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Falha desconhecida");
+      setBulkResults(data);
+      toast({
+        title: `${data.imported} publicado(s)`,
+        description:
+          data.skipped > 0 || data.errors > 0
+            ? `${data.skipped} pulado(s), ${data.errors} erro(s). ${data.still_pending} pendente(s).`
+            : `${data.still_pending} pendente(s) restando.`,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro no import em massa",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
   const fetchViaBot = async (link: string): Promise<FetchResult> => {
     const { data, error } = await supabase.functions.invoke("telegram-fetch", {
       body: { url: link },
