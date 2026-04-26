@@ -218,6 +218,43 @@ const AdminTelegramImport = () => {
     }
   };
 
+  // Bulk import
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResults, setBulkResults] = useState<{
+    imported: number;
+    skipped: number;
+    errors: number;
+    still_pending: number;
+    results: Array<{ status: string; reason?: string; title?: string }>;
+  } | null>(null);
+
+  const runBulkImport = async () => {
+    setBulkRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-bulk-import", {
+        body: { limit: 5 },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Falha desconhecida");
+      setBulkResults(data);
+      toast({
+        title: `${data.imported} publicado(s)`,
+        description:
+          data.skipped > 0 || data.errors > 0
+            ? `${data.skipped} pulado(s), ${data.errors} erro(s). ${data.still_pending} pendente(s).`
+            : `${data.still_pending} pendente(s) restando.`,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro no import em massa",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
   const fetchViaBot = async (link: string): Promise<FetchResult> => {
     const { data, error } = await supabase.functions.invoke("telegram-fetch", {
       body: { url: link },
@@ -588,6 +625,84 @@ const AdminTelegramImport = () => {
           </div>
         )}
       </div>
+
+      {/* Import em massa: processa o que o cron já capturou */}
+      {savedChatId && (
+        <div className="rounded-lg border border-primary/40 bg-[hsl(var(--admin-panel))] p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="font-bold text-sm">Importar mensagens capturadas</h2>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Processa até 5 vídeos pendentes de <span className="font-bold">{savedChatTitle}</span>:
+            baixa o vídeo, sobe pro storage, IA detecta título/ano/gênero e publica
+            no catálogo automaticamente.
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            ⚠️ Bot API só baixa arquivos até <span className="font-bold">20 MB</span>. Vídeos
+            maiores serão marcados como "too_large" e precisam do Worker MTProto.
+          </p>
+
+          <button
+            onClick={runBulkImport}
+            disabled={bulkRunning}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50 w-full sm:w-auto"
+          >
+            {bulkRunning ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Processando lote...</>
+            ) : (
+              <><Download className="w-4 h-4" /> Importar próximos 5</>
+            )}
+          </button>
+
+          {bulkResults && (
+            <div className="space-y-2 text-xs">
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="rounded-md bg-primary/10 p-2">
+                  <p className="text-lg font-black text-primary">{bulkResults.imported}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Publicados</p>
+                </div>
+                <div className="rounded-md bg-muted p-2">
+                  <p className="text-lg font-black">{bulkResults.skipped}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Pulados</p>
+                </div>
+                <div className="rounded-md bg-destructive/10 p-2">
+                  <p className="text-lg font-black text-destructive">{bulkResults.errors}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Erros</p>
+                </div>
+                <div className="rounded-md bg-muted p-2">
+                  <p className="text-lg font-black">{bulkResults.still_pending}</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">Restam</p>
+                </div>
+              </div>
+              {bulkResults.results.length > 0 && (
+                <ul className="space-y-1 max-h-48 overflow-auto rounded-md border border-[hsl(var(--admin-border))] p-2">
+                  {bulkResults.results.map((r, i) => (
+                    <li
+                      key={i}
+                      className={`text-[11px] flex items-start gap-2 ${
+                        r.status === "imported"
+                          ? "text-primary"
+                          : r.status === "error"
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      <span className="font-bold uppercase shrink-0">{r.status}</span>
+                      <span className="truncate">{r.title || r.reason || "—"}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {bulkResults.still_pending > 0 && (
+                <p className="text-[11px] text-muted-foreground italic">
+                  Clique de novo pra processar os próximos {Math.min(5, bulkResults.still_pending)}.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Etapa 1: cola link */}
       <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
