@@ -329,21 +329,28 @@ const AdminVideos = () => {
           </div>
 
           {uploading && (
-            <div className="mt-4 p-4 bg-background border border-border rounded-lg space-y-2">
+            <div className="mt-4 p-4 bg-background border border-primary/40 rounded-lg space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-primary" />
+                  <Zap className="w-4 h-4 text-primary animate-pulse" />
                   {uploadStage}
                 </span>
-                <span className="font-mono text-primary font-bold">{uploadProgress.toFixed(1)}%</span>
+                <span className="font-mono text-primary font-bold text-lg">{uploadProgress.toFixed(1)}%</span>
               </div>
-              <Progress value={uploadProgress} className="h-2" />
+              <Progress value={uploadProgress} className="h-3" />
               {uploadSpeed && (
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>⚡ {uploadSpeed}</span>
-                  {uploadEta && <span>⏱ Faltam ~{uploadEta}</span>}
+                  <span className="font-semibold">⚡ {uploadSpeed}</span>
+                  {uploadEta && <span className="font-semibold">⏱ Faltam ~{uploadEta}</span>}
                 </div>
               )}
+              <div className="flex items-start gap-2 text-xs text-amber-500 bg-amber-500/10 p-2 rounded">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p>
+                  <b>Mantenha esta aba aberta</b> até terminar. Se fechar o navegador, o upload para
+                  (limitação do browser). Se cair a conexão, ele retoma automaticamente.
+                </p>
+              </div>
             </div>
           )}
 
