@@ -832,9 +832,13 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                         {
                           id: -1,
                           label: "Auto",
-                          hint: autoActiveHeight ? `${autoActiveHeight}p` : undefined,
+                          hint: autoActiveHeight
+                            ? `${autoActiveHeight}p`
+                            : nativeHeight
+                              ? `${nativeHeight}p`
+                              : undefined,
                         },
-                        ...qualities.map((q) => ({
+                        ...displayQualities.map((q) => ({
                           id: q.index,
                           label: q.label,
                           hint: q.height >= 2160 ? "4K" : q.height >= 1080 ? "HD" : undefined,
@@ -845,7 +849,10 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                         setCurrentQuality(id);
                         if (hlsRef.current) hlsRef.current.currentLevel = id;
                         // 💾 Salva preferência (altura ou 0 = Auto)
-                        const h = id === -1 ? 0 : qualities.find((q) => q.index === id)?.height ?? 0;
+                        const h =
+                          id === -1
+                            ? 0
+                            : displayQualities.find((q) => q.index === id)?.height ?? 0;
                         updatePlayerPrefs({ qualityHeight: h });
                         setSettingsTab(null);
                       }}
