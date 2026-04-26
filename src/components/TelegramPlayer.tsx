@@ -170,15 +170,6 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
           </div>
         )}
 
-        {loadTimedOut && !importing && (
-          <div className="absolute inset-x-4 bottom-24 z-30 rounded-lg bg-card/95 p-4 text-card-foreground shadow-2xl backdrop-blur">
-            <p className="text-sm font-bold">O Telegram bloqueou o player interno.</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Tente importar para tocar no player do app. Se o arquivo for grande, envie o MP4 pelo painel admin.
-            </p>
-          </div>
-        )}
-
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
           <button
             onClick={handleImport}
