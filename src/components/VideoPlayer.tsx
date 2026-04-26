@@ -785,11 +785,15 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                           currentQuality === -1
                             ? autoActiveHeight
                               ? `Auto (${autoActiveHeight}p)`
-                              : "Auto"
-                            : qualities[currentQuality]?.label || "—"
+                              : nativeHeight
+                                ? `Auto (${nativeHeight}p)`
+                                : "Auto"
+                            : (qualities[currentQuality]?.label ??
+                                displayQualities.find((d) => d.index === currentQuality)?.label ??
+                                "—")
                         }
                         onClick={() => setSettingsTab("quality")}
-                        disabled={qualities.length === 0}
+                        disabled={displayQualities.length === 0}
                       />
                       <SettingsRow
                         icon={<Languages className="w-4 h-4" />}
