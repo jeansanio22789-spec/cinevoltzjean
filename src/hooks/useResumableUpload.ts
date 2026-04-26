@@ -303,6 +303,7 @@ export function useResumableUpload() {
 
   const pause = useCallback(() => {
     uploadRef.current?.abort();
+    turboXhrRef.current?.abort();
     setState((s) => ({ ...s, status: "paused", uploading: false }));
   }, []);
 
