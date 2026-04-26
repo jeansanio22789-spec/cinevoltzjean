@@ -1,14 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2, Download,
+  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
-import { saveLocalVideo, saveLocalBlob, getStorageEstimate, isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
+import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
 
 interface Video {
   id: string;
@@ -170,8 +169,6 @@ const AdminVideos = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
-  const [downloadingLink, setDownloadingLink] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [recognizingTitle, setRecognizingTitle] = useState(false);
 
   // Lê o título escrito na capa via IA com visão (OCR semântico).
@@ -311,114 +308,6 @@ const AdminVideos = () => {
     });
   };
 
-  // 🚀 Modo "Salvar no app": tenta subir pra nuvem (todos os clientes assistem).
-  // Se falhar (offline / sem permissão), faz fallback pro IndexedDB do aparelho.
-  const handleLocalSave = async () => {
-    if (selectedFiles.length === 0) {
-      toast.error("Selecione pelo menos um arquivo");
-      return;
-    }
-    if (!form.title.trim()) {
-      toast.error("Título é obrigatório");
-      return;
-    }
-
-    const tId = toast.loading(
-      `Publicando ${selectedFiles.length} arquivo(s) para todos os clientes…`,
-    );
-    let cloudCount = 0;
-    let localCount = 0;
-
-    for (const file of selectedFiles) {
-      try {
-        // Sobe a thumbnail (se houver) — sempre vai pra nuvem
-        let thumbnailUrl: string | null = null;
-        if (thumbnailFile) {
-          const ext = thumbnailFile.name.split(".").pop() || "jpg";
-          const path = `thumbnails/${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2, 7)}.${ext}`;
-          const { error: thErr } = await supabase.storage
-            .from("videos")
-            .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
-          if (!thErr) {
-            const { data } = supabase.storage.from("videos").getPublicUrl(path);
-            thumbnailUrl = data.publicUrl;
-          }
-        }
-
-        // Tenta subir o vídeo pra nuvem (fica disponível pra todos)
-        let videoUrl: string | null = null;
-        try {
-          const ext = file.name.split(".").pop() || "mp4";
-          const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 60);
-          const path = `uploads/${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2, 7)}-${safeName}`;
-          const { error: upErr } = await supabase.storage
-            .from("videos")
-            .upload(path, file, {
-              upsert: false,
-              cacheControl: "3600",
-              contentType: file.type || `video/${ext}`,
-            });
-          if (upErr) throw upErr;
-          const { data } = supabase.storage.from("videos").getPublicUrl(path);
-          videoUrl = data.publicUrl;
-        } catch (cloudErr) {
-          console.warn("Upload pra nuvem falhou, salvando local:", cloudErr);
-          // Fallback: salva no aparelho (toca só aqui)
-          const est = await getStorageEstimate();
-          const sizeMB = file.size / 1024 / 1024;
-          if (est && est.quotaMB - est.usageMB < sizeMB) {
-            throw new Error(
-              `Sem internet pra nuvem e sem espaço local (${sizeMB.toFixed(0)} MB).`,
-            );
-          }
-          videoUrl = await saveLocalVideo(file);
-          localCount++;
-        }
-
-        const { error } = await supabase.from("movies").insert({
-          title: form.title,
-          video_url: videoUrl,
-          thumbnail_url: thumbnailUrl,
-          genre: form.genre,
-          description: form.description,
-          status: "published",
-        });
-        if (error) throw error;
-        if (!videoUrl?.startsWith("local://")) cloudCount++;
-      } catch (e) {
-        console.error("Erro ao salvar:", e);
-      }
-    }
-
-    toast.dismiss(tId);
-    const total = cloudCount + localCount;
-    if (total > 0) {
-      if (cloudCount > 0 && localCount === 0) {
-        toast.success(
-          `☁️ ${cloudCount} vídeo(s) publicado(s) para todos os clientes`,
-        );
-      } else if (localCount > 0 && cloudCount === 0) {
-        toast.warning(
-          `📱 ${localCount} vídeo(s) salvo(s) só neste aparelho (nuvem indisponível)`,
-        );
-      } else {
-        toast.success(
-          `☁️ ${cloudCount} na nuvem · 📱 ${localCount} só neste aparelho`,
-        );
-      }
-      setSelectedFiles([]);
-      setThumbnailFile(null);
-      setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
-      fetchVideos();
-    } else {
-      toast.error("Não foi possível publicar");
-    }
-  };
-
   // 🔗 Salvar Link: cadastra o filme com a URL colada (sem baixar nada).
   // Toca direto da fonte original ao assistir. Aparece pra todo mundo.
   const handleSaveLink = async () => {
@@ -474,145 +363,6 @@ const AdminVideos = () => {
       toast.dismiss(tId);
       const msg = e instanceof Error ? e.message : "Falha ao salvar link";
       toast.error(msg);
-    }
-  };
-
-  // 📥 Baixar link e salvar no aparelho: faz fetch da URL e guarda o arquivo
-  // no IndexedDB. Depois toca offline (sem internet, direto do celular).
-  const handleDownloadLinkLocal = async () => {
-    const url = linkUrl.trim();
-    if (!url) {
-      toast.error("Cole o link do vídeo");
-      return;
-    }
-    if (!/^https?:\/\//i.test(url)) {
-      toast.error("Link inválido — precisa começar com http:// ou https://");
-      return;
-    }
-    if (!form.title.trim()) {
-      toast.error("Título é obrigatório");
-      return;
-    }
-
-    setDownloadingLink(true);
-    setDownloadProgress({ loaded: 0, total: 0 });
-    const tId = toast.loading("Baixando link no aparelho…");
-    try {
-      const resp = await fetch(url, { mode: "cors" });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const total = Number(resp.headers.get("content-length") || 0);
-
-      // Lê em stream pra mostrar progresso
-      let blob: Blob;
-      if (resp.body && typeof ReadableStream !== "undefined") {
-        const reader = resp.body.getReader();
-        const chunks: Uint8Array[] = [];
-        let loaded = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value) {
-            chunks.push(value);
-            loaded += value.byteLength;
-            setDownloadProgress({ loaded, total });
-          }
-        }
-        blob = new Blob(chunks as BlobPart[], {
-          type: resp.headers.get("content-type") || "video/mp4",
-        });
-      } else {
-        blob = await resp.blob();
-      }
-
-      // Checa espaço livre
-      const est = await getStorageEstimate();
-      const sizeMB = blob.size / 1024 / 1024;
-      if (est && est.quotaMB - est.usageMB < sizeMB) {
-        throw new Error(
-          `Espaço local insuficiente: precisa de ${sizeMB.toFixed(0)} MB, livre ${(est.quotaMB - est.usageMB).toFixed(0)} MB`,
-        );
-      }
-
-      // Tenta inferir nome de arquivo da URL
-      const filename = (() => {
-        try {
-          const u = new URL(url);
-          const last = u.pathname.split("/").pop() || "video.mp4";
-          return last.includes(".") ? last : `${last}.mp4`;
-        } catch {
-          return "video.mp4";
-        }
-      })();
-      // Tenta subir o blob baixado pra nuvem (todos os clientes assistem)
-      let videoUrl: string | null = null;
-      let savedToCloud = false;
-      try {
-        const safeName = filename.replace(/[^\w.-]+/g, "_").slice(0, 60);
-        const path = `uploads/${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 7)}-${safeName}`;
-        const { error: upErr } = await supabase.storage
-          .from("videos")
-          .upload(path, blob, {
-            upsert: false,
-            cacheControl: "3600",
-            contentType: blob.type || "video/mp4",
-          });
-        if (upErr) throw upErr;
-        const { data } = supabase.storage.from("videos").getPublicUrl(path);
-        videoUrl = data.publicUrl;
-        savedToCloud = true;
-      } catch (cloudErr) {
-        console.warn("Upload pra nuvem falhou, salvando local:", cloudErr);
-        videoUrl = await saveLocalBlob(blob, filename, blob.type);
-      }
-
-      // Sobe a thumbnail se houver
-      let thumbnailUrl: string | null = null;
-      if (thumbnailFile) {
-        const ext = thumbnailFile.name.split(".").pop() || "jpg";
-        const path = `thumbnails/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-        const { error: thErr } = await supabase.storage
-          .from("videos")
-          .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
-        if (!thErr) {
-          const { data } = supabase.storage.from("videos").getPublicUrl(path);
-          thumbnailUrl = data.publicUrl;
-        }
-      }
-
-      const { error } = await supabase.from("movies").insert({
-        title: form.title,
-        video_url: videoUrl,
-        thumbnail_url: thumbnailUrl,
-        genre: form.genre,
-        description: form.description,
-        status: "published",
-      });
-      if (error) throw error;
-
-      toast.dismiss(tId);
-      if (savedToCloud) {
-        toast.success(`☁️ Baixado e publicado para todos (${sizeMB.toFixed(1)} MB)`);
-      } else {
-        toast.warning(`📱 Nuvem indisponível — salvo só neste aparelho (${sizeMB.toFixed(1)} MB)`);
-      }
-      setLinkUrl("");
-      setThumbnailFile(null);
-      setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
-      fetchVideos();
-    } catch (e) {
-      toast.dismiss(tId);
-      const msg = e instanceof Error ? e.message : "Falha ao baixar link";
-      // CORS é o erro mais comum aqui — explica pro usuário
-      if (msg.includes("Failed to fetch") || msg.toLowerCase().includes("cors")) {
-        toast.error("O servidor do link bloqueou o download (CORS). Use 'Salvar Link' ou baixe o arquivo manualmente e use 'Salvar Local'.");
-      } else {
-        toast.error(msg);
-      }
-    } finally {
-      setDownloadingLink(false);
-      setDownloadProgress(null);
     }
   };
 
@@ -826,59 +576,18 @@ const AdminVideos = () => {
               {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
             </button>
             <button
-              onClick={handleLocalSave}
-              disabled={selectedFiles.length === 0}
-              className="px-6 py-2 bg-accent text-accent-foreground rounded text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-              title="Salva no próprio aparelho — não sobe pra nuvem. Só você assiste neste celular."
-            >
-              <Zap className="w-4 h-4" />
-              Salvar Local (Instantâneo)
-            </button>
-            <button
               onClick={handleSaveLink}
-              disabled={!linkUrl.trim() || downloadingLink}
+              disabled={!linkUrl.trim()}
               className="px-6 py-2 bg-secondary text-secondary-foreground rounded text-sm font-semibold hover:bg-secondary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
               title="Cadastra o filme com o link colado — sem baixar nada. Toca direto da fonte."
             >
               <Link2 className="w-4 h-4" />
               Salvar Link
             </button>
-            <button
-              onClick={handleDownloadLinkLocal}
-              disabled={!linkUrl.trim() || downloadingLink}
-              className="px-6 py-2 bg-accent text-accent-foreground rounded text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
-              title="Baixa o arquivo do link agora e salva no aparelho. Depois toca offline."
-            >
-              {downloadingLink ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              Baixar Link no Aparelho
-            </button>
             <p className="text-xs text-muted-foreground self-center w-full sm:w-auto">
-              💡 <strong>Link</strong>: instantâneo, todos veem. <strong>Baixar Link</strong>: salva offline neste aparelho. <strong>Local</strong>: importa arquivo do celular. <strong>Enviar</strong>: sobe pra nuvem.
+              💡 <strong>Salvar Link</strong>: publica instantaneamente para todos. <strong>Enviar</strong>: sobe o arquivo para a nuvem.
             </p>
           </div>
-
-          {downloadingLink && downloadProgress && (
-            <div className="mt-3 space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Baixando…</span>
-                <span>
-                  {(downloadProgress.loaded / 1024 / 1024).toFixed(1)} MB
-                  {downloadProgress.total > 0 && ` / ${(downloadProgress.total / 1024 / 1024).toFixed(1)} MB`}
-                </span>
-              </div>
-              <Progress
-                value={
-                  downloadProgress.total > 0
-                    ? (downloadProgress.loaded / downloadProgress.total) * 100
-                    : undefined
-                }
-              />
-            </div>
-          )}
 
         </div>
       )}
