@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Loader2, Lock, Play, Send } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
+import TelegramPlayer from "@/components/TelegramPlayer";
 
 interface WatchMovie {
   id: string;
