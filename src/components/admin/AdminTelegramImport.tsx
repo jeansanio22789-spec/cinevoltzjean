@@ -638,7 +638,7 @@ const AdminTelegramImport = () => {
             baixa o vídeo, sobe pro storage, IA detecta título/ano/gênero e publica
             no catálogo automaticamente.
           </p>
-          <p className="text-[11px] text-amber-500">
+          <p className="text-[11px] text-muted-foreground">
             ⚠️ Bot API só baixa arquivos até <span className="font-bold">20 MB</span>. Vídeos
             maiores serão marcados como "too_large" e precisam do Worker MTProto.
           </p>
