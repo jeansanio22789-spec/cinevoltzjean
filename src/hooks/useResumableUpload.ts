@@ -94,21 +94,19 @@ export function useResumableUpload() {
 
       const upload = new tus.Upload(file, {
         endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
-        // Retentativas com backoff exponencial — retoma automaticamente
-        // quando a conexão volta (até ~3 minutos de tentativas).
-        retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000, 60000],
+        // Retentativas rápidas: reconecta em <1s se cair
+        retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000, 30000],
         headers: {
           authorization: `Bearer ${accessToken}`,
           "x-upsert": "false",
         },
         uploadDataDuringCreation: true,
         removeFingerprintOnSuccess: true,
-        // ⚡ TURBO: Supabase Storage exige chunks de exatamente 6 MB,
-        // mas podemos enviar VÁRIOS em paralelo para saturar a banda.
-        // 8 conexões simultâneas tornam o upload muito mais rápido
-        // quando o arquivo já está baixado localmente.
+        // ⚡ Supabase Storage TUS exige chunks de exatamente 6 MB.
+        // parallelUploads > 1 NÃO é suportado pelo Supabase (causa
+        // erros silenciosos que deixam o envio lentíssimo). Mantemos 1.
         chunkSize: 6 * 1024 * 1024,
-        parallelUploads: 8,
+        parallelUploads: 1,
         metadata: {
           bucketName: bucket,
           objectName,
