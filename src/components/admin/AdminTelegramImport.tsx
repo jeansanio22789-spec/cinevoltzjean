@@ -150,6 +150,74 @@ const AdminTelegramImport = () => {
     }
   };
 
+  const discoverChats = async () => {
+    setDiscovering(true);
+    setDiscoverHint("");
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-discover-chats", {
+        body: {},
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Falha ao buscar grupos");
+      setDiscoveredChats(data.chats || []);
+      setDiscoverHint(data.hint || "");
+      if ((data.chats || []).length === 0) {
+        toast({
+          title: "Nenhum grupo detectado",
+          description: "Mande uma mensagem no grupo (com o bot dentro) e tente de novo.",
+        });
+      } else {
+        toast({
+          title: `${data.chats.length} chat(s) detectado(s)`,
+          description: "Escolha o grupo Doramas VIP e clique em salvar.",
+        });
+      }
+    } catch (e) {
+      toast({
+        title: "Erro ao descobrir grupos",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const saveChat = async (chat: DiscoveredChat) => {
+    try {
+      await upsertSetting(DORAMAS_CHAT_KEY, String(chat.chat_id));
+      await upsertSetting(DORAMAS_CHAT_TITLE_KEY, chat.title);
+      setSavedChatId(String(chat.chat_id));
+      setSavedChatTitle(chat.title);
+      toast({
+        title: "Grupo salvo",
+        description: `${chat.title} (${chat.chat_id}) está cadastrado.`,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao salvar",
+        description: e instanceof Error ? e.message : "Tente novamente",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const clearSavedChat = async () => {
+    try {
+      await upsertSetting(DORAMAS_CHAT_KEY, "");
+      await upsertSetting(DORAMAS_CHAT_TITLE_KEY, "");
+      setSavedChatId("");
+      setSavedChatTitle("");
+      toast({ title: "Grupo removido" });
+    } catch (e) {
+      toast({
+        title: "Erro ao remover",
+        description: e instanceof Error ? e.message : "Tente novamente",
+        variant: "destructive",
+      });
+    }
+  };
+
   const fetchViaBot = async (link: string): Promise<FetchResult> => {
     const { data, error } = await supabase.functions.invoke("telegram-fetch", {
       body: { url: link },
