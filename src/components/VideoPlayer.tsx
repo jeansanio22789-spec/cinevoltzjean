@@ -795,6 +795,9 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                       onPick={(id) => {
                         setCurrentQuality(id);
                         if (hlsRef.current) hlsRef.current.currentLevel = id;
+                        // 💾 Salva preferência (altura ou 0 = Auto)
+                        const h = id === -1 ? 0 : qualities.find((q) => q.index === id)?.height ?? 0;
+                        updatePlayerPrefs({ qualityHeight: h });
                         setSettingsTab(null);
                       }}
                     />
