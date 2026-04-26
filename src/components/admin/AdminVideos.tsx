@@ -582,14 +582,19 @@ const AdminVideos = () => {
           </div>
 
           <div className="mt-4">
-            <label className="text-sm font-medium mb-1.5 block">Descrição</label>
-            <textarea
-              className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-              rows={3}
-              placeholder="Sinopse do conteúdo..."
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+            <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5" /> Link do vídeo (opcional — sem precisar de upload)
+            </label>
+            <input
+              type="url"
+              className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              placeholder="https://... (mp4, m3u8, YouTube, Vimeo, Drive)"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
             />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Cole o link e use <strong>Salvar Link</strong> para publicar instantaneamente sem baixar o arquivo.
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-3 mt-4">
@@ -611,10 +616,20 @@ const AdminVideos = () => {
               <Zap className="w-4 h-4" />
               Salvar Local (Instantâneo)
             </button>
+            <button
+              onClick={handleSaveLink}
+              disabled={!linkUrl.trim()}
+              className="px-6 py-2 bg-secondary text-secondary-foreground rounded text-sm font-semibold hover:bg-secondary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              title="Cadastra o filme com o link colado — sem baixar nada. Toca direto da fonte."
+            >
+              <Link2 className="w-4 h-4" />
+              Salvar Link
+            </button>
             <p className="text-xs text-muted-foreground self-center w-full sm:w-auto">
-              💡 <strong>Local</strong>: instantâneo, mas só toca neste aparelho. <strong>Enviar</strong>: sobe pra nuvem, todo mundo vê.
+              💡 <strong>Link</strong>: instantâneo, todos veem (depende do link no ar). <strong>Local</strong>: instantâneo, só neste aparelho. <strong>Enviar</strong>: sobe pra nuvem.
             </p>
           </div>
+
         </div>
       )}
 
