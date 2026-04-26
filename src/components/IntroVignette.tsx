@@ -96,11 +96,6 @@ const IntroVignette = ({
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
-      try {
-        audioCtxRef.current?.close();
-      } catch {
-        /* noop */
-      }
     };
   }, [duration, onFinish]);
 
