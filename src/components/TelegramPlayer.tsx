@@ -35,11 +35,18 @@ const buildEmbedUrl = (url: string | null | undefined): string | null => {
 const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
   const embedUrl = useMemo(() => buildEmbedUrl(movie.telegram_url), [movie.telegram_url]);
   const [loaded, setLoaded] = useState(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importedUrl, setImportedUrl] = useState<string | null>(movie.video_url || null);
 
   useEffect(() => {
     setLoaded(false);
+    setLoadTimedOut(false);
+    const timer = window.setTimeout(() => {
+      setLoadTimedOut(true);
+      setLoaded(true);
+    }, 8000);
+    return () => window.clearTimeout(timer);
   }, [embedUrl]);
 
   const handleImport = async () => {
@@ -168,12 +175,20 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
           </div>
         )}
 
-        {/* Botão flutuante: importa o vídeo do Telegram pro storage e toca aqui */}
+        {loadTimedOut && !importing && (
+          <div className="absolute inset-x-4 bottom-24 z-30 rounded-lg bg-card/95 p-4 text-card-foreground shadow-2xl backdrop-blur">
+            <p className="text-sm font-bold">O Telegram bloqueou o player interno.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Tente importar para tocar no player do app. Se o arquivo for grande, envie o MP4 pelo painel admin.
+            </p>
+          </div>
+        )}
+
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
           <button
             onClick={handleImport}
             disabled={importing}
-            className="bg-primary text-primary-foreground px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-2xl disabled:opacity-60"
+            className="bg-primary text-primary-foreground px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-2xl disabled:opacity-60 whitespace-nowrap"
           >
             {importing ? (
               <>
