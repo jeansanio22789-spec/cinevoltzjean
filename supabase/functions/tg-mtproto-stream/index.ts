@@ -1,8 +1,9 @@
-// Edge function: proxia stream MTProto com Range requests, retry e cache
+// Edge function: streaming MTProto com Range requests, retry e cache CDN
 // Otimizado pra vídeos grandes (2-3GB) sem estourar timeout
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { TelegramClient, Api } from "https://deno.land/x/grm@0.8.2/mod.ts";
-import { StringSession } from "https://deno.land/x/grm@0.8.2/sessions/mod.ts";
+import { BaseTelegramClient } from "npm:@mtcute/core@0.29.6";
+import { MemoryStorage } from "npm:@mtcute/core@0.29.6/storage/memory.js";
+import { resolvePeer, getMessages, downloadAsBuffer } from "npm:@mtcute/core@0.29.6/methods.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,35 +13,26 @@ const corsHeaders = {
     "content-length, content-range, accept-ranges, content-type",
 };
 
-// Cache de cliente MTProto reaproveitado entre requests no mesmo isolate
-let cachedClient: TelegramClient | null = null;
+// Cache de cliente MTProto entre requests no mesmo isolate
+let cachedClient: BaseTelegramClient | null = null;
 let cachedSession = "";
 
 async function getClient(stringSession: string, apiId: number, apiHash: string) {
   if (cachedClient && cachedSession === stringSession) {
-    try {
-      // ping pra ver se ainda tá vivo
-      if (!cachedClient.connected) await cachedClient.connect();
-      return cachedClient;
-    } catch {
-      cachedClient = null;
-    }
+    return cachedClient;
   }
-  const client = new TelegramClient(
-    new StringSession(stringSession),
-    apiId,
-    apiHash,
-    { connectionRetries: 5, retryDelay: 1000, timeout: 15 },
-  );
+  const storage = new MemoryStorage();
+  const client = new BaseTelegramClient({ apiId, apiHash, storage });
+  await client.importSession(stringSession);
   await client.connect();
   cachedClient = client;
   cachedSession = stringSession;
   return client;
 }
 
-// Cache de metadados de mídia (size, mimeType, document) por URL
+// Cache de metadados por URL
 const mediaCache = new Map<string, { size: number; mimeType: string; document: any; ts: number }>();
-const META_TTL = 5 * 60 * 1000; // 5 min
+const META_TTL = 5 * 60 * 1000;
 
 function parseTelegramUrl(url: string): { username?: string; channelId?: number; messageId: number } | null {
   try {
@@ -61,11 +53,9 @@ function parseTelegramUrl(url: string): { username?: string; channelId?: number;
 async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   let lastErr: any;
   for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (e) {
+    try { return await fn(); }
+    catch (e) {
       lastErr = e;
-      // reseta cliente em caso de erro de conexão
       if (i < attempts - 1) {
         cachedClient = null;
         await new Promise((r) => setTimeout(r, 500 * (i + 1)));
@@ -85,16 +75,14 @@ Deno.serve(async (req) => {
     const tgUrl = url.searchParams.get("url");
     if (!tgUrl) {
       return new Response(JSON.stringify({ error: "url é obrigatório" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const parsed = parseTelegramUrl(tgUrl);
     if (!parsed) {
       return new Response(JSON.stringify({ error: "URL Telegram inválida" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -105,42 +93,31 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, supabaseService);
     const { data: sess } = await admin
-      .from("mtproto_sessions")
-      .select("string_session")
-      .eq("id", 1)
-      .maybeSingle();
+      .from("mtproto_sessions").select("string_session").eq("id", 1).maybeSingle();
 
     if (!sess?.string_session) {
-      return new Response(
-        JSON.stringify({ error: "MTProto não configurado. Faça login no admin." }),
-        {
-          status: 503,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "MTProto não configurado" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const client = await getClient(sess.string_session, apiId, apiHash);
 
-    // Resolve metadados (com cache)
     let meta = mediaCache.get(tgUrl);
     if (!meta || Date.now() - meta.ts > META_TTL) {
       meta = await withRetry(async () => {
-        let entity: any;
-        if (parsed.username) {
-          entity = await client.getEntity(parsed.username);
-        } else {
-          entity = await client.getEntity(BigInt(`-100${parsed.channelId}`));
-        }
-        const messages = await client.getMessages(entity, { ids: [parsed.messageId] });
-        const msg = messages[0];
+        const peer = parsed.username
+          ? await resolvePeer(client, parsed.username)
+          : await resolvePeer(client, Number(`-100${parsed.channelId}`));
+        const messages = await getMessages(client, peer, [parsed.messageId]);
+        const msg: any = messages[0];
         if (!msg || !msg.media) throw new Error("Mídia não encontrada");
-        const document: any = (msg.media as any).document;
+        const document = msg.media.document || msg.media.video || msg.media;
         if (!document) throw new Error("Mensagem não é vídeo");
         return {
-          size: Number(document.size),
+          size: Number(document.fileSize || document.size),
           mimeType: document.mimeType || "video/mp4",
-          document,
+          document: msg.media,
           ts: Date.now(),
         };
       });
@@ -149,7 +126,6 @@ Deno.serve(async (req) => {
 
     const { size: fileSize, mimeType, document } = meta;
 
-    // HEAD request: só metadados, sem corpo
     if (req.method === "HEAD") {
       return new Response(null, {
         status: 200,
@@ -162,13 +138,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Range parsing
     const rangeHeader = req.headers.get("range") || req.headers.get("Range");
     let start = 0;
     let end = fileSize - 1;
     let isPartial = false;
-
-    // Chunk grande (8MB) — equilíbrio entre throughput e timeout
     const MAX_CHUNK = 8 * 1024 * 1024;
 
     if (rangeHeader) {
@@ -184,79 +157,32 @@ Deno.serve(async (req) => {
       isPartial = true;
     }
 
-    // Garante que start está alinhado em 4KB (requisito MTProto)
-    const alignedStart = Math.floor(start / 4096) * 4096;
-    const skip = start - alignedStart;
     const length = end - start + 1;
 
-    // Stream chunks MTProto (1MB cada) com retry
-    const CHUNK_LIMIT = 1024 * 1024;
-    const chunks: Uint8Array[] = [];
-    let offset = alignedStart;
-    let collected = 0;
-    const targetLen = length + skip;
-
-    while (collected < targetLen) {
-      const remaining = targetLen - collected;
-      const limit = Math.min(CHUNK_LIMIT, Math.ceil(remaining / 4096) * 4096);
-
-      const result: any = await withRetry(() =>
-        client.invoke(
-          new Api.upload.GetFile({
-            location: new Api.InputDocumentFileLocation({
-              id: document.id,
-              accessHash: document.accessHash,
-              fileReference: document.fileReference,
-              thumbSize: "",
-            }),
-            offset: BigInt(offset),
-            limit,
-          }),
-        ),
-      );
-
-      const bytes: Uint8Array = result.bytes;
-      if (!bytes || bytes.length === 0) break;
-      chunks.push(bytes);
-      offset += bytes.length;
-      collected += bytes.length;
-    }
-
-    // Junta chunks e remove o "skip" inicial
-    const totalLen = chunks.reduce((a, c) => a + c.length, 0);
-    const merged = new Uint8Array(totalLen);
-    let pos = 0;
-    for (const c of chunks) {
-      merged.set(c, pos);
-      pos += c.length;
-    }
-    const body = merged.subarray(skip, skip + length);
+    // Download chunk usando downloadAsBuffer com offset/limit
+    const buffer: Uint8Array = await withRetry(() =>
+      downloadAsBuffer(client, document, { offset: start, limit: length }),
+    );
 
     const headers: Record<string, string> = {
       ...corsHeaders,
       "Content-Type": mimeType,
-      "Content-Length": String(body.length),
+      "Content-Length": String(buffer.length),
       "Accept-Ranges": "bytes",
-      // Cache CDN por 1h — mesmo range pedido de novo vem do cache
       "Cache-Control": "public, max-age=3600, immutable",
     };
 
     if (isPartial) {
-      headers["Content-Range"] = `bytes ${start}-${start + body.length - 1}/${fileSize}`;
-      return new Response(body, { status: 206, headers });
+      headers["Content-Range"] = `bytes ${start}-${start + buffer.length - 1}/${fileSize}`;
+      return new Response(buffer, { status: 206, headers });
     }
 
-    return new Response(body, { status: 200, headers });
+    return new Response(buffer, { status: 200, headers });
   } catch (err) {
     console.error("stream error:", err);
     return new Response(
-      JSON.stringify({
-        error: err instanceof Error ? err.message : "Erro desconhecido",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      JSON.stringify({ error: err instanceof Error ? err.message : "Erro desconhecido" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });
