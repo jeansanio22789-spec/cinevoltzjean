@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
-import { saveLocalVideo, getStorageEstimate } from "@/lib/localVideoStore";
+import { saveLocalVideo, getStorageEstimate, isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
 
 interface Video {
   id: string;
@@ -352,6 +352,12 @@ const AdminVideos = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir este vídeo?")) return;
+    // Se for vídeo local, limpa o IndexedDB também
+    const target = videos.find((v) => v.id === id);
+    if (target?.video_url && isLocalVideoUrl(target.video_url)) {
+      const lid = parseLocalVideoId(target.video_url);
+      if (lid) await deleteLocalVideo(lid);
+    }
     const { error } = await supabase.from("movies").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir");
