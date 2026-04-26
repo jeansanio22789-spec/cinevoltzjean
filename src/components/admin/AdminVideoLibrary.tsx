@@ -331,6 +331,13 @@ const AdminVideoLibrary = () => {
           ))}
         </div>
       )}
+
+      <ChannelVideosDialog
+        open={!!openChat}
+        onOpenChange={(v) => !v && setOpenChat(null)}
+        chatId={openChat?.id ?? null}
+        chatTitle={openChat?.title ?? ""}
+      />
     </div>
   );
 };
