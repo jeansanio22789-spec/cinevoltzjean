@@ -139,13 +139,13 @@ const AdminVideos = () => {
       return;
     }
 
-    // Para múltiplos arquivos, anexa numeração ao título (ex.: "Meu Filme (2)")
-    const items = selectedFiles.map((file, idx) => ({
+    // Todos os vídeos usam o mesmo título digitado (ou o reconhecido da capa).
+    // Mesma capa pra todos os arquivos do lote.
+    const items = selectedFiles.map((file) => ({
       file,
-      thumbnail: idx === 0 ? thumbnailFile : null, // só o 1º herda a thumb
+      thumbnail: thumbnailFile,
       meta: {
-        title:
-          selectedFiles.length === 1 ? form.title : `${form.title} (${idx + 1})`,
+        title: form.title,
         genre: form.genre,
         description: form.description,
       },
