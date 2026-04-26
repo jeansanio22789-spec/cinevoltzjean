@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Eye, Loader2, Zap
+  FileVideo, Image, Type, Tag, Trash2, Eye, Loader2, Zap, AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import * as tus from "tus-js-client";
 
 interface Video {
   id: string;
