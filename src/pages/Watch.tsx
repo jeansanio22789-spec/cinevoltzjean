@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
+import { useLocalVideoSrc } from "@/hooks/useLocalVideoSrc";
 import TelegramPlayer from "@/components/TelegramPlayer";
 import VideoPlayer from "@/components/VideoPlayer";
 import IntroVignette from "@/components/IntroVignette";
@@ -188,9 +189,14 @@ const Watch = () => {
 
   const source = resolveVideoSource(movie.video_url);
 
+  // Se for vídeo "local://", resolve do IndexedDB pra um blob: URL tocável
+  const isLocal = source?.kind === "local";
+  const { resolvedUrl: localBlobUrl, missing: localMissing, loading: localLoading } =
+    useLocalVideoSrc(isLocal ? source.url : null);
+
   // Mostra a vinheta de abertura (estilo Netflix) só quando há vídeo de fato
   const hasPlayableVideo = source && source.kind !== "unknown";
-  const showIntro = hasPlayableVideo && !introDone;
+  const showIntro = hasPlayableVideo && !introDone && !localLoading;
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -232,6 +238,33 @@ const Watch = () => {
               title={movie.title}
             />
           </div>
+        ) : source.kind === "local" ? (
+          localLoading ? (
+            <div className="h-full flex items-center justify-center text-white">
+              <Loader2 className="w-8 h-8 animate-spin" />
+            </div>
+          ) : localMissing || !localBlobUrl ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white gap-4">
+              <Lock className="w-10 h-10 text-muted-foreground" />
+              <p className="font-semibold">Este vídeo está salvo localmente em outro dispositivo</p>
+              <p className="text-sm text-white/70 max-w-sm">
+                Vídeos no modo "Local" só tocam no aparelho que os importou — abra no celular onde você adicionou o arquivo.
+              </p>
+              <button
+                onClick={() => navigate(-1)}
+                className="flex items-center gap-2 text-white/80 text-sm hover:text-white"
+              >
+                <ArrowLeft className="w-4 h-4" /> Voltar
+              </button>
+            </div>
+          ) : (
+            <VideoPlayer
+              src={localBlobUrl}
+              poster={movie.thumbnail_url}
+              title={movie.title}
+              onBack={() => navigate(-1)}
+            />
+          )
         ) : (
           <VideoPlayer
             src={source.url}
