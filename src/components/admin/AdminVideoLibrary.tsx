@@ -298,8 +298,21 @@ const AdminVideoLibrary = () => {
                             )}
                           </TableCell>
                           <TableCell className="text-xs">
-                            <div className="font-medium truncate max-w-[140px]">{chatLabel(String(r.chat_id))}</div>
-                            <div className="text-[10px] font-mono text-muted-foreground truncate">{r.chat_id}</div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenChat({ id: r.chat_id, title: chatLabel(String(r.chat_id)) })
+                              }
+                              className="text-left hover:text-primary transition-colors"
+                              title="Abrir todos os vídeos deste grupo"
+                            >
+                              <div className="font-medium truncate max-w-[140px] underline-offset-2 hover:underline">
+                                {chatLabel(String(r.chat_id))}
+                              </div>
+                              <div className="text-[10px] font-mono text-muted-foreground truncate">
+                                {r.chat_id}
+                              </div>
+                            </button>
                           </TableCell>
                           <TableCell className="text-xs">{formatDuration(r.duration)}</TableCell>
                           <TableCell className="text-xs">{formatBytes(r.file_size)}</TableCell>
