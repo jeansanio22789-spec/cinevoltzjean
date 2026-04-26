@@ -509,13 +509,29 @@ export const useUploadQueue = (onJobDone?: () => void) => {
   const retry = (id: string) => {
     const target = store.jobs.find((j) => j.id === id);
     if (!target) return;
+    // Aborta qualquer XHR/TUS que ainda esteja rodando para esse job
+    try {
+      target.abort?.();
+    } catch {
+      /* noop */
+    }
+    runningJobIds.delete(id);
     store.update(id, {
       status: "queued",
       progress: 0,
+      speedMBs: 0,
+      etaSec: 0,
+      lockedEtaSec: undefined,
+      lockedEndAt: undefined,
       errorMsg: undefined,
       timedOut: false,
+      abort: undefined,
     });
-    void runJob({ ...target, status: "queued", timedOut: false });
+    // Pequeno delay pra garantir que o abort propagou antes de redisparar
+    setTimeout(() => {
+      const fresh = store.jobs.find((j) => j.id === id);
+      if (fresh) void runJob(fresh);
+    }, 100);
   };
 
   const activeCount = jobs.filter(

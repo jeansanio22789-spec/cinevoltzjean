@@ -108,15 +108,6 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
           {badge.label}
         </span>
 
-        {j.status === "error" && (
-          <button
-            onClick={onRetry}
-            className="p-1.5 hover:bg-muted rounded transition-colors"
-            title="Tentar novamente"
-          >
-            <RotateCw className="w-3.5 h-3.5 text-primary" />
-          </button>
-        )}
         {(j.status === "done" || j.status === "error") && (
           <button
             onClick={onRemove}
@@ -127,6 +118,18 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
           </button>
         )}
       </div>
+
+      {/* Botão de Retomar envio — aparece em erro ou travado/lento */}
+      {(j.status === "error" || j.status === "warning") && (
+        <button
+          onClick={onRetry}
+          className="w-full inline-flex items-center justify-center gap-2 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors py-2 rounded"
+          title="Reiniciar este envio do zero"
+        >
+          <RotateCw className="w-3.5 h-3.5" />
+          Retomar envio
+        </button>
+      )}
 
       {showProgress && (
         <>
