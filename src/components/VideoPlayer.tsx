@@ -59,6 +59,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<number | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(true);
@@ -69,10 +70,24 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [muted, setMuted] = useState(false);
   const [fs, setFs] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<
+    null | "main" | "speed" | "quality" | "audio" | "subs"
+  >(null);
   const [speed, setSpeed] = useState(1);
   const [seeking, setSeeking] = useState(false);
   const [centerHint, setCenterHint] = useState<null | "play" | "pause" | "back" | "forward">(null);
+
+  // ---- HLS / qualidade / áudio / legendas ----
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1); // -1 = auto
+  const [autoActiveHeight, setAutoActiveHeight] = useState<number>(0);
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [currentAudio, setCurrentAudio] = useState<number>(-1);
+  const [subTracks, setSubTracks] = useState<SubtitleTrack[]>([]);
+  const [currentSub, setCurrentSub] = useState<number>(-1);
+
+  const isHls = useMemo(() => /\.m3u8(\?.*)?$/i.test(src), [src]);
+  const showSettings = settingsTab !== null;
 
   // ---- Auto-hide controles ----
   const armHide = useCallback(() => {
