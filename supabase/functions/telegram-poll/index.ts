@@ -140,7 +140,11 @@ Deno.serve(async (req) => {
         const captionOrText = (msg.caption ?? msg.text ?? "").trim();
         const externalUrl = extractVideoUrl(captionOrText);
 
-        const hasContent = !!(video || externalUrl);
+        // Bloqueia links internos do Telegram (t.me/c/... ou t.me/+...) — não são streamáveis
+        const isTelegramInternal = externalUrl &&
+          /^https?:\/\/t\.me\//i.test(externalUrl);
+
+        const hasContent = !!(video || (externalUrl && !isTelegramInternal));
         const tooBig =
           !!video && !externalUrl &&
           (video.file_size ?? 0) > TELEGRAM_DOWNLOAD_LIMIT;
