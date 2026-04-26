@@ -211,6 +211,9 @@ const uploadFileTus = (
 // Execução do job (continua rodando mesmo se o componente desmontar)
 // ---------------------------------------------------------------------------
 const runJob = async (job: UploadJob) => {
+  // Pede pra tela ficar acordada — ajuda muito em mobile
+  void requestWakeLock();
+
   const timeoutTimer = window.setTimeout(() => {
     const cur = store.jobs.find((j) => j.id === job.id);
     if (cur && (cur.status === "uploading" || cur.status === "saving")) {
@@ -284,6 +287,8 @@ const runJob = async (job: UploadJob) => {
     store.update(job.id, { status: "error", errorMsg: msg });
   } finally {
     window.clearTimeout(timeoutTimer);
+    // Libera o wake lock se não tem mais nada rolando
+    if (!hasActiveUploads()) void releaseWakeLock();
   }
 };
 
