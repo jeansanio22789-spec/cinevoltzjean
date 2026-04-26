@@ -650,8 +650,18 @@ const AdminVideos = () => {
               <Link2 className="w-4 h-4" />
               Salvar Link
             </button>
-            <p className="text-xs text-muted-foreground self-center w-full sm:w-auto">
-              💡 <strong>Salvar Link</strong>: publica instantaneamente para todos. <strong>Enviar</strong>: sobe o arquivo para a nuvem.
+            <button
+              onClick={handleSaveLocal}
+              disabled={selectedFiles.length === 0}
+              className="px-6 py-2 bg-accent text-accent-foreground rounded text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              title="Guarda o vídeo direto neste celular (IndexedDB). Instantâneo, mas só toca aqui."
+            >
+              <Smartphone className="w-4 h-4" />
+              Salvar no Aparelho
+              {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
+            </button>
+            <p className="text-xs text-muted-foreground self-center w-full">
+              💡 <strong>Enviar</strong>: nuvem, todos veem. <strong>Salvar Link</strong>: instantâneo p/ todos. <strong>Salvar no Aparelho</strong>: instantâneo, só neste celular.
             </p>
           </div>
 
