@@ -466,10 +466,10 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     >
       <video
         ref={videoRef}
-        src={src}
         poster={poster || undefined}
         autoPlay
         playsInline
+        crossOrigin="anonymous"
         className="w-full h-full object-contain bg-black"
       />
 
