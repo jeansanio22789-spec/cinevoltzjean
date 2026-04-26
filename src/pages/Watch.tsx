@@ -99,6 +99,16 @@ const Watch = () => {
     checkAccess();
   }, [user, authLoading, tokenAccess, id]);
 
+  // ⚠️ Hooks SEMPRE antes de qualquer return condicional (regra do React).
+  // Resolve já a fonte do vídeo (inclui local://) pra evitar reordenar hooks.
+  const source = resolveVideoSource(movie?.video_url ?? null);
+  const isLocalSrc = source?.kind === "local";
+  const {
+    resolvedUrl: localBlobUrl,
+    missing: localMissing,
+    loading: localLoading,
+  } = useLocalVideoSrc(isLocalSrc ? source!.url : null);
+
   const isLoading = loading || authLoading || checkingAccess;
 
   if (isLoading) {
