@@ -22,6 +22,37 @@ interface Video {
 const fmtEta = (sec: number) =>
   sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
 
+// Hora local de término (ex.: 14:32) — usa o ETA pra prever
+const fmtEndTime = (etaSec: number) => {
+  const end = new Date(Date.now() + etaSec * 1000);
+  return end.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+// Tira nome "limpo" de série/filme a partir do nome do arquivo de capa
+// Ex.: "Breaking.Bad.S01.1080p.jpg" -> "Breaking Bad"
+const guessTitleFromFilename = (filename: string): string => {
+  let name = filename.replace(/\.[^/.]+$/, ""); // remove extensão
+  // remove tags técnicas comuns
+  name = name.replace(
+    /\b(1080p|720p|480p|2160p|4k|webrip|web-dl|webdl|bluray|brrip|hdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|dublado|legendado|nacional|completo|temporada|season|s\d{1,2}(e\d{1,2})?|ep?\d{1,3}|t\d{1,2})\b/gi,
+    " ",
+  );
+  // remove ano isolado (1900-2099)
+  name = name.replace(/\b(19|20)\d{2}\b/g, " ");
+  // separadores -> espaço
+  name = name.replace(/[._\-\[\](){}]/g, " ");
+  // colapsa espaços
+  name = name.replace(/\s+/g, " ").trim();
+  // capitaliza palavras
+  return name
+    .split(" ")
+    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w.toLowerCase()))
+    .join(" ");
+};
+
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
     case "queued":
@@ -271,13 +302,29 @@ const AdminVideos = () => {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Image className="w-3.5 h-3.5" /> Thumbnail</label>
+              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Image className="w-3.5 h-3.5" /> Thumbnail (capa)</label>
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => e.target.files && setThumbnailFile(e.target.files[0])}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  setThumbnailFile(f);
+                  setForm((prev) => {
+                    if (prev.title.trim()) return prev;
+                    const guess = guessTitleFromFilename(f.name);
+                    if (!guess) return prev;
+                    toast.success(`Título reconhecido: "${guess}"`);
+                    return { ...prev, title: guess };
+                  });
+                }}
                 className="w-full px-3 py-2 bg-background border border-border rounded text-sm file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-muted file:text-foreground"
               />
+              {thumbnailFile && (
+                <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                  📎 {thumbnailFile.name}
+                </p>
+              )}
             </div>
           </div>
 
@@ -399,13 +446,16 @@ const AdminVideos = () => {
                         value={j.progress}
                         className={`h-2 ${j.status === "warning" ? "[&>div]:bg-amber-500" : ""}`}
                       />
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono gap-2 flex-wrap">
                         <span>{j.progress.toFixed(1)}%</span>
                         {j.speedMBs > 0 && (
-                          <span>
+                          <span className="text-right">
                             ⚡ {j.speedMBs.toFixed(1)} MB/s
                             {j.etaSec > 0 && j.etaSec < 99999 && (
-                              <> • ⏱ {fmtEta(j.etaSec)}</>
+                              <>
+                                {" "}• ⏱ falta {fmtEta(j.etaSec)}
+                                {" "}• 🕒 termina às <b className="text-foreground">{fmtEndTime(j.etaSec)}</b>
+                              </>
                             )}
                           </span>
                         )}

@@ -48,6 +48,8 @@ const uploadFileTus = (
     const endpoint = `https://${projectId}.supabase.co/storage/v1/upload/resumable`;
 
     const startTime = Date.now();
+    // Janela móvel pra calcular velocidade real (últimos 5s) — ETA precisa
+    const samples: { t: number; bytes: number }[] = [];
     const upload = new tus.Upload(file, {
       endpoint,
       retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
@@ -66,9 +68,25 @@ const uploadFileTus = (
       chunkSize: 6 * 1024 * 1024,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
+        const now = Date.now();
         const pct = (bytesUploaded / bytesTotal) * 100;
-        const elapsed = (Date.now() - startTime) / 1000;
-        const speedMBs = bytesUploaded / 1024 / 1024 / Math.max(elapsed, 0.1);
+
+        // Mantém só amostras dos últimos 5s pra refletir a velocidade ATUAL
+        samples.push({ t: now, bytes: bytesUploaded });
+        const cutoff = now - 5000;
+        while (samples.length > 2 && samples[0].t < cutoff) samples.shift();
+
+        const first = samples[0];
+        const last = samples[samples.length - 1];
+        const dt = (last.t - first.t) / 1000;
+        const db = last.bytes - first.bytes;
+        // Velocidade janela; se não dá pra medir, cai pra média total
+        const speedMBs =
+          dt > 0.5 && db > 0
+            ? db / 1024 / 1024 / dt
+            : bytesUploaded / 1024 / 1024 /
+              Math.max((now - startTime) / 1000, 0.1);
+
         const remaining = (bytesTotal - bytesUploaded) / 1024 / 1024;
         const etaSec = remaining / Math.max(speedMBs, 0.01);
         onProgress(pct, speedMBs, etaSec);
