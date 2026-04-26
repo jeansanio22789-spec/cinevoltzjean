@@ -348,7 +348,13 @@ const AdminVideoLibrary = () => {
                       const title =
                         (r.caption || r.text || "").split("\n")[0]?.slice(0, 80) || `Mensagem #${r.message_id}`;
                       return (
-                        <TableRow key={`${r.chat_id}-${r.update_id}`}>
+                        <TableRow
+                          key={`${r.chat_id}-${r.update_id}`}
+                          className="cursor-pointer hover:bg-accent/50"
+                          onClick={() =>
+                            setOpenChat({ id: r.chat_id, title: chatLabel(String(r.chat_id)) })
+                          }
+                        >
                           <TableCell className="text-xs text-muted-foreground">
                             {new Date(r.created_at).toLocaleDateString("pt-BR", {
                               day: "2-digit",
@@ -366,21 +372,12 @@ const AdminVideoLibrary = () => {
                             )}
                           </TableCell>
                           <TableCell className="text-xs">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenChat({ id: r.chat_id, title: chatLabel(String(r.chat_id)) })
-                              }
-                              className="text-left hover:text-primary transition-colors"
-                              title="Abrir todos os vídeos deste grupo"
-                            >
-                              <div className="font-medium truncate max-w-[140px] underline-offset-2 hover:underline">
-                                {chatLabel(String(r.chat_id))}
-                              </div>
-                              <div className="text-[10px] font-mono text-muted-foreground truncate">
-                                {r.chat_id}
-                              </div>
-                            </button>
+                            <div className="font-medium truncate max-w-[140px]">
+                              {chatLabel(String(r.chat_id))}
+                            </div>
+                            <div className="text-[10px] font-mono text-muted-foreground truncate">
+                              {r.chat_id}
+                            </div>
                           </TableCell>
                           <TableCell className="text-xs">{formatDuration(r.duration)}</TableCell>
                           <TableCell className="text-xs">{formatBytes(r.file_size)}</TableCell>
