@@ -87,10 +87,11 @@ const hasActiveUploads = () =>
 
 const requestWakeLock = async () => {
   try {
-    // @ts-expect-error - WakeLock API ainda não tipada em todos os browsers
-    if (navigator.wakeLock && !wakeLock) {
-      // @ts-expect-error
-      wakeLock = await navigator.wakeLock.request("screen");
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (t: string) => Promise<WakeLockSentinel> };
+    };
+    if (nav.wakeLock && !wakeLock) {
+      wakeLock = await nav.wakeLock.request("screen");
     }
   } catch {
     /* navegador não suporta - ignora */
