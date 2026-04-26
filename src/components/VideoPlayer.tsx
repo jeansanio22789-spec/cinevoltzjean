@@ -550,6 +550,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       className="relative w-full h-full bg-black overflow-hidden select-none group"
       onMouseMove={armHide}
       onTouchStart={armHide}
+      onContextMenu={(e) => e.preventDefault()}
       onClick={(e) => {
         // Clique simples no vídeo (não nos controles) → play/pause
         if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === "VIDEO") {
@@ -569,6 +570,10 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
         poster={poster || undefined}
         autoPlay
         playsInline
+        controlsList="nodownload noplaybackrate noremoteplayback"
+        disablePictureInPicture
+        disableRemotePlayback
+        onContextMenu={(e) => e.preventDefault()}
         className="w-full h-full object-contain bg-black"
       />
 
