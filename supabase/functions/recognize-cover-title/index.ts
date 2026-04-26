@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash", // suporta visão
+          model: "google/gemini-2.5-pro", // visão mais precisa pra ler texto na capa
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             {
