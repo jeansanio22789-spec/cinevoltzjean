@@ -20,19 +20,38 @@ interface ParsedLink {
 }
 
 const parseTelegramLink = (raw: string): ParsedLink | null => {
+  const input = (raw || "").trim();
+  if (!input) return null;
+
+  // Aceita formatos colados sem protocolo: t.me/..., @canal/123, canal/123
+  const withProto = /^https?:\/\//i.test(input)
+    ? input
+    : input.startsWith("t.me/") || input.startsWith("telegram.me/")
+      ? `https://${input}`
+      : input.startsWith("@")
+        ? `https://t.me/${input.slice(1)}`
+        : `https://t.me/${input}`;
+
   try {
-    const url = new URL(raw.trim());
+    const url = new URL(withProto);
     if (url.hostname !== "t.me" && url.hostname !== "telegram.me") return null;
+    // Filtra parâmetros e fragmentos (?single, ?thread=, #...)
     const parts = url.pathname.split("/").filter(Boolean);
+
+    // t.me/c/<channel>/<thread?>/<message>
     if (parts[0] === "c" && parts.length >= 3) {
       const chan = parts[1];
-      const msg = parseInt(parts[2], 10);
+      // Pega o ÚLTIMO segmento numérico como messageId (suporta tópicos)
+      const last = parts[parts.length - 1];
+      const msg = parseInt(last, 10);
       if (!chan || isNaN(msg)) return null;
       return { chatId: `-100${chan}`, messageId: msg };
     }
+    // t.me/<username>/<thread?>/<message>
     if (parts.length >= 2) {
       const username = parts[0];
-      const msg = parseInt(parts[1], 10);
+      const last = parts[parts.length - 1];
+      const msg = parseInt(last, 10);
       if (!username || isNaN(msg)) return null;
       return { chatId: `@${username}`, messageId: msg };
     }
