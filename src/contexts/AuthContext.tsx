@@ -19,31 +19,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Verifica se o usuário está banido — se sim, faz signOut
+  // Verifica se o usuário está banido — se sim, faz signOut.
+  // IMPORTANTE: só desloga se a query confirmar "Banido". Erro de rede/timeout
+  // NÃO desloga (evita o "desconectar toda hora" em conexões instáveis).
   const enforceBan = async (u: User | null) => {
     if (!u) return;
-    setTimeout(async () => {
-      const { data } = await supabase.from("profiles").select("status").eq("id", u.id).maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("id", u.id)
+        .maybeSingle();
+      if (error) return; // falha de rede → ignora, não desloga
       if (data?.status === "Banido") {
         toast.error("Sua conta foi banida. Entre em contato com o suporte.");
         await supabase.auth.signOut();
       }
-    }, 0);
+    } catch {
+      // qualquer exceção: mantém logado
+    }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      enforceBan(session?.user ?? null);
-    });
-
+    // 1) Pega a sessão atual primeiro (sync com localStorage) pra evitar flicker
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      enforceBan(session?.user ?? null);
+      if (session?.user) void enforceBan(session.user);
+    });
+
+    // 2) Escuta mudanças. Só roda enforceBan em eventos que realmente importam
+    //    (login novo / troca de usuário). TOKEN_REFRESHED e USER_UPDATED não
+    //    precisam re-checar ban — evita queries desnecessárias e desconexões
+    //    falsas quando a query falha.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      if (event === "SIGNED_IN" && session?.user) {
+        void enforceBan(session.user);
+      }
     });
 
     return () => subscription.unsubscribe();
