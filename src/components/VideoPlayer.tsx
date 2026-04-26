@@ -275,6 +275,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       hls.attachMedia(v);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const prefs = getPlayerPrefs();
+
         const levels: QualityLevel[] = hls.levels.map((lvl, i) => ({
           index: i,
           height: lvl.height,
@@ -285,13 +287,28 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
         levels.sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
         setQualities(levels);
 
+        // 🎯 Aplica qualidade preferida (se houver e bater com algum nível)
+        const preferredQ = pickQualityIndex(levels, prefs.qualityHeight);
+        if (preferredQ !== -1) {
+          hls.currentLevel = preferredQ;
+          setCurrentQuality(preferredQ);
+        }
+
         const audios: AudioTrack[] = hls.audioTracks.map((a, i) => ({
           id: i,
           name: a.name || a.lang || `Faixa ${i + 1}`,
           lang: a.lang,
         }));
         setAudioTracks(audios);
-        setCurrentAudio(hls.audioTrack);
+
+        // 🎯 Aplica faixa de áudio preferida (por idioma)
+        const preferredA = pickTrackId(audios, prefs.audioLang, prefs.audioName);
+        if (preferredA !== -1 && preferredA !== hls.audioTrack) {
+          hls.audioTrack = preferredA;
+          setCurrentAudio(preferredA);
+        } else {
+          setCurrentAudio(hls.audioTrack);
+        }
 
         const subs: SubtitleTrack[] = hls.subtitleTracks.map((s, i) => ({
           id: i,
@@ -299,7 +316,22 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
           lang: s.lang,
         }));
         setSubTracks(subs);
-        setCurrentSub(hls.subtitleTrack);
+
+        // 🎯 Aplica legenda preferida ("off" desliga; idioma seleciona)
+        if (prefs.subLang === "off") {
+          hls.subtitleTrack = -1;
+          setCurrentSub(-1);
+        } else if (prefs.subLang) {
+          const preferredS = pickTrackId(subs, prefs.subLang, prefs.subName);
+          if (preferredS !== -1) {
+            hls.subtitleTrack = preferredS;
+            setCurrentSub(preferredS);
+          } else {
+            setCurrentSub(hls.subtitleTrack);
+          }
+        } else {
+          setCurrentSub(hls.subtitleTrack);
+        }
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
