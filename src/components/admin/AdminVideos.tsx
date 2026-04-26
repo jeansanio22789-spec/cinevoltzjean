@@ -22,6 +22,37 @@ interface Video {
 const fmtEta = (sec: number) =>
   sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
 
+// Hora local de término (ex.: 14:32) — usa o ETA pra prever
+const fmtEndTime = (etaSec: number) => {
+  const end = new Date(Date.now() + etaSec * 1000);
+  return end.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+// Tira nome "limpo" de série/filme a partir do nome do arquivo de capa
+// Ex.: "Breaking.Bad.S01.1080p.jpg" -> "Breaking Bad"
+const guessTitleFromFilename = (filename: string): string => {
+  let name = filename.replace(/\.[^/.]+$/, ""); // remove extensão
+  // remove tags técnicas comuns
+  name = name.replace(
+    /\b(1080p|720p|480p|2160p|4k|webrip|web-dl|webdl|bluray|brrip|hdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|dublado|legendado|nacional|completo|temporada|season|s\d{1,2}(e\d{1,2})?|ep?\d{1,3}|t\d{1,2})\b/gi,
+    " ",
+  );
+  // remove ano isolado (1900-2099)
+  name = name.replace(/\b(19|20)\d{2}\b/g, " ");
+  // separadores -> espaço
+  name = name.replace(/[._\-\[\](){}]/g, " ");
+  // colapsa espaços
+  name = name.replace(/\s+/g, " ").trim();
+  // capitaliza palavras
+  return name
+    .split(" ")
+    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w.toLowerCase()))
+    .join(" ");
+};
+
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
     case "queued":
