@@ -21,6 +21,7 @@ export type AdminTab =
   | "channels"
   | "users"
   | "videos"
+  | "library"
   | "telegram"
   | "billing"
   | "purchases"
