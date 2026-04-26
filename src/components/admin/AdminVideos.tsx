@@ -127,19 +127,19 @@ const AdminVideos = () => {
     genre: string;
     type: string;
     description: string;
-    audio: AudioTrack;
   }>({
     title: "",
     genre: "Ação",
     type: "Filme",
     description: "",
-    audio: "Original",
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [recognizingTitle, setRecognizingTitle] = useState(false);
 
-  // Lê o título escrito na capa via IA com visão (OCR semântico)
+  // Lê o título escrito na capa via IA com visão (OCR semântico).
+  // O título final fica TUDO MAIÚSCULO e, se a capa indicar áudio
+  // (DUBLADO / LEGENDADO / DUAL), a palavra é colada no fim do título.
   const recognizeTitleFromCover = async (file: File) => {
     setRecognizingTitle(true);
     try {
@@ -151,46 +151,30 @@ const AdminVideos = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Limpa qualquer marcação de áudio que a IA possa ter colado no título
-      // Ex.: "Vingadores Dublado", "Matrix [LEG]", "One Piece - DUAL ÁUDIO"
-      const stripAudioFromTitle = (raw: string) => {
-        let t = raw;
-        // Remove blocos entre [], () ou {} contendo dub/leg/dual
-        t = t.replace(
-          /[\[\(\{][^\]\)\}]*\b(dub(lad[oa])?|leg(endad[oa])?|dual|nacional|pt[\s._-]?br|sub(title[ds]?)?)\b[^\]\)\}]*[\]\)\}]/gi,
-          "",
-        );
-        // Remove sufixos soltos no fim/meio: " - Dublado", " • LEG", " | DUAL"
-        t = t.replace(
-          /[\s\-\|•·:]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br|sub(?:title[ds]?)?)\b\.?\s*$/gi,
-          "",
-        );
-        // Remove a mesma palavra solta no meio cercada por separadores
-        t = t.replace(
-          /[\s\-\|•·]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br)\b[\s\-\|•·]+/gi,
-          " ",
-        );
-        return t.replace(/\s{2,}/g, " ").trim();
-      };
-      const title = stripAudioFromTitle((data?.title || "").trim());
-      const audio = data?.audio as AudioTrack | undefined;
-      if (!title) {
+      const rawTitle = (data?.title || "").trim();
+      if (!rawTitle) {
         toast.warning("Não consegui ler nenhum título nessa capa.");
         return;
       }
-      // Trocar capa = trocar nome (sobrescreve) e atualiza áudio se a capa indicou
-      setForm((prev) => ({
-        ...prev,
-        title,
-        audio: audio && audio !== "Original" ? audio : prev.audio,
-      }));
 
-      const audioMsg =
-        audio && audio !== "Original" ? ` • áudio: ${audio}` : "";
+      // Normaliza o áudio devolvido pela IA pra nossa tag em maiúsculas
+      const audioRaw = (data?.audio || "").toString().toLowerCase();
+      let audioTag: AudioTag | null = null;
+      if (audioRaw === "dublado") audioTag = "DUBLADO";
+      else if (audioRaw === "legendado") audioTag = "LEGENDADO";
+      else if (audioRaw === "dual") audioTag = "DUAL";
+      // Se a IA não viu áudio, tenta pelo nome do arquivo do vídeo (fallback)
+      if (!audioTag) audioTag = detectAudioFromFiles(selectedFiles);
+
+      const finalTitle = buildTitleWithAudio(rawTitle, audioTag);
+
+      // Trocar capa = trocar nome (sobrescreve sempre)
+      setForm((prev) => ({ ...prev, title: finalTitle }));
+
       toast.success(
         data?.confidence === "high"
-          ? `Lido da capa: "${title}"${audioMsg}`
-          : `Lido (confiança ${data?.confidence}): "${title}"${audioMsg} — confira`,
+          ? `Lido da capa: "${finalTitle}"`
+          : `Lido (confiança ${data?.confidence}): "${finalTitle}" — confira`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao ler capa";
