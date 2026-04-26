@@ -215,9 +215,15 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     const onProgress = () => {
       if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1));
     };
+    let volSaveTimer: number | null = null;
     const onVol = () => {
       setVolume(v.volume);
       setMuted(v.muted);
+      // Salva com debounce para não escrever no localStorage a cada frame do slider
+      if (volSaveTimer) window.clearTimeout(volSaveTimer);
+      volSaveTimer = window.setTimeout(() => {
+        updatePlayerPrefs({ volume: v.volume, muted: v.muted });
+      }, 300);
     };
     v.addEventListener("play", onPlay);
     v.addEventListener("pause", onPause);
