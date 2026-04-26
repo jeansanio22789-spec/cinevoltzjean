@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { getAudioContext, primeAudio } from "@/lib/audioUnlock";
 
 interface IntroVignetteProps {
   /** Chamado quando a vinheta termina (fade-out completo). */
@@ -22,43 +23,64 @@ const IntroVignette = ({
   duration = 3200,
 }: IntroVignetteProps) => {
   const [phase, setPhase] = useState<"enter" | "hold" | "exit">("enter");
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    // Som "tudum" sintetizado: dois pulsos graves + sub-bass
+    // 🔊 Som "tudum" cinematográfico — sintetizado em tempo real
+    // (sem precisar de arquivo .mp3). Funciona em mobile porque o
+    // AudioContext já foi destravado pelo gesto inicial do usuário
+    // (installAudioUnlock no App.tsx).
     try {
-      const Ctx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext;
-      const ctx = new Ctx();
-      audioCtxRef.current = ctx;
+      primeAudio();
+      const ctx = getAudioContext();
+      if (!ctx) return;
 
-      const playTone = (freq: number, start: number, dur: number, gain = 0.4) => {
+      // Master gain para volume geral
+      const master = ctx.createGain();
+      master.gain.value = 0.9;
+      // Compressor para ficar mais "punchy"
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -18;
+      comp.ratio.value = 6;
+      master.connect(comp).connect(ctx.destination);
+
+      const t0 = ctx.currentTime + 0.15;
+
+      const playLayer = (
+        type: OscillatorType,
+        startFreq: number,
+        endFreq: number,
+        start: number,
+        dur: number,
+        gain: number,
+      ) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-        // Envelope: ataque rápido, decay longo
-        g.gain.setValueAtTime(0, ctx.currentTime + start);
-        g.gain.linearRampToValueAtTime(gain, ctx.currentTime + start + 0.02);
-        g.gain.exponentialRampToValueAtTime(
-          0.0001,
-          ctx.currentTime + start + dur,
+        osc.type = type;
+        osc.frequency.setValueAtTime(startFreq, t0 + start);
+        osc.frequency.exponentialRampToValueAtTime(
+          Math.max(20, endFreq),
+          t0 + start + dur,
         );
-        osc.connect(g).connect(ctx.destination);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + dur + 0.05);
+        g.gain.setValueAtTime(0, t0 + start);
+        g.gain.linearRampToValueAtTime(gain, t0 + start + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+        osc.connect(g).connect(master);
+        osc.start(t0 + start);
+        osc.stop(t0 + start + dur + 0.05);
       };
 
-      // "TU" — grave curto
-      playTone(80, 0.05, 0.35, 0.5);
-      playTone(55, 0.05, 0.4, 0.35);
-      // "DUM" — mais grave e longo
-      playTone(60, 0.45, 0.9, 0.55);
-      playTone(40, 0.45, 1.0, 0.45);
+      // 🎵 "TU" — pulso grave curto com sweep para baixo
+      playLayer("sine", 140, 70, 0, 0.35, 0.7);
+      playLayer("triangle", 220, 90, 0, 0.3, 0.35);
+      playLayer("sine", 55, 40, 0, 0.4, 0.5); // sub-bass
+
+      // 🎵 "DUM" — pulso mais grave, mais longo e poderoso
+      playLayer("sine", 110, 50, 0.42, 1.0, 0.85);
+      playLayer("triangle", 165, 75, 0.42, 0.9, 0.4);
+      playLayer("sine", 45, 32, 0.42, 1.1, 0.65); // sub-bass profundo
+      playLayer("sawtooth", 80, 38, 0.42, 0.6, 0.15); // grão/textura
     } catch {
-      /* navegador bloqueou áudio sem gesto — segue sem som */
+      /* navegador sem áudio — segue silencioso */
     }
 
     // Fases da animação
@@ -74,11 +96,6 @@ const IntroVignette = ({
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
-      try {
-        audioCtxRef.current?.close();
-      } catch {
-        /* noop */
-      }
     };
   }, [duration, onFinish]);
 

@@ -18,11 +18,17 @@ import ExternalView from "./pages/ExternalView.tsx";
 import TestChannels from "./pages/TestChannels.tsx";
 import ChannelView from "./pages/ChannelView.tsx";
 import MaintenanceGate from "@/components/MaintenanceGate";
+import { useEffect } from "react";
+import { installAudioUnlock } from "@/lib/audioUnlock";
 
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  useEffect(() => {
+    installAudioUnlock();
+  }, []);
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       
@@ -52,6 +58,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
