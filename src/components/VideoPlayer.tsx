@@ -279,7 +279,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     };
   }, []);
 
-  // ---- Aplica preferências (volume/velocidade) ao trocar de filme ----
+  // ---- Aplica preferências (volume/velocidade/qualidade) ao trocar de filme ----
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -287,7 +287,20 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     if (typeof prefs.volume === "number") v.volume = prefs.volume;
     if (typeof prefs.muted === "boolean") v.muted = prefs.muted;
     if (typeof prefs.speed === "number") v.playbackRate = prefs.speed;
+    // Reseta qualidade — o useEffect [nativeHeight] aplica a preferência salva
+    setCurrentQuality(-1);
+    setNativeHeight(0);
   }, [src]);
+
+  // Aplica preferência de qualidade salva quando a resolução nativa é detectada (MP4)
+  useEffect(() => {
+    if (qualities.length > 0) return; // HLS lida em outro effect
+    if (!nativeHeight) return;
+    const prefs = getPlayerPrefs();
+    if (!prefs.qualityHeight) return;
+    const idx = pickQualityIndex(displayQualities, prefs.qualityHeight);
+    if (idx !== -1) setCurrentQuality(idx);
+  }, [nativeHeight, qualities.length, displayQualities]);
 
   // ---- HLS: streams adaptativos com qualidade até 4K + faixas de áudio/legendas ----
   useEffect(() => {
