@@ -351,6 +351,64 @@ const AdminVideos = () => {
     }
   };
 
+  // 🔗 Salvar Link: cadastra o filme com a URL colada (sem baixar nada).
+  // Toca direto da fonte original ao assistir. Aparece pra todo mundo.
+  const handleSaveLink = async () => {
+    const url = linkUrl.trim();
+    if (!url) {
+      toast.error("Cole o link do vídeo");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      toast.error("Link inválido — precisa começar com http:// ou https://");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Título é obrigatório");
+      return;
+    }
+
+    const tId = toast.loading("Salvando link…");
+    try {
+      // Sobe a thumbnail se houver
+      let thumbnailUrl: string | null = null;
+      if (thumbnailFile) {
+        const ext = thumbnailFile.name.split(".").pop() || "jpg";
+        const path = `thumbnails/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}.${ext}`;
+        const { error: thErr } = await supabase.storage
+          .from("videos")
+          .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
+        if (!thErr) {
+          const { data } = supabase.storage.from("videos").getPublicUrl(path);
+          thumbnailUrl = data.publicUrl;
+        }
+      }
+
+      const { error } = await supabase.from("movies").insert({
+        title: form.title,
+        video_url: url,
+        thumbnail_url: thumbnailUrl,
+        genre: form.genre,
+        description: form.description,
+        status: "published",
+      });
+      if (error) throw error;
+
+      toast.dismiss(tId);
+      toast.success("⚡ Link publicado instantaneamente");
+      setLinkUrl("");
+      setThumbnailFile(null);
+      setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+      fetchVideos();
+    } catch (e) {
+      toast.dismiss(tId);
+      const msg = e instanceof Error ? e.message : "Falha ao salvar link";
+      toast.error(msg);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir este vídeo?")) return;
     // Se for vídeo local, limpa o IndexedDB também
