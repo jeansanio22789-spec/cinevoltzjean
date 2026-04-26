@@ -55,6 +55,92 @@ const fmt = (s: number) => {
   return `${m}:${String(sec).padStart(2, "0")}`;
 };
 
+// ---------- Subcomponentes do menu de configurações ----------
+const SettingsRow = ({
+  icon,
+  label,
+  value,
+  onClick,
+  disabled,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      "w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left transition-colors",
+      disabled
+        ? "opacity-40 cursor-not-allowed"
+        : "hover:bg-white/10 active:bg-white/20",
+    )}
+  >
+    {icon && <span className="text-white/70">{icon}</span>}
+    <span className="flex-1 text-white font-medium">{label}</span>
+    <span className="text-xs text-white/60 truncate max-w-[100px]">{value}</span>
+    <span className="text-white/40">›</span>
+  </button>
+);
+
+const SettingsList = <T extends string | number>({
+  title,
+  items,
+  activeId,
+  onPick,
+  onBack,
+}: {
+  title: string;
+  items: { id: T; label: string; hint?: string }[];
+  activeId: T;
+  onPick: (id: T) => void;
+  onBack: () => void;
+}) => (
+  <div>
+    <button
+      type="button"
+      onClick={onBack}
+      className="w-full flex items-center gap-2 px-3 py-2 border-b border-white/10 text-xs text-white/70 font-semibold uppercase tracking-wide hover:bg-white/5"
+    >
+      <span>‹</span>
+      <span>{title}</span>
+    </button>
+    <div className="py-1">
+      {items.map((it) => (
+        <button
+          key={String(it.id)}
+          type="button"
+          onClick={() => onPick(it.id)}
+          className={cn(
+            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors",
+            activeId === it.id && "text-primary font-bold",
+          )}
+        >
+          <span className="w-4 text-center">{activeId === it.id ? "•" : ""}</span>
+          <span className="flex-1 text-left">{it.label}</span>
+          {it.hint && (
+            <span
+              className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                it.hint === "4K"
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-white/10 text-white/70",
+              )}
+            >
+              {it.hint}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+
 const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
