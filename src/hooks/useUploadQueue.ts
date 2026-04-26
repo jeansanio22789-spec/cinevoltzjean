@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import * as tus from "tus-js-client";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  deletePersistedUploadJob,
+  deletePersistedUploadJobs,
+  loadPersistedUploadJobs,
+  persistUploadJob,
+  type PersistedUploadJob,
+} from "@/lib/uploadQueuePersistence";
 
 export type UploadStatus =
   | "queued"
