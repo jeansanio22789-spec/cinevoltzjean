@@ -205,7 +205,12 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     if (!v) return;
     v.playbackRate = r;
     setSpeed(r);
-    setShowSettings(false);
+    setSettingsTab(null);
+  };
+
+  const toggleSettings = () => {
+    setSettingsTab((t) => (t === null ? "main" : null));
+    armHide();
   };
 
   // ---- Atalhos de teclado ----
