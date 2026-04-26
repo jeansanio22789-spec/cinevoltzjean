@@ -744,17 +744,49 @@ const AdminVideos = () => {
             </button>
             <button
               onClick={handleSaveLink}
-              disabled={!linkUrl.trim()}
+              disabled={!linkUrl.trim() || downloadingLink}
               className="px-6 py-2 bg-secondary text-secondary-foreground rounded text-sm font-semibold hover:bg-secondary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
               title="Cadastra o filme com o link colado — sem baixar nada. Toca direto da fonte."
             >
               <Link2 className="w-4 h-4" />
               Salvar Link
             </button>
+            <button
+              onClick={handleDownloadLinkLocal}
+              disabled={!linkUrl.trim() || downloadingLink}
+              className="px-6 py-2 bg-accent text-accent-foreground rounded text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              title="Baixa o arquivo do link agora e salva no aparelho. Depois toca offline."
+            >
+              {downloadingLink ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Baixar Link no Aparelho
+            </button>
             <p className="text-xs text-muted-foreground self-center w-full sm:w-auto">
-              💡 <strong>Link</strong>: instantâneo, todos veem (depende do link no ar). <strong>Local</strong>: instantâneo, só neste aparelho. <strong>Enviar</strong>: sobe pra nuvem.
+              💡 <strong>Link</strong>: instantâneo, todos veem. <strong>Baixar Link</strong>: salva offline neste aparelho. <strong>Local</strong>: importa arquivo do celular. <strong>Enviar</strong>: sobe pra nuvem.
             </p>
           </div>
+
+          {downloadingLink && downloadProgress && (
+            <div className="mt-3 space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Baixando…</span>
+                <span>
+                  {(downloadProgress.loaded / 1024 / 1024).toFixed(1)} MB
+                  {downloadProgress.total > 0 && ` / ${(downloadProgress.total / 1024 / 1024).toFixed(1)} MB`}
+                </span>
+              </div>
+              <Progress
+                value={
+                  downloadProgress.total > 0
+                    ? (downloadProgress.loaded / downloadProgress.total) * 100
+                    : undefined
+                }
+              />
+            </div>
+          )}
 
         </div>
       )}
