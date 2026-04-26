@@ -222,6 +222,7 @@ const AdminVideos = () => {
         title: form.title,
         genre: form.genre,
         description: form.description,
+        audio: form.audio,
       },
     }));
 
@@ -234,7 +235,13 @@ const AdminVideos = () => {
     // Limpa o formulário, mas mantém o painel aberto para a fila
     setSelectedFiles([]);
     setThumbnailFile(null);
-    setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+    setForm({
+      title: "",
+      genre: "Ação",
+      type: "Filme",
+      description: "",
+      audio: "Original",
+    });
   };
 
   const handleDelete = async (id: string) => {
