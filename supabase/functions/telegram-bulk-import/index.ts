@@ -389,11 +389,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Conta o que ainda falta
+    // Conta o que ainda falta (qualquer chat)
     const { count: stillPending } = await supabase
       .from('telegram_messages')
       .select('*', { count: 'exact', head: true })
-      .eq('chat_id', chatId)
       .eq('processing_status', 'pending')
       .not('file_id', 'is', null)
       .like('mime_type', 'video/%');
