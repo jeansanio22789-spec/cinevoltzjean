@@ -92,6 +92,65 @@ export function useResumableUpload() {
         fileName: file.name,
       });
 
+      // ⚡⚡ MODO TURBO ⚡⚡
+      // Para arquivos até 4 GB tenta upload direto (uma única requisição
+      // HTTP, sem overhead de chunks/locking do TUS) — é 3-10x mais
+      // rápido. Se falhar, cai automaticamente pro TUS resumível.
+      const TURBO_LIMIT = 4 * 1024 * 1024 * 1024;
+      if (file.size <= TURBO_LIMIT) {
+        const turboOk = await tryTurboUpload({
+          file,
+          bucket,
+          objectName,
+          accessToken,
+          xhrRef: turboXhrRef,
+          onProgress: (bytesUploaded) => {
+            const now = Date.now();
+            const last = lastTickRef.current;
+            let speedKbps = 0;
+            if (last && now > last.time) {
+              const dt = (now - last.time) / 1000;
+              const db = bytesUploaded - last.bytes;
+              if (dt > 0.5) {
+                speedKbps = db / 1024 / dt;
+                lastTickRef.current = { time: now, bytes: bytesUploaded };
+              }
+            }
+            setState((s) => ({
+              ...s,
+              bytesUploaded,
+              bytesTotal: file.size,
+              progress: Math.round((bytesUploaded / file.size) * 100),
+              speedKbps: Math.max(0, Math.round(speedKbps)),
+              status: "uploading",
+            }));
+          },
+        });
+
+        if (turboOk) {
+          const { data } = supabase.storage.from(bucket).getPublicUrl(objectName);
+          setState((s) => ({
+            ...s,
+            uploading: false,
+            progress: 100,
+            status: "done",
+            publicUrl: data.publicUrl,
+          }));
+          onSuccess?.(data.publicUrl, objectName);
+          return;
+        }
+
+        // Turbo falhou — reseta e cai pro TUS resumível
+        lastTickRef.current = { time: Date.now(), bytes: 0 };
+        setState((s) => ({
+          ...s,
+          bytesUploaded: 0,
+          progress: 0,
+          status: "retrying",
+          error: "Modo turbo falhou, retomando em modo seguro...",
+        }));
+      }
+
       const upload = new tus.Upload(file, {
         endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
         // Retentativas rápidas: reconecta em <1s se cair
