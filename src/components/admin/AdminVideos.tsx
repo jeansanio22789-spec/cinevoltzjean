@@ -493,8 +493,7 @@ const AdminVideos = () => {
             <div className="flex items-start gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <p>
-                <b>Mantenha esta aba aberta</b> até terminar. Se cair a conexão, os envios retomam automaticamente.
-                Envios que passam de <b>2 minutos</b> ficam marcados em amarelo, mas seguem tentando.
+                O envio fica salvo e retoma sozinho se o app recarregar. Mantenha a tela ligada para puxar o máximo da internet.
               </p>
             </div>
           )}
