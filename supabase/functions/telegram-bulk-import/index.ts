@@ -346,7 +346,9 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         ok: true,
+        dryRun,
         processed: results.length,
+        previews: results.filter((r) => r.status === 'preview').length,
         imported: results.filter((r) => r.status === 'imported').length,
         skipped: results.filter((r) => r.status === 'skipped').length,
         errors: results.filter((r) => r.status === 'error').length,
