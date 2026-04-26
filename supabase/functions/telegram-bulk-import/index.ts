@@ -17,10 +17,24 @@ const DORAMAS_CHAT_KEY = 'telegram_doramas_chat_id';
 
 interface ProcessResult {
   update_id: number;
-  status: 'imported' | 'skipped' | 'error';
+  status: 'imported' | 'skipped' | 'error' | 'preview';
   reason?: string;
   movie_id?: string;
   title?: string;
+  // Campos extras quando dryRun=true (preview):
+  video_url?: string;
+  thumbnail_url?: string | null;
+  duration_min?: number | null;
+  size_mb?: number | null;
+  meta?: {
+    title: string;
+    year?: number;
+    genre: string;
+    kind: 'movie' | 'series';
+    season?: number;
+    episode?: number;
+    synopsis: string;
+  };
 }
 
 async function extractMetadata(
