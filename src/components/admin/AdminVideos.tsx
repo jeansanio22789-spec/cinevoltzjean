@@ -7,7 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
-import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
+import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo, saveLocalVideo } from "@/lib/localVideoStore";
+import { Smartphone } from "lucide-react";
 
 interface Video {
   id: string;
@@ -366,6 +367,71 @@ const AdminVideos = () => {
     }
   };
 
+  // 📱 Salvar no aparelho: guarda o vídeo no IndexedDB local (sem subir nada).
+  // Vantagem: instantâneo. Limitação: só toca neste celular/navegador.
+  const handleSaveLocal = async () => {
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um arquivo de vídeo");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Título é obrigatório");
+      return;
+    }
+
+    const tId = toast.loading(
+      `Salvando ${selectedFiles.length} ${selectedFiles.length === 1 ? "vídeo" : "vídeos"} no aparelho…`,
+    );
+    try {
+      // Sobe a thumbnail (capa) pra nuvem mesmo, pra todo mundo ver na lista.
+      let thumbnailUrl: string | null = null;
+      if (thumbnailFile) {
+        const ext = thumbnailFile.name.split(".").pop() || "jpg";
+        const path = `thumbnails/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}.${ext}`;
+        const { error: thErr } = await supabase.storage
+          .from("videos")
+          .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
+        if (!thErr) {
+          const { data } = supabase.storage.from("videos").getPublicUrl(path);
+          thumbnailUrl = data.publicUrl;
+        }
+      }
+
+      let ok = 0;
+      for (const file of selectedFiles) {
+        const localUrl = await saveLocalVideo(file);
+        const { error } = await supabase.from("movies").insert({
+          title: form.title,
+          video_url: localUrl,
+          thumbnail_url: thumbnailUrl,
+          genre: form.genre,
+          description: form.description,
+          status: "published",
+        });
+        if (!error) ok++;
+      }
+
+      toast.dismiss(tId);
+      if (ok === 0) {
+        toast.error("Nenhum vídeo pôde ser salvo");
+      } else {
+        toast.success(
+          `📱 ${ok} ${ok === 1 ? "vídeo salvo" : "vídeos salvos"} no aparelho — toca só neste celular`,
+        );
+        setSelectedFiles([]);
+        setThumbnailFile(null);
+        setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+        fetchVideos();
+      }
+    } catch (e) {
+      toast.dismiss(tId);
+      const msg = e instanceof Error ? e.message : "Falha ao salvar no aparelho";
+      toast.error(msg);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir este vídeo?")) return;
     // Se for vídeo local, limpa o IndexedDB também
@@ -584,8 +650,18 @@ const AdminVideos = () => {
               <Link2 className="w-4 h-4" />
               Salvar Link
             </button>
-            <p className="text-xs text-muted-foreground self-center w-full sm:w-auto">
-              💡 <strong>Salvar Link</strong>: publica instantaneamente para todos. <strong>Enviar</strong>: sobe o arquivo para a nuvem.
+            <button
+              onClick={handleSaveLocal}
+              disabled={selectedFiles.length === 0}
+              className="px-6 py-2 bg-accent text-accent-foreground rounded text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              title="Guarda o vídeo direto neste celular (IndexedDB). Instantâneo, mas só toca aqui."
+            >
+              <Smartphone className="w-4 h-4" />
+              Salvar no Aparelho
+              {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
+            </button>
+            <p className="text-xs text-muted-foreground self-center w-full">
+              💡 <strong>Enviar</strong>: nuvem, todos veem. <strong>Salvar Link</strong>: instantâneo p/ todos. <strong>Salvar no Aparelho</strong>: instantâneo, só neste celular.
             </p>
           </div>
 
