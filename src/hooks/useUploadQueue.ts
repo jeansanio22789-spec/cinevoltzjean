@@ -110,8 +110,10 @@ const uploadFileTus = (
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
 
-    // Chunk maior + várias conexões = muito mais rápido em qualquer tamanho
-    // (o TUS faz pedaços de 16MB enviados em paralelo).
+    // 🚀 Configuração agressiva pra usar 100% da banda:
+    // - chunks grandes (50MB) → menos overhead de rede
+    // - 6 conexões simultâneas → satura links de fibra/5G
+    // Limite real é a SUA INTERNET (upload típico residencial: 5–60 MB/s).
     const upload = new tus.Upload(file, {
       endpoint,
       retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
@@ -127,10 +129,8 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      // Supabase Storage TUS: precisa ser exatamente 6MB por chunk
-      // (com chunks maiores, ele rejeita partes intermediárias).
-      // O ganho de velocidade vem de enviar VÁRIOS jobs em paralelo (já fazemos).
-      chunkSize: 6 * 1024 * 1024,
+      chunkSize: 50 * 1024 * 1024, // 50MB
+      parallelUploads: 6,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         const now = Date.now();
