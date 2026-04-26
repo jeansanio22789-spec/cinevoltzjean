@@ -31,27 +31,18 @@ const fmtEndTime = (etaSec: number) => {
   });
 };
 
-// Tira nome "limpo" de série/filme a partir do nome do arquivo de capa
-// Ex.: "Breaking.Bad.S01.1080p.jpg" -> "Breaking Bad"
-const guessTitleFromFilename = (filename: string): string => {
-  let name = filename.replace(/\.[^/.]+$/, ""); // remove extensão
-  // remove tags técnicas comuns
-  name = name.replace(
-    /\b(1080p|720p|480p|2160p|4k|webrip|web-dl|webdl|bluray|brrip|hdrip|hdtv|x264|x265|h264|h265|hevc|aac|ac3|dts|dual|dublado|legendado|nacional|completo|temporada|season|s\d{1,2}(e\d{1,2})?|ep?\d{1,3}|t\d{1,2})\b/gi,
-    " ",
-  );
-  // remove ano isolado (1900-2099)
-  name = name.replace(/\b(19|20)\d{2}\b/g, " ");
-  // separadores -> espaço
-  name = name.replace(/[._\-\[\](){}]/g, " ");
-  // colapsa espaços
-  name = name.replace(/\s+/g, " ").trim();
-  // capitaliza palavras
-  return name
-    .split(" ")
-    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w.toLowerCase()))
-    .join(" ");
-};
+// Lê arquivo como base64 puro (sem o prefixo data:)
+const fileToBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
@@ -89,6 +80,41 @@ const AdminVideos = () => {
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [recognizingTitle, setRecognizingTitle] = useState(false);
+
+  // Lê o título escrito na capa via IA com visão (OCR semântico)
+  const recognizeTitleFromCover = async (file: File) => {
+    setRecognizingTitle(true);
+    try {
+      const imageBase64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke(
+        "recognize-cover-title",
+        { body: { imageBase64, mimeType: file.type || "image/jpeg" } },
+      );
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const title = (data?.title || "").trim();
+      if (!title) {
+        toast.warning("Não consegui ler nenhum título nessa capa.");
+        return;
+      }
+      setForm((prev) => {
+        if (prev.title.trim()) return prev; // não sobrescreve digitado
+        return { ...prev, title };
+      });
+      toast.success(
+        data?.confidence === "high"
+          ? `Título lido da capa: "${title}"`
+          : `Título lido (confiança ${data?.confidence}): "${title}" — confira`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao ler capa";
+      toast.error(msg);
+    } finally {
+      setRecognizingTitle(false);
+    }
+  };
 
   const fetchVideos = async () => {
     const { data, error } = await supabase
@@ -306,25 +332,26 @@ const AdminVideos = () => {
               <input
                 type="file"
                 accept="image/*"
+                disabled={recognizingTitle}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
                   setThumbnailFile(f);
-                  setForm((prev) => {
-                    if (prev.title.trim()) return prev;
-                    const guess = guessTitleFromFilename(f.name);
-                    if (!guess) return prev;
-                    toast.success(`Título reconhecido: "${guess}"`);
-                    return { ...prev, title: guess };
-                  });
+                  // Lê o título escrito na própria capa via IA
+                  void recognizeTitleFromCover(f);
                 }}
-                className="w-full px-3 py-2 bg-background border border-border rounded text-sm file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-muted file:text-foreground"
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-muted file:text-foreground disabled:opacity-60"
               />
-              {thumbnailFile && (
+              {recognizingTitle ? (
+                <p className="text-[11px] text-primary mt-1 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Lendo o título escrito na capa…
+                </p>
+              ) : thumbnailFile ? (
                 <p className="text-[11px] text-muted-foreground mt-1 truncate">
                   📎 {thumbnailFile.name}
                 </p>
-              )}
+              ) : null}
             </div>
           </div>
 
