@@ -80,7 +80,7 @@ const extractTitle = (caption: string | null, text: string | null, msgId: number
 
 const StatusIcon = ({ status }: { status: string }) => {
   if (status === "done" || status === "published")
-    return <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />;
+    return <CheckCircle2 className="w-3.5 h-3.5 text-primary" />;
   if (status === "error" || status === "failed")
     return <XCircle className="w-3.5 h-3.5 text-destructive" />;
   if (status === "processing")
