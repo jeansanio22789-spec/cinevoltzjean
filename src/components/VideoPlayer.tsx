@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import Hls from "hls.js";
 import { cn } from "@/lib/utils";
+import {
+  getPlayerPrefs,
+  updatePlayerPrefs,
+  pickQualityIndex,
+  pickTrackId,
+} from "@/lib/playerPrefs";
 
 interface QualityLevel {
   index: number; // -1 = auto
