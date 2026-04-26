@@ -17,9 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Search, RefreshCcw, Film } from "lucide-react";
+import { Loader2, Search, RefreshCcw, Film, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ChannelVideosDialog from "./ChannelVideosDialog";
+
+interface FeaturedChannel {
+  id: number;
+  title: string;
+}
 
 interface TgRow {
   update_id: number;
