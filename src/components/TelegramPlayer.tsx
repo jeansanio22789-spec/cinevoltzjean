@@ -35,11 +35,18 @@ const buildEmbedUrl = (url: string | null | undefined): string | null => {
 const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
   const embedUrl = useMemo(() => buildEmbedUrl(movie.telegram_url), [movie.telegram_url]);
   const [loaded, setLoaded] = useState(false);
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importedUrl, setImportedUrl] = useState<string | null>(movie.video_url || null);
 
   useEffect(() => {
     setLoaded(false);
+    setLoadTimedOut(false);
+    const timer = window.setTimeout(() => {
+      setLoadTimedOut(true);
+      setLoaded(true);
+    }, 8000);
+    return () => window.clearTimeout(timer);
   }, [embedUrl]);
 
   const handleImport = async () => {
