@@ -274,6 +274,40 @@ const AdminVideoLibrary = () => {
         </div>
       </div>
 
+      {featured.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Star className="w-3.5 h-3.5 text-primary" />
+            Canais favoritos
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {featured.map((c) => {
+              const count = rows.filter((r) => r.chat_id === c.id).length;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setOpenChat({ id: c.id, title: c.title })}
+                  className="group flex items-center gap-2 px-3 py-2 rounded-lg border bg-card hover:border-primary hover:bg-accent transition-colors text-left"
+                >
+                  <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Film className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="leading-tight">
+                    <div className="text-sm font-semibold group-hover:text-primary transition-colors">
+                      {c.title}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {count} mensagem(ns) • ID {c.id}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="text-xs text-muted-foreground">
         {filtered.length} de {rows.length} vídeos
       </div>
