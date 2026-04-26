@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Captions,
+  Languages,
   Loader2,
   Maximize,
   Minimize,
@@ -9,10 +11,31 @@ import {
   RotateCcw,
   RotateCw,
   Settings,
+  Sparkles,
   Volume2,
   VolumeX,
 } from "lucide-react";
+import Hls from "hls.js";
 import { cn } from "@/lib/utils";
+
+interface QualityLevel {
+  index: number; // -1 = auto
+  height: number; // 0 = auto
+  bitrate: number;
+  label: string;
+}
+
+interface AudioTrack {
+  id: number;
+  name: string;
+  lang?: string;
+}
+
+interface SubtitleTrack {
+  id: number;
+  name: string;
+  lang?: string;
+}
 
 interface VideoPlayerProps {
   src: string;
@@ -32,10 +55,109 @@ const fmt = (s: number) => {
   return `${m}:${String(sec).padStart(2, "0")}`;
 };
 
+const labelForHeight = (h: number, bitrate?: number): string => {
+  if (h >= 4320) return "8K (4320p)";
+  if (h >= 2160) return "4K UHD (2160p)";
+  if (h >= 1440) return "2K (1440p)";
+  if (h >= 1080) return "Full HD (1080p)";
+  if (h >= 720) return "HD (720p)";
+  if (h >= 480) return "SD (480p)";
+  if (h > 0) return `${h}p`;
+  if (bitrate) return `${Math.round(bitrate / 1000)} kbps`;
+  return "Auto";
+};
+
+// ---------- Subcomponentes do menu de configurações ----------
+const SettingsRow = ({
+  icon,
+  label,
+  value,
+  onClick,
+  disabled,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={cn(
+      "w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left transition-colors",
+      disabled
+        ? "opacity-40 cursor-not-allowed"
+        : "hover:bg-white/10 active:bg-white/20",
+    )}
+  >
+    {icon && <span className="text-white/70">{icon}</span>}
+    <span className="flex-1 text-white font-medium">{label}</span>
+    <span className="text-xs text-white/60 truncate max-w-[100px]">{value}</span>
+    <span className="text-white/40">›</span>
+  </button>
+);
+
+const SettingsList = <T extends string | number>({
+  title,
+  items,
+  activeId,
+  onPick,
+  onBack,
+}: {
+  title: string;
+  items: { id: T; label: string; hint?: string }[];
+  activeId: T;
+  onPick: (id: T) => void;
+  onBack: () => void;
+}) => (
+  <div>
+    <button
+      type="button"
+      onClick={onBack}
+      className="w-full flex items-center gap-2 px-3 py-2 border-b border-white/10 text-xs text-white/70 font-semibold uppercase tracking-wide hover:bg-white/5"
+    >
+      <span>‹</span>
+      <span>{title}</span>
+    </button>
+    <div className="py-1">
+      {items.map((it) => (
+        <button
+          key={String(it.id)}
+          type="button"
+          onClick={() => onPick(it.id)}
+          className={cn(
+            "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-white/10 transition-colors",
+            activeId === it.id && "text-primary font-bold",
+          )}
+        >
+          <span className="w-4 text-center">{activeId === it.id ? "•" : ""}</span>
+          <span className="flex-1 text-left">{it.label}</span>
+          {it.hint && (
+            <span
+              className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                it.hint === "4K"
+                  ? "bg-accent text-accent-foreground"
+                  : "bg-white/10 text-white/70",
+              )}
+            >
+              {it.hint}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+
 const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<number | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [waiting, setWaiting] = useState(true);
@@ -46,10 +168,24 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [muted, setMuted] = useState(false);
   const [fs, setFs] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<
+    null | "main" | "speed" | "quality" | "audio" | "subs"
+  >(null);
   const [speed, setSpeed] = useState(1);
   const [seeking, setSeeking] = useState(false);
   const [centerHint, setCenterHint] = useState<null | "play" | "pause" | "back" | "forward">(null);
+
+  // ---- HLS / qualidade / áudio / legendas ----
+  const [qualities, setQualities] = useState<QualityLevel[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1); // -1 = auto
+  const [autoActiveHeight, setAutoActiveHeight] = useState<number>(0);
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [currentAudio, setCurrentAudio] = useState<number>(-1);
+  const [subTracks, setSubTracks] = useState<SubtitleTrack[]>([]);
+  const [currentSub, setCurrentSub] = useState<number>(-1);
+
+  const isHls = useMemo(() => /\.m3u8(\?.*)?$/i.test(src), [src]);
+  const showSettings = settingsTab !== null;
 
   // ---- Auto-hide controles ----
   const armHide = useCallback(() => {
@@ -98,6 +234,101 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("volumechange", onVol);
     };
   }, []);
+
+  // ---- HLS: streams adaptativos com qualidade até 4K + faixas de áudio/legendas ----
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    // Limpa instância anterior
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    setQualities([]);
+    setAudioTracks([]);
+    setSubTracks([]);
+    setCurrentQuality(-1);
+    setCurrentAudio(-1);
+    setCurrentSub(-1);
+    setAutoActiveHeight(0);
+
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({
+        // ⚡ Configurações para máxima qualidade + carregamento rápido
+        capLevelToPlayerSize: false, // permite escolher 4K mesmo em janela menor
+        startLevel: -1, // começa em Auto
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 60,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 120,
+      });
+      hlsRef.current = hls;
+      hls.loadSource(src);
+      hls.attachMedia(v);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        const levels: QualityLevel[] = hls.levels.map((lvl, i) => ({
+          index: i,
+          height: lvl.height,
+          bitrate: lvl.bitrate,
+          label: labelForHeight(lvl.height, lvl.bitrate),
+        }));
+        // Ordena do maior para o menor
+        levels.sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
+        setQualities(levels);
+
+        const audios: AudioTrack[] = hls.audioTracks.map((a, i) => ({
+          id: i,
+          name: a.name || a.lang || `Faixa ${i + 1}`,
+          lang: a.lang,
+        }));
+        setAudioTracks(audios);
+        setCurrentAudio(hls.audioTrack);
+
+        const subs: SubtitleTrack[] = hls.subtitleTracks.map((s, i) => ({
+          id: i,
+          name: s.name || s.lang || `Legenda ${i + 1}`,
+          lang: s.lang,
+        }));
+        setSubTracks(subs);
+        setCurrentSub(hls.subtitleTrack);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
+        const lvl = hls.levels[data.level];
+        if (lvl) setAutoActiveHeight(lvl.height);
+      });
+
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_e, data) => {
+        setCurrentAudio(data.id);
+      });
+
+      hls.on(Hls.Events.SUBTITLE_TRACK_SWITCH, (_e, data) => {
+        setCurrentSub(data.id);
+      });
+
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) {
+          console.warn("HLS fatal error:", data);
+          // Tenta recuperar
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+        }
+      });
+    } else {
+      // Vídeo regular (mp4/webm/etc) ou HLS nativo (Safari)
+      v.src = src;
+    }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
+  }, [src, isHls]);
 
   // ---- Fullscreen ----
   useEffect(() => {
@@ -167,7 +398,12 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     if (!v) return;
     v.playbackRate = r;
     setSpeed(r);
-    setShowSettings(false);
+    setSettingsTab(null);
+  };
+
+  const toggleSettings = () => {
+    setSettingsTab((t) => (t === null ? "main" : null));
+    armHide();
   };
 
   // ---- Atalhos de teclado ----
@@ -230,7 +466,6 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     >
       <video
         ref={videoRef}
-        src={src}
         poster={poster || undefined}
         autoPlay
         playsInline
@@ -413,40 +648,154 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
 
             <div className="flex-1" />
 
-            {/* Velocidade */}
+            {/* Configurações: qualidade / áudio / legendas / velocidade */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowSettings((s) => !s)}
+                onClick={toggleSettings}
                 className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors flex items-center gap-1"
                 aria-label="Configurações"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className={cn("w-5 h-5 transition-transform", showSettings && "rotate-90")} />
+                {currentQuality === -1 && autoActiveHeight >= 2160 && (
+                  <span className="text-[9px] font-bold bg-accent text-accent-foreground px-1 py-0.5 rounded leading-none">
+                    4K
+                  </span>
+                )}
+                {currentQuality !== -1 && qualities[currentQuality]?.height >= 2160 && (
+                  <span className="text-[9px] font-bold bg-accent text-accent-foreground px-1 py-0.5 rounded leading-none">
+                    4K
+                  </span>
+                )}
                 {speed !== 1 && (
                   <span className="text-[10px] font-bold bg-primary px-1.5 py-0.5 rounded">
                     {speed}x
                   </span>
                 )}
               </button>
+
               {showSettings && (
-                <div className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-md rounded-lg overflow-hidden ring-1 ring-white/10 shadow-2xl min-w-[120px] animate-in fade-in slide-in-from-bottom-2 duration-150">
-                  <div className="text-[11px] text-white/60 px-3 py-2 border-b border-white/10 font-semibold uppercase tracking-wide">
-                    Velocidade
-                  </div>
-                  {SPEEDS.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setPlaybackRate(r)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors flex items-center justify-between",
-                        speed === r && "text-primary font-bold",
-                      )}
-                    >
-                      <span>{r === 1 ? "Normal" : `${r}x`}</span>
-                      {speed === r && <span>•</span>}
-                    </button>
-                  ))}
+                <div className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-md rounded-xl overflow-hidden ring-1 ring-white/10 shadow-2xl min-w-[220px] max-h-[60vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  {settingsTab === "main" && (
+                    <div className="py-1">
+                      <SettingsRow
+                        icon={<Sparkles className="w-4 h-4" />}
+                        label="Qualidade"
+                        value={
+                          currentQuality === -1
+                            ? autoActiveHeight
+                              ? `Auto (${autoActiveHeight}p)`
+                              : "Auto"
+                            : qualities[currentQuality]?.label || "—"
+                        }
+                        onClick={() => setSettingsTab("quality")}
+                        disabled={qualities.length === 0}
+                      />
+                      <SettingsRow
+                        icon={<Languages className="w-4 h-4" />}
+                        label="Áudio / Dublagem"
+                        value={
+                          audioTracks.find((t) => t.id === currentAudio)?.name ||
+                          "Padrão"
+                        }
+                        onClick={() => setSettingsTab("audio")}
+                        disabled={audioTracks.length <= 1}
+                      />
+                      <SettingsRow
+                        icon={<Captions className="w-4 h-4" />}
+                        label="Legendas"
+                        value={
+                          currentSub === -1
+                            ? "Desligadas"
+                            : subTracks.find((t) => t.id === currentSub)?.name || "Padrão"
+                        }
+                        onClick={() => setSettingsTab("subs")}
+                        disabled={subTracks.length === 0}
+                      />
+                      <SettingsRow
+                        label="Velocidade"
+                        value={speed === 1 ? "Normal" : `${speed}x`}
+                        onClick={() => setSettingsTab("speed")}
+                      />
+                    </div>
+                  )}
+
+                  {settingsTab === "quality" && (
+                    <SettingsList
+                      title="Qualidade"
+                      onBack={() => setSettingsTab("main")}
+                      items={[
+                        {
+                          id: -1,
+                          label: "Auto",
+                          hint: autoActiveHeight ? `${autoActiveHeight}p` : undefined,
+                        },
+                        ...qualities.map((q) => ({
+                          id: q.index,
+                          label: q.label,
+                          hint: q.height >= 2160 ? "4K" : q.height >= 1080 ? "HD" : undefined,
+                        })),
+                      ]}
+                      activeId={currentQuality}
+                      onPick={(id) => {
+                        setCurrentQuality(id);
+                        if (hlsRef.current) hlsRef.current.currentLevel = id;
+                        setSettingsTab(null);
+                      }}
+                    />
+                  )}
+
+                  {settingsTab === "audio" && (
+                    <SettingsList
+                      title="Áudio / Dublagem"
+                      onBack={() => setSettingsTab("main")}
+                      items={audioTracks.map((t) => ({
+                        id: t.id,
+                        label: t.name,
+                        hint: t.lang?.toUpperCase(),
+                      }))}
+                      activeId={currentAudio}
+                      onPick={(id) => {
+                        setCurrentAudio(id);
+                        if (hlsRef.current) hlsRef.current.audioTrack = id;
+                        setSettingsTab(null);
+                      }}
+                    />
+                  )}
+
+                  {settingsTab === "subs" && (
+                    <SettingsList
+                      title="Legendas"
+                      onBack={() => setSettingsTab("main")}
+                      items={[
+                        { id: -1, label: "Desligadas" },
+                        ...subTracks.map((t) => ({
+                          id: t.id,
+                          label: t.name,
+                          hint: t.lang?.toUpperCase(),
+                        })),
+                      ]}
+                      activeId={currentSub}
+                      onPick={(id) => {
+                        setCurrentSub(id);
+                        if (hlsRef.current) hlsRef.current.subtitleTrack = id;
+                        setSettingsTab(null);
+                      }}
+                    />
+                  )}
+
+                  {settingsTab === "speed" && (
+                    <SettingsList
+                      title="Velocidade"
+                      onBack={() => setSettingsTab("main")}
+                      items={SPEEDS.map((r) => ({
+                        id: r,
+                        label: r === 1 ? "Normal" : `${r}x`,
+                      }))}
+                      activeId={speed}
+                      onPick={(id) => setPlaybackRate(id as number)}
+                    />
+                  )}
                 </div>
               )}
             </div>
