@@ -452,6 +452,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     if (!v) return;
     v.playbackRate = r;
     setSpeed(r);
+    updatePlayerPrefs({ speed: r });
     setSettingsTab(null);
   };
 
