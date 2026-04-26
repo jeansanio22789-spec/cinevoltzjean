@@ -128,22 +128,30 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Vídeo > 20 MB: não dá para baixar via Bot API. Usamos o link público do Telegram
+    // como video_url e seguimos criando/atualizando o filme.
+    let useTelegramPublicLink = false;
     if (video && !externalUrl && (video.file_size ?? 0) > TELEGRAM_DOWNLOAD_LIMIT) {
-      const errMsg = `Vídeo excede 20 MB (${Math.round((video.file_size ?? 0) / 1024 / 1024)} MB). Cole o link direto na legenda.`;
-      await supabase
-        .from("telegram_messages")
-        .update({ processing_status: "error", processing_error: errMsg, processed_at: new Date().toISOString() })
-        .eq("update_id", updateId);
-      return new Response(
-        JSON.stringify({ ok: false, error: errMsg }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      useTelegramPublicLink = true;
     }
 
     // 1. Vídeo
     let videoUrl: string;
     if (externalUrl && !isTelegramInternal) {
       videoUrl = externalUrl;
+    } else if (useTelegramPublicLink) {
+      // Monta link público do Telegram. Para canais privados usa /c/<internal_id>/<msg_id>
+      const chatId = msg.chat?.id as number | undefined;
+      const username = msg.chat?.username as string | undefined;
+      const messageId = msg.message_id as number | undefined;
+      if (username && messageId) {
+        videoUrl = `https://t.me/${username}/${messageId}`;
+      } else if (chatId && messageId) {
+        const internal = String(chatId).replace(/^-100/, "");
+        videoUrl = `https://t.me/c/${internal}/${messageId}`;
+      } else {
+        throw new Error("Vídeo > 20 MB e sem link público disponível");
+      }
     } else {
       const fileInfo = await tg("getFile", { file_id: video.file_id }, LOVABLE_API_KEY, TELEGRAM_API_KEY);
       const dl = await fetch(`${GATEWAY_URL}/file/${fileInfo.file_path}`, {
