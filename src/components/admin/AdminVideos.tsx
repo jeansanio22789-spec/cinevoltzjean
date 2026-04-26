@@ -311,9 +311,8 @@ const AdminVideos = () => {
     });
   };
 
-  // 🚀 Modo "Local": salva o arquivo direto no IndexedDB do navegador.
-  // Não envia nada pra nuvem — fica disponível instantaneamente, mas só
-  // toca no aparelho que importou.
+  // 🚀 Modo "Salvar no app": tenta subir pra nuvem (todos os clientes assistem).
+  // Se falhar (offline / sem permissão), faz fallback pro IndexedDB do aparelho.
   const handleLocalSave = async () => {
     if (selectedFiles.length === 0) {
       toast.error("Selecione pelo menos um arquivo");
@@ -324,25 +323,15 @@ const AdminVideos = () => {
       return;
     }
 
-    const est = await getStorageEstimate();
-    const totalMB = selectedFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024;
-    if (est && est.quotaMB - est.usageMB < totalMB) {
-      toast.error(
-        `Espaço local insuficiente: precisa de ${totalMB.toFixed(0)} MB, disponível ${(
-          est.quotaMB - est.usageMB
-        ).toFixed(0)} MB`,
-      );
-      return;
-    }
-
     const tId = toast.loading(
-      `Salvando ${selectedFiles.length} arquivo(s) no dispositivo…`,
+      `Publicando ${selectedFiles.length} arquivo(s) para todos os clientes…`,
     );
-    let okCount = 0;
+    let cloudCount = 0;
+    let localCount = 0;
+
     for (const file of selectedFiles) {
       try {
-        const localUrl = await saveLocalVideo(file);
-        // Sobe a thumbnail (pequena) pra nuvem pra aparecer pra todo mundo
+        // Sobe a thumbnail (se houver) — sempre vai pra nuvem
         let thumbnailUrl: string | null = null;
         if (thumbnailFile) {
           const ext = thumbnailFile.name.split(".").pop() || "jpg";
@@ -358,31 +347,75 @@ const AdminVideos = () => {
           }
         }
 
+        // Tenta subir o vídeo pra nuvem (fica disponível pra todos)
+        let videoUrl: string | null = null;
+        try {
+          const ext = file.name.split(".").pop() || "mp4";
+          const safeName = file.name.replace(/[^\w.-]+/g, "_").slice(0, 60);
+          const path = `uploads/${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from("videos")
+            .upload(path, file, {
+              upsert: false,
+              cacheControl: "3600",
+              contentType: file.type || `video/${ext}`,
+            });
+          if (upErr) throw upErr;
+          const { data } = supabase.storage.from("videos").getPublicUrl(path);
+          videoUrl = data.publicUrl;
+        } catch (cloudErr) {
+          console.warn("Upload pra nuvem falhou, salvando local:", cloudErr);
+          // Fallback: salva no aparelho (toca só aqui)
+          const est = await getStorageEstimate();
+          const sizeMB = file.size / 1024 / 1024;
+          if (est && est.quotaMB - est.usageMB < sizeMB) {
+            throw new Error(
+              `Sem internet pra nuvem e sem espaço local (${sizeMB.toFixed(0)} MB).`,
+            );
+          }
+          videoUrl = await saveLocalVideo(file);
+          localCount++;
+        }
+
         const { error } = await supabase.from("movies").insert({
           title: form.title,
-          video_url: localUrl,
+          video_url: videoUrl,
           thumbnail_url: thumbnailUrl,
           genre: form.genre,
           description: form.description,
           status: "published",
         });
         if (error) throw error;
-        okCount++;
+        if (!videoUrl?.startsWith("local://")) cloudCount++;
       } catch (e) {
-        console.error("Erro ao salvar local:", e);
+        console.error("Erro ao salvar:", e);
       }
     }
+
     toast.dismiss(tId);
-    if (okCount > 0) {
-      toast.success(
-        `⚡ ${okCount} vídeo(s) publicado(s) instantaneamente (modo local)`,
-      );
+    const total = cloudCount + localCount;
+    if (total > 0) {
+      if (cloudCount > 0 && localCount === 0) {
+        toast.success(
+          `☁️ ${cloudCount} vídeo(s) publicado(s) para todos os clientes`,
+        );
+      } else if (localCount > 0 && cloudCount === 0) {
+        toast.warning(
+          `📱 ${localCount} vídeo(s) salvo(s) só neste aparelho (nuvem indisponível)`,
+        );
+      } else {
+        toast.success(
+          `☁️ ${cloudCount} na nuvem · 📱 ${localCount} só neste aparelho`,
+        );
+      }
       setSelectedFiles([]);
       setThumbnailFile(null);
       setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
       fetchVideos();
     } else {
-      toast.error("Não foi possível salvar localmente");
+      toast.error("Não foi possível publicar");
     }
   };
 
@@ -510,7 +543,29 @@ const AdminVideos = () => {
           return "video.mp4";
         }
       })();
-      const localUrl = await saveLocalBlob(blob, filename, blob.type);
+      // Tenta subir o blob baixado pra nuvem (todos os clientes assistem)
+      let videoUrl: string | null = null;
+      let savedToCloud = false;
+      try {
+        const safeName = filename.replace(/[^\w.-]+/g, "_").slice(0, 60);
+        const path = `uploads/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("videos")
+          .upload(path, blob, {
+            upsert: false,
+            cacheControl: "3600",
+            contentType: blob.type || "video/mp4",
+          });
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from("videos").getPublicUrl(path);
+        videoUrl = data.publicUrl;
+        savedToCloud = true;
+      } catch (cloudErr) {
+        console.warn("Upload pra nuvem falhou, salvando local:", cloudErr);
+        videoUrl = await saveLocalBlob(blob, filename, blob.type);
+      }
 
       // Sobe a thumbnail se houver
       let thumbnailUrl: string | null = null;
@@ -528,7 +583,7 @@ const AdminVideos = () => {
 
       const { error } = await supabase.from("movies").insert({
         title: form.title,
-        video_url: localUrl,
+        video_url: videoUrl,
         thumbnail_url: thumbnailUrl,
         genre: form.genre,
         description: form.description,
@@ -537,7 +592,11 @@ const AdminVideos = () => {
       if (error) throw error;
 
       toast.dismiss(tId);
-      toast.success(`📥 Baixado e salvo no aparelho (${sizeMB.toFixed(1)} MB)`);
+      if (savedToCloud) {
+        toast.success(`☁️ Baixado e publicado para todos (${sizeMB.toFixed(1)} MB)`);
+      } else {
+        toast.warning(`📱 Nuvem indisponível — salvo só neste aparelho (${sizeMB.toFixed(1)} MB)`);
+      }
       setLinkUrl("");
       setThumbnailFile(null);
       setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
