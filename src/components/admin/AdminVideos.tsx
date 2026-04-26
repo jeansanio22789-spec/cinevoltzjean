@@ -80,6 +80,41 @@ const AdminVideos = () => {
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [recognizingTitle, setRecognizingTitle] = useState(false);
+
+  // Lê o título escrito na capa via IA com visão (OCR semântico)
+  const recognizeTitleFromCover = async (file: File) => {
+    setRecognizingTitle(true);
+    try {
+      const imageBase64 = await fileToBase64(file);
+      const { data, error } = await supabase.functions.invoke(
+        "recognize-cover-title",
+        { body: { imageBase64, mimeType: file.type || "image/jpeg" } },
+      );
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const title = (data?.title || "").trim();
+      if (!title) {
+        toast.warning("Não consegui ler nenhum título nessa capa.");
+        return;
+      }
+      setForm((prev) => {
+        if (prev.title.trim()) return prev; // não sobrescreve digitado
+        return { ...prev, title };
+      });
+      toast.success(
+        data?.confidence === "high"
+          ? `Título lido da capa: "${title}"`
+          : `Título lido (confiança ${data?.confidence}): "${title}" — confira`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Falha ao ler capa";
+      toast.error(msg);
+    } finally {
+      setRecognizingTitle(false);
+    }
+  };
 
   const fetchVideos = async () => {
     const { data, error } = await supabase
