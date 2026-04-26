@@ -183,7 +183,7 @@ const AdminTelegramImport = () => {
           <Server className="w-4 h-4 text-primary" />
           <h2 className="font-bold text-sm">Worker MTProto Externo</h2>
           {workerStatus === "ok" && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary">
               <CheckCircle2 className="w-3 h-3" /> ONLINE
             </span>
           )}
@@ -312,8 +312,8 @@ const AdminTelegramImport = () => {
         </div>
 
         {lastResult?.ok && (
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs">
-            <p className="font-bold text-emerald-500 mb-1">✓ Importado</p>
+          <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-xs">
+            <p className="font-bold text-primary mb-1">✓ Importado</p>
             <p className="text-muted-foreground break-all">
               <span className="text-foreground">URL:</span> {lastResult.stream_url}
             </p>
