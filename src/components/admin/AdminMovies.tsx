@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2 } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2, Send, Users } from "lucide-react";
+import MovieAccessManager from "./MovieAccessManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { buildShareLink } from "@/lib/videoUrl";
@@ -9,6 +10,7 @@ interface Movie {
   id: string;
   title: string;
   video_url: string | null;
+  telegram_url: string | null;
   thumbnail_url: string | null;
   description: string | null;
   genre: string | null;
@@ -23,6 +25,7 @@ const AdminMovies = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Movie | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [accessFor, setAccessFor] = useState<Movie | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [importingTg, setImportingTg] = useState(false);
@@ -30,6 +33,7 @@ const AdminMovies = () => {
   const [form, setForm] = useState({
     title: "",
     video_url: "",
+    telegram_url: "",
     thumbnail_url: "",
     description: "",
     genre: "Ação",
@@ -59,7 +63,7 @@ const AdminMovies = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", video_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft" });
+    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft" });
     setShowForm(true);
   };
 
@@ -68,6 +72,7 @@ const AdminMovies = () => {
     setForm({
       title: movie.title,
       video_url: movie.video_url || "",
+      telegram_url: movie.telegram_url || "",
       thumbnail_url: movie.thumbnail_url || "",
       description: movie.description || "",
       genre: movie.genre || "Ação",
