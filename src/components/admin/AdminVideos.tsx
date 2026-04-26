@@ -537,8 +537,17 @@ const AdminVideos = () => {
               Enviar e Publicar
               {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
             </button>
-            <p className="text-xs text-muted-foreground self-center">
-              Você pode adicionar mais arquivos enquanto outros estão enviando.
+            <button
+              onClick={handleLocalSave}
+              disabled={selectedFiles.length === 0}
+              className="px-6 py-2 bg-accent text-accent-foreground rounded text-sm font-semibold hover:bg-accent/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              title="Salva no próprio aparelho — não sobe pra nuvem. Só você assiste neste celular."
+            >
+              <Zap className="w-4 h-4" />
+              Salvar Local (Instantâneo)
+            </button>
+            <p className="text-xs text-muted-foreground self-center w-full sm:w-auto">
+              💡 <strong>Local</strong>: instantâneo, mas só toca neste aparelho. <strong>Enviar</strong>: sobe pra nuvem, todo mundo vê.
             </p>
           </div>
         </div>
