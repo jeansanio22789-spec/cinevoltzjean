@@ -26,10 +26,7 @@ export const useMovies = () => {
         .select("*")
         .eq("status", "published")
         .order("created_at", { ascending: false });
-      const publishedMovies = ((data as DbMovie[]) || []).filter(
-        (movie) => !movie.video_url?.startsWith("local://"),
-      );
-      setMovies(publishedMovies);
+      setMovies((data as DbMovie[]) || []);
       setLoading(false);
     };
     fetch();
