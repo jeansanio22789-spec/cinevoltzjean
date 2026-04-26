@@ -68,15 +68,24 @@ const AdminTelegramImport = () => {
   const [meta, setMeta] = useState<AIMetadata | null>(null);
   const [thumbOverride, setThumbOverride] = useState("");
 
+  // Descoberta de grupos
+  const [savedChatId, setSavedChatId] = useState("");
+  const [savedChatTitle, setSavedChatTitle] = useState("");
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveredChats, setDiscoveredChats] = useState<DiscoveredChat[]>([]);
+  const [discoverHint, setDiscoverHint] = useState("");
+
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
         .from("platform_settings")
         .select("key, value")
-        .in("key", [WORKER_URL_KEY, WORKER_TOKEN_KEY]);
+        .in("key", [WORKER_URL_KEY, WORKER_TOKEN_KEY, DORAMAS_CHAT_KEY, DORAMAS_CHAT_TITLE_KEY]);
       const map = new Map((data || []).map((r) => [r.key, r.value || ""]));
       setWorkerUrl(map.get(WORKER_URL_KEY) || "");
       setWorkerToken(map.get(WORKER_TOKEN_KEY) || "");
+      setSavedChatId(map.get(DORAMAS_CHAT_KEY) || "");
+      setSavedChatTitle(map.get(DORAMAS_CHAT_TITLE_KEY) || "");
       setLoadingConfig(false);
     };
     load();
