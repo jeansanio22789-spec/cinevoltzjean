@@ -39,6 +39,7 @@ const Index = () => {
       <HeroSection movie={movies[0] ?? null} />
 
       <div className="relative z-10 py-6">
+        <AdminUploadsRail />
         <UpcomingPremieres />
 
         <div className="px-4 md:px-12 mb-6">
