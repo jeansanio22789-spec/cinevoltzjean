@@ -431,6 +431,8 @@ const AdminVideos = () => {
       toast.error(msg);
     }
   };
+
+  const handleDelete = async (id: string) => {
     if (!confirm("Excluir este vídeo?")) return;
     // Se for vídeo local, limpa o IndexedDB também
     const target = videos.find((v) => v.id === id);
