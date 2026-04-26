@@ -35,17 +35,12 @@ const buildEmbedUrl = (url: string | null | undefined): string | null => {
 const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
   const embedUrl = useMemo(() => buildEmbedUrl(movie.telegram_url), [movie.telegram_url]);
   const [loaded, setLoaded] = useState(false);
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importedUrl, setImportedUrl] = useState<string | null>(movie.video_url || null);
 
   useEffect(() => {
     setLoaded(false);
-    setLoadTimedOut(false);
-    const timer = window.setTimeout(() => {
-      setLoadTimedOut(true);
-      setLoaded(true);
-    }, 8000);
+    const timer = window.setTimeout(() => setLoaded(true), 5000);
     return () => window.clearTimeout(timer);
   }, [embedUrl]);
 
@@ -172,15 +167,6 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 pointer-events-none">
             <Loader2 className="w-8 h-8 text-white animate-spin" />
             <p className="text-white/80 text-xs">Carregando player...</p>
-          </div>
-        )}
-
-        {loadTimedOut && !importing && (
-          <div className="absolute inset-x-4 bottom-24 z-30 rounded-lg bg-card/95 p-4 text-card-foreground shadow-2xl backdrop-blur">
-            <p className="text-sm font-bold">O Telegram bloqueou o player interno.</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Tente importar para tocar no player do app. Se o arquivo for grande, envie o MP4 pelo painel admin.
-            </p>
           </div>
         )}
 
