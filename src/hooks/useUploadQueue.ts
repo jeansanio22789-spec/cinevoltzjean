@@ -127,8 +127,10 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      chunkSize: 16 * 1024 * 1024, // 16MB por chunk
-      parallelUploads: 4, // 4 conexões simultâneas
+      // Supabase Storage TUS: precisa ser exatamente 6MB por chunk
+      // (com chunks maiores, ele rejeita partes intermediárias).
+      // O ganho de velocidade vem de enviar VÁRIOS jobs em paralelo (já fazemos).
+      chunkSize: 6 * 1024 * 1024,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         const now = Date.now();
