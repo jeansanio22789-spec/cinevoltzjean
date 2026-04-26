@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Captions,
+  Languages,
   Loader2,
   Maximize,
   Minimize,
@@ -9,10 +11,31 @@ import {
   RotateCcw,
   RotateCw,
   Settings,
+  Sparkles,
   Volume2,
   VolumeX,
 } from "lucide-react";
+import Hls from "hls.js";
 import { cn } from "@/lib/utils";
+
+interface QualityLevel {
+  index: number; // -1 = auto
+  height: number; // 0 = auto
+  bitrate: number;
+  label: string;
+}
+
+interface AudioTrack {
+  id: number;
+  name: string;
+  lang?: string;
+}
+
+interface SubtitleTrack {
+  id: number;
+  name: string;
+  lang?: string;
+}
 
 interface VideoPlayerProps {
   src: string;
