@@ -295,7 +295,10 @@ const AdminVideoLibrary = () => {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="text-xs font-mono">{r.chat_id}</TableCell>
+                          <TableCell className="text-xs">
+                            <div className="font-medium truncate max-w-[140px]">{chatLabel(String(r.chat_id))}</div>
+                            <div className="text-[10px] font-mono text-muted-foreground truncate">{r.chat_id}</div>
+                          </TableCell>
                           <TableCell className="text-xs">{formatDuration(r.duration)}</TableCell>
                           <TableCell className="text-xs">{formatBytes(r.file_size)}</TableCell>
                           <TableCell>
