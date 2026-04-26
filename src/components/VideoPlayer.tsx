@@ -840,6 +840,13 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                       onPick={(id) => {
                         setCurrentSub(id);
                         if (hlsRef.current) hlsRef.current.subtitleTrack = id;
+                        // 💾 Salva preferência ("off" ou idioma)
+                        if (id === -1) {
+                          updatePlayerPrefs({ subLang: "off", subName: undefined });
+                        } else {
+                          const t = subTracks.find((tr) => tr.id === id);
+                          updatePlayerPrefs({ subLang: t?.lang, subName: t?.name });
+                        }
                         setSettingsTab(null);
                       }}
                     />
