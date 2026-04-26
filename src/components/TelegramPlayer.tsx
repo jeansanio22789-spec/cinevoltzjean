@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Download, ExternalLink, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { resolveVideoSource } from "@/lib/videoUrl";
+import { useEffect, useMemo } from "react";
+import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 
 interface TelegramPlayerProps {
   movie: {
@@ -20,173 +17,80 @@ interface TelegramPlayerProps {
   onBack: () => void;
 }
 
-const buildEmbedUrl = (url: string | null | undefined): string | null => {
+const normalizeTelegramUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
   const clean = url.trim();
-  const post = clean.match(/^https?:\/\/(?:t|telegram)\.me\/([^/?#]+(?:\/\d+)?)\/(\d+)(?:[/?#].*)?$/i);
-  if (post) {
-    return `https://t.me/${post[1]}/${post[2]}?embed=1&mode=tme`;
-  }
-  const channel = clean.match(/^https?:\/\/(?:t|telegram)\.me\/([^/?#]+)\/?$/i);
-  if (channel) return `https://t.me/s/${channel[1]}`;
-  return `${clean}${clean.includes("?") ? "&" : "?"}embed=1&mode=tme`;
+  if (!clean) return null;
+  return clean.replace(/^https?:\/\/telegram\.me\//i, "https://t.me/");
 };
 
 const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
-  const embedUrl = useMemo(() => buildEmbedUrl(movie.telegram_url), [movie.telegram_url]);
-  const [loaded, setLoaded] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [importedUrl, setImportedUrl] = useState<string | null>(movie.video_url || null);
+  const telegramUrl = useMemo(() => normalizeTelegramUrl(movie.telegram_url), [movie.telegram_url]);
 
   useEffect(() => {
-    setLoaded(false);
-    const timer = window.setTimeout(() => setLoaded(true), 5000);
+    if (!telegramUrl) return;
+    const timer = window.setTimeout(() => {
+      window.location.assign(telegramUrl);
+    }, 400);
     return () => window.clearTimeout(timer);
-  }, [embedUrl]);
+  }, [telegramUrl]);
 
-  const handleImport = async () => {
-    if (!movie.telegram_url) return;
-    setImporting(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-fetch`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ url: movie.telegram_url }),
-      });
-
-      const payload = await response.json().catch(() => null) as { video_url?: string; error?: string } | null;
-      const videoUrl = payload?.video_url;
-      if (!response.ok || !videoUrl) {
-        throw new Error(payload?.error || "O Telegram bloqueou a importação desse vídeo.");
-      }
-
-      await supabase.from("movies").update({ video_url: videoUrl }).eq("id", movie.id);
-
-      setImportedUrl(videoUrl);
-      toast.success("Vídeo importado! Tocando aqui mesmo.");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "O Telegram bloqueou a importação desse vídeo.";
-      toast.error("Não deu para tocar esse vídeo dentro do app", {
-        description: msg.includes("message to forward not found")
-          ? "O bot não consegue acessar essa mensagem. Adicione o bot como admin do canal/grupo e tente novamente."
-          : msg,
-      });
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  // Se já foi importado, usa o player nativo
-  if (importedUrl) {
-    const source = resolveVideoSource(importedUrl);
+  if (!telegramUrl) {
     return (
-      <div className="min-h-screen bg-black flex flex-col">
-        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 text-white text-sm font-medium hover:opacity-80"
-          >
-            <ArrowLeft className="w-5 h-5" /> Voltar
-          </button>
-          <h2 className="text-white font-semibold text-sm md:text-base truncate max-w-[60%]">
-            {movie.title}
-          </h2>
-          <div className="w-10" />
-        </div>
-        <div className="flex-1 w-full h-screen flex items-center justify-center">
-          {source?.kind === "video" ? (
-            <video
-              src={source.url}
-              poster={movie.thumbnail_url || undefined}
-              controls
-              autoPlay
-              playsInline
-              className="w-full h-full object-contain bg-black"
-            />
-          ) : (
-            <iframe
-              src={source?.url || importedUrl}
-              className="w-full h-full border-0"
-              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-              allowFullScreen
-              title={movie.title}
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (!embedUrl) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-foreground">
-        Link inválido
+      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-lg font-bold">Link do Telegram inválido</p>
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <div className="flex items-center justify-between px-4 py-4">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-white text-sm font-medium hover:opacity-80"
+          className="inline-flex items-center gap-2 text-sm font-medium text-foreground"
         >
-          <ArrowLeft className="w-5 h-5" /> Voltar
+          <ArrowLeft className="h-5 w-5" /> Voltar
         </button>
-        <h2 className="text-white font-semibold text-sm md:text-base truncate max-w-[55%]">
-          {movie.title}
-        </h2>
+        <h1 className="max-w-[58%] truncate text-sm font-bold md:text-base">{movie.title}</h1>
         <a
-          href={movie.telegram_url ?? "#"}
-          target="_blank"
+          href={telegramUrl}
           rel="noopener noreferrer"
-          className="text-white/80 hover:text-white text-xs flex items-center gap-1"
-          title="Abrir no Telegram"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-foreground"
+          aria-label="Abrir filme"
         >
-          <ExternalLink className="w-4 h-4" />
+          <ExternalLink className="h-5 w-5" />
         </a>
       </div>
 
-      <div className="flex-1 relative w-full h-screen">
-        <iframe
-          key={embedUrl}
-          src={embedUrl}
-          title={movie.title}
-          className="absolute inset-0 w-full h-full border-0 bg-black"
-          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-          allowFullScreen
-          referrerPolicy="no-referrer"
-          onLoad={() => setLoaded(true)}
-        />
-        {!loaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 pointer-events-none">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-            <p className="text-white/80 text-xs">Carregando player...</p>
-          </div>
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+        {movie.thumbnail_url && (
+          <img
+            src={movie.thumbnail_url}
+            alt={movie.title}
+            className="h-56 w-40 rounded-lg object-cover shadow-2xl"
+          />
         )}
-
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
-          <button
-            onClick={handleImport}
-            disabled={importing}
-            className="bg-primary text-primary-foreground px-5 py-3 rounded-full font-bold text-sm flex items-center gap-2 shadow-2xl disabled:opacity-60 whitespace-nowrap"
-          >
-            {importing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Importando...
-              </>
-            ) : (
-              <>
-                <Download className="w-4 h-4" /> Tocar dentro do app
-              </>
-            )}
-          </button>
+        <Loader2 className="h-9 w-9 animate-spin text-primary" />
+        <div className="space-y-2">
+          <p className="text-xl font-black">Abrindo o filme agora...</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Se não abrir automaticamente, toque no botão abaixo.
+          </p>
         </div>
+        <a
+          href={telegramUrl}
+          rel="noopener noreferrer"
+          className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-md bg-primary px-6 py-4 text-sm font-black text-primary-foreground"
+        >
+          <ExternalLink className="h-4 w-4" /> Abrir filme
+        </a>
       </div>
     </div>
   );
