@@ -16,6 +16,7 @@ import AdminPurchases from "@/components/admin/AdminPurchases";
 import AdminAccessLinks from "@/components/admin/AdminAccessLinks";
 import AdminSponsors from "@/components/admin/AdminSponsors";
 import AdminTelegramImport from "@/components/admin/AdminTelegramImport";
+import AdminVideoLibrary from "@/components/admin/AdminVideoLibrary";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
