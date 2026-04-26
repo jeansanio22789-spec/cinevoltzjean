@@ -85,6 +85,7 @@ const AdminVideoLibrary = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [chatFilter, setChatFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all"); // YYYY-MM
+  const [openChat, setOpenChat] = useState<{ id: number; title: string } | null>(null);
 
   const load = async () => {
     setLoading(true);
