@@ -337,10 +337,32 @@ const runJob = async (job: UploadJob) => {
       (pct, speedMBs, etaSec) => {
         const cur = store.jobs.find((j) => j.id === job.id);
         const keepWarn = cur?.status === "warning";
+
+        // 🔒 Trava a estimativa UMA VEZ, quando temos velocidade estável
+        // (entre 3% e 15% de progresso). Depois disso, NÃO oscila mais.
+        // Só recalcula se a previsão estourou em mais de 50% (rede caiu de vez).
+        let lockedEtaSec = cur?.lockedEtaSec;
+        let lockedEndAt = cur?.lockedEndAt;
+
+        const shouldLockNow =
+          !lockedEndAt && pct >= 3 && pct <= 15 && etaSec > 0 && etaSec < 99999;
+        const shouldRelock =
+          lockedEndAt &&
+          Date.now() > lockedEndAt + 60_000 && // já passou mais de 1min da hora prevista
+          etaSec > 0 &&
+          etaSec < 99999;
+
+        if (shouldLockNow || shouldRelock) {
+          lockedEtaSec = Math.round(etaSec);
+          lockedEndAt = Date.now() + lockedEtaSec * 1000;
+        }
+
         store.update(job.id, {
           progress: pct,
           speedMBs,
           etaSec,
+          lockedEtaSec,
+          lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
         });
       },
