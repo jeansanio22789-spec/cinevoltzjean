@@ -223,27 +223,29 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Download vídeo
-        const dl = await downloadTelegramFile(row.file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
-        if (!dl) {
+        // Download vídeo (em stream — funciona pra arquivos de qualquer tamanho
+        // dentro do limite que a Bot API permitir; passa o stream direto pro
+        // upload, sem carregar tudo em memória).
+        const dl = await downloadTelegramFileStream(row.file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
+        if ('error' in dl) {
           await supabase
             .from('telegram_messages')
             .update({
               processing_status: 'download_failed',
-              processing_error: 'getFile/download falhou',
+              processing_error: dl.error.slice(0, 500),
               processed_at: new Date().toISOString(),
             })
             .eq('update_id', row.update_id);
-          results.push({ update_id: row.update_id, status: 'error', reason: 'Download falhou' });
+          results.push({ update_id: row.update_id, status: 'error', reason: dl.error });
           continue;
         }
 
-        // Upload pro storage
+        // Upload pro storage (passa o stream direto)
         const ext = (dl.path.split('.').pop() || 'mp4').toLowerCase();
         const storagePath = `telegram/${chatId}/${row.message_id}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from('videos')
-          .upload(storagePath, dl.bytes, {
+          .upload(storagePath, dl.stream, {
             contentType: row.mime_type || 'video/mp4',
             upsert: true,
           });
@@ -253,10 +255,10 @@ Deno.serve(async (req) => {
         // Thumbnail (se houver)
         let thumbUrl: string | null = null;
         if (row.thumb_file_id) {
-          const thumbDl = await downloadTelegramFile(row.thumb_file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
-          if (thumbDl) {
+          const thumbBytes = await downloadTelegramFileBytes(row.thumb_file_id, LOVABLE_API_KEY, TELEGRAM_API_KEY);
+          if (thumbBytes) {
             const thumbPath = `telegram/${chatId}/${row.message_id}_thumb.jpg`;
-            await supabase.storage.from('thumbnails').upload(thumbPath, thumbDl.bytes, {
+            await supabase.storage.from('thumbnails').upload(thumbPath, thumbBytes, {
               contentType: 'image/jpeg',
               upsert: true,
             });
