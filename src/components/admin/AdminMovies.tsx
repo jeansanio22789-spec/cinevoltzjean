@@ -423,7 +423,7 @@ const AdminMovies = () => {
                     className="mt-2 w-full flex items-center justify-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-3 py-2 rounded text-xs font-semibold transition-colors disabled:opacity-50"
                   >
                     {importingTg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    Tentar importar do Telegram (se < 20 MB)
+                    Tentar importar do Telegram (se &lt; 20 MB)
                   </button>
                 )}
               </div>
