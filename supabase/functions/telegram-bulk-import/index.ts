@@ -105,11 +105,11 @@ async function extractMetadata(
   return JSON.parse(args);
 }
 
-async function downloadTelegramFile(
+async function downloadTelegramFileStream(
   fileId: string,
   lovableKey: string,
   tgKey: string,
-): Promise<{ bytes: ArrayBuffer; path: string } | null> {
+): Promise<{ stream: ReadableStream<Uint8Array>; path: string } | { error: string }> {
   const fileRes = await fetch(`${GATEWAY_URL}/getFile`, {
     method: 'POST',
     headers: {
@@ -120,7 +120,10 @@ async function downloadTelegramFile(
     body: JSON.stringify({ file_id: fileId }),
   });
   const fileData = await fileRes.json().catch(() => null);
-  if (!fileRes.ok || !fileData?.ok) return null;
+  if (!fileRes.ok || !fileData?.ok) {
+    const desc = fileData?.description || `getFile HTTP ${fileRes.status}`;
+    return { error: desc };
+  }
 
   const path = fileData.result.file_path;
   const dl = await fetch(`${GATEWAY_URL}/file/${path}`, {
@@ -129,8 +132,21 @@ async function downloadTelegramFile(
       'X-Connection-Api-Key': tgKey,
     },
   });
-  if (!dl.ok) return null;
-  return { bytes: await dl.arrayBuffer(), path };
+  if (!dl.ok || !dl.body) {
+    return { error: `download HTTP ${dl.status}` };
+  }
+  return { stream: dl.body, path };
+}
+
+// Thumbnails são pequenas — baixa em memória.
+async function downloadTelegramFileBytes(
+  fileId: string,
+  lovableKey: string,
+  tgKey: string,
+): Promise<ArrayBuffer | null> {
+  const r = await downloadTelegramFileStream(fileId, lovableKey, tgKey);
+  if ('error' in r) return null;
+  return await new Response(r.stream).arrayBuffer();
 }
 
 Deno.serve(async (req) => {
