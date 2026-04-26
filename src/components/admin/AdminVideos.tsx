@@ -507,30 +507,6 @@ const AdminVideos = () => {
                 onRemove={() => removeJob(j.id)}
               />
             ))}
-            {false && (jobs.map((j) => {
-              const badge = statusBadge(j);
-              const Icon = badge.icon;
-              return (
-                <div key={j.id}>
-                  {/* legacy */}
-                </div>
-              );
-            }))}
-
-                  {j.status === "warning" && (
-                    <p className="text-[11px] text-amber-500">
-                      ⚠️ Está demorando mais que 2 minutos, mas continua tentando.
-                    </p>
-                  )}
-
-                  {j.status === "error" && j.errorMsg && (
-                    <p className="text-[11px] text-destructive">
-                      ❌ {j.errorMsg}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </div>
       )}
