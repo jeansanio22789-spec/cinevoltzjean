@@ -90,7 +90,7 @@ const AdminVideoLibrary = () => {
     const { data, error } = await supabase
       .from("telegram_messages")
       .select(
-        "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id",
+        "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id,raw_update",
       )
       .order("created_at", { ascending: false })
       .limit(1000);
