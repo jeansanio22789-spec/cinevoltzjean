@@ -19,7 +19,6 @@ import TestChannels from "./pages/TestChannels.tsx";
 import ChannelView from "./pages/ChannelView.tsx";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import InstallAppPrompt from "@/components/InstallAppPrompt";
-import AdminUploadsFab from "@/components/AdminUploadsFab";
 import { useEffect } from "react";
 import { installAudioUnlock } from "@/lib/audioUnlock";
 import { initUploadQueue } from "@/hooks/useUploadQueue";
