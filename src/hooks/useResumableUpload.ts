@@ -103,7 +103,11 @@ export function useResumableUpload() {
         },
         uploadDataDuringCreation: true,
         removeFingerprintOnSuccess: true,
-        chunkSize: 6 * 1024 * 1024, // 6 MB — exigido pelo Supabase Storage
+        // ⚡ TURBO: chunks grandes + upload paralelo = muito mais rápido
+        // quando o arquivo já está local. 50 MB por chunk e 6 conexões
+        // simultâneas saturam a banda de upload da maioria das redes.
+        chunkSize: 50 * 1024 * 1024, // 50 MB por chunk
+        parallelUploads: 6, // 6 chunks em paralelo
         metadata: {
           bucketName: bucket,
           objectName,
