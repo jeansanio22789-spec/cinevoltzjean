@@ -187,23 +187,8 @@ Deno.serve(async (req) => {
 
     for (const row of pending ?? []) {
       try {
-        const fileSize = row.file_size ?? 0;
-        if (fileSize > MAX_TG_FILE_BYTES) {
-          await supabase
-            .from('telegram_messages')
-            .update({
-              processing_status: 'too_large',
-              processing_error: `Arquivo de ${(fileSize / 1024 / 1024).toFixed(1)}MB excede limite de 20MB da Bot API. Use Worker MTProto.`,
-              processed_at: new Date().toISOString(),
-            })
-            .eq('update_id', row.update_id);
-          results.push({
-            update_id: row.update_id,
-            status: 'skipped',
-            reason: `Arquivo > 20MB (${(fileSize / 1024 / 1024).toFixed(1)}MB)`,
-          });
-          continue;
-        }
+        // Sem mais bloqueio por tamanho — tenta baixar tudo. Se o Telegram
+        // recusar (arquivo > limite da Bot API), o catch grava o erro real.
 
         const caption = row.caption || row.text || '';
         if (!caption.trim()) {
