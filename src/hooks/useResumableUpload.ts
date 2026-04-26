@@ -45,9 +45,54 @@ interface StartOptions {
  * - Permite pausar/continuar manualmente
  * - Persiste o URL do upload no localStorage para retomar entre reloads
  */
+/**
+ * MODO TURBO: upload direto via XHR (uma única requisição HTTP).
+ * Muito mais rápido que TUS porque não tem overhead de criar/finalizar
+ * múltiplos chunks. Usado por padrão; se falhar, cai pro TUS resumível.
+ */
+function tryTurboUpload(args: {
+  file: File;
+  bucket: string;
+  objectName: string;
+  accessToken: string;
+  xhrRef: { current: XMLHttpRequest | null };
+  onProgress: (bytesUploaded: number) => void;
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    args.xhrRef.current = xhr;
+    const url = `${SUPABASE_URL}/storage/v1/object/${args.bucket}/${args.objectName}`;
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("authorization", `Bearer ${args.accessToken}`);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.setRequestHeader("cache-control", "3600");
+    xhr.setRequestHeader(
+      "content-type",
+      args.file.type || "application/octet-stream",
+    );
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) args.onProgress(e.loaded);
+    };
+    xhr.onload = () => {
+      args.xhrRef.current = null;
+      resolve(xhr.status >= 200 && xhr.status < 300);
+    };
+    xhr.onerror = () => {
+      args.xhrRef.current = null;
+      resolve(false);
+    };
+    xhr.onabort = () => {
+      args.xhrRef.current = null;
+      resolve(false);
+    };
+    xhr.send(args.file);
+  });
+}
+
 export function useResumableUpload() {
   const [state, setState] = useState<UploadState>(initialState);
   const uploadRef = useRef<tus.Upload | null>(null);
+  const turboXhrRef = useRef<XMLHttpRequest | null>(null);
   const lastTickRef = useRef<{ time: number; bytes: number } | null>(null);
 
   const reset = useCallback(() => {
@@ -58,6 +103,14 @@ export function useResumableUpload() {
         /* noop */
       }
       uploadRef.current = null;
+    }
+    if (turboXhrRef.current) {
+      try {
+        turboXhrRef.current.abort();
+      } catch {
+        /* noop */
+      }
+      turboXhrRef.current = null;
     }
     lastTickRef.current = null;
     setState(initialState);
