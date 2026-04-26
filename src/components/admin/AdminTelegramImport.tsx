@@ -4,16 +4,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import {
   Loader2, Save, Download, Server, ExternalLink, CheckCircle2,
-  Sparkles, Search, Film, Tv,
+  Sparkles, Search, Film, Tv, Bot, Cpu,
 } from "lucide-react";
 
 const WORKER_URL_KEY = "telegram_worker_url";
 const WORKER_TOKEN_KEY = "telegram_worker_token";
 
-interface WorkerFetchResult {
+type ImportMode = "bot" | "worker";
+
+interface FetchResult {
   ok: boolean;
-  file_id?: string;
   stream_url?: string;
+  video_url?: string;
   caption?: string;
   thumbnail_url?: string;
   duration?: number;
@@ -35,7 +37,10 @@ interface AIMetadata {
 const AdminTelegramImport = () => {
   const { toast } = useToast();
 
-  // Config
+  // Modo de importação
+  const [mode, setMode] = useState<ImportMode>("bot");
+
+  // Config worker (opcional)
   const [workerUrl, setWorkerUrl] = useState("");
   const [workerToken, setWorkerToken] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
@@ -48,7 +53,7 @@ const AdminTelegramImport = () => {
   const [enriching, setEnriching] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
-  const [fetchResult, setFetchResult] = useState<WorkerFetchResult | null>(null);
+  const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [meta, setMeta] = useState<AIMetadata | null>(null);
   const [thumbOverride, setThumbOverride] = useState("");
 
@@ -125,9 +130,41 @@ const AdminTelegramImport = () => {
     }
   };
 
+  const fetchViaBot = async (link: string): Promise<FetchResult> => {
+    const { data, error } = await supabase.functions.invoke("telegram-fetch", {
+      body: { url: link },
+    });
+    if (error) throw new Error(error.message);
+    if (data?.error) throw new Error(data.error);
+    return {
+      ok: true,
+      stream_url: data.video_url,
+      duration: data.duration,
+      size: data.size,
+      caption: data.caption,
+      thumbnail_url: data.thumbnail_url,
+    };
+  };
+
+  const fetchViaWorker = async (link: string): Promise<FetchResult> => {
+    const res = await fetch(`${workerUrl}/import`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
+      },
+      body: JSON.stringify({ url: link }),
+    });
+    const data = (await res.json()) as FetchResult;
+    if (!res.ok || !data.ok || !data.stream_url) {
+      throw new Error(data.error || `Worker retornou ${res.status}`);
+    }
+    return data;
+  };
+
   const fetchFromTelegram = async () => {
-    if (!workerUrl) {
-      toast({ title: "Configure o worker antes", variant: "destructive" });
+    if (mode === "worker" && !workerUrl) {
+      toast({ title: "Configure o worker antes ou troque pro modo Bot", variant: "destructive" });
       return;
     }
     if (!telegramLink.trim()) {
@@ -141,22 +178,13 @@ const AdminTelegramImport = () => {
     setThumbOverride("");
 
     try {
-      const res = await fetch(`${workerUrl}/import`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
-        },
-        body: JSON.stringify({ url: telegramLink.trim() }),
-      });
-      const data = (await res.json()) as WorkerFetchResult;
-      if (!res.ok || !data.ok || !data.stream_url) {
-        throw new Error(data.error || `Worker retornou ${res.status}`);
-      }
+      const data = mode === "bot"
+        ? await fetchViaBot(telegramLink.trim())
+        : await fetchViaWorker(telegramLink.trim());
+
       setFetchResult(data);
       setThumbOverride(data.thumbnail_url || "");
 
-      // Auto-roda IA com o caption
       if (data.caption) {
         await enrichWithAI(data.caption);
       } else {
@@ -244,7 +272,6 @@ const AdminTelegramImport = () => {
         title: "Publicado!",
         description: `${fullTitle} já está no catálogo.`,
       });
-      // Reset
       setTelegramLink("");
       setFetchResult(null);
       setMeta(null);
@@ -268,65 +295,105 @@ const AdminTelegramImport = () => {
     );
   }
 
+  const buscarDisabled =
+    fetching || enriching || publishing || (mode === "worker" && !workerUrl);
+
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Config do worker */}
-      <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <Server className="w-4 h-4 text-primary" />
-          <h2 className="font-bold text-sm">Worker MTProto Externo</h2>
-          {workerStatus === "ok" && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary">
-              <CheckCircle2 className="w-3 h-3" /> ONLINE
+      {/* Seletor de modo */}
+      <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-3">
+        <h2 className="font-bold text-sm">Método de importação</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => setMode("bot")}
+            className={`flex flex-col items-center gap-2 rounded-md border-2 p-4 text-xs font-bold transition ${
+              mode === "bot"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-[hsl(var(--admin-border))] text-muted-foreground"
+            }`}
+          >
+            <Bot className="w-5 h-5" />
+            Bot API (padrão)
+            <span className="text-[10px] font-normal opacity-70 text-center">
+              Funciona se o bot for membro do grupo
             </span>
-          )}
-          {workerStatus === "down" && (
-            <span className="text-[10px] font-bold text-destructive">OFFLINE</span>
-          )}
-        </div>
-
-        <div className="grid gap-3">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-              URL do worker
-            </label>
-            <Input
-              value={workerUrl}
-              onChange={(e) => setWorkerUrl(e.target.value)}
-              placeholder="https://meu-worker.up.railway.app"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-              Token (opcional)
-            </label>
-            <Input
-              type="password"
-              value={workerToken}
-              onChange={(e) => setWorkerToken(e.target.value)}
-              placeholder="••••••••"
-              className="mt-1"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={saveConfig}
-              disabled={savingConfig}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
-            >
-              {savingConfig ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-              Salvar
-            </button>
-            <button
-              onClick={testWorker}
-              className="inline-flex items-center gap-2 rounded-md bg-muted px-4 py-2 text-xs font-bold text-foreground"
-            >
-              <ExternalLink className="w-3 h-3" /> Testar conexão
-            </button>
-          </div>
+          </button>
+          <button
+            onClick={() => setMode("worker")}
+            className={`flex flex-col items-center gap-2 rounded-md border-2 p-4 text-xs font-bold transition ${
+              mode === "worker"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-[hsl(var(--admin-border))] text-muted-foreground"
+            }`}
+          >
+            <Cpu className="w-5 h-5" />
+            Worker MTProto
+            <span className="text-[10px] font-normal opacity-70 text-center">
+              VPS externa (avançado)
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* Config do worker (só aparece no modo worker) */}
+      {mode === "worker" && (
+        <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4 text-primary" />
+            <h2 className="font-bold text-sm">Worker MTProto Externo</h2>
+            {workerStatus === "ok" && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary">
+                <CheckCircle2 className="w-3 h-3" /> ONLINE
+              </span>
+            )}
+            {workerStatus === "down" && (
+              <span className="text-[10px] font-bold text-destructive">OFFLINE</span>
+            )}
+          </div>
+
+          <div className="grid gap-3">
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                URL do worker
+              </label>
+              <Input
+                value={workerUrl}
+                onChange={(e) => setWorkerUrl(e.target.value)}
+                placeholder="https://meu-worker.up.railway.app"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                Token (opcional)
+              </label>
+              <Input
+                type="password"
+                value={workerToken}
+                onChange={(e) => setWorkerToken(e.target.value)}
+                placeholder="••••••••"
+                className="mt-1"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={saveConfig}
+                disabled={savingConfig}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {savingConfig ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                Salvar
+              </button>
+              <button
+                onClick={testWorker}
+                className="inline-flex items-center gap-2 rounded-md bg-muted px-4 py-2 text-xs font-bold text-foreground"
+              >
+                <ExternalLink className="w-3 h-3" /> Testar conexão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Etapa 1: cola link */}
       <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
@@ -348,7 +415,7 @@ const AdminTelegramImport = () => {
 
         <button
           onClick={fetchFromTelegram}
-          disabled={fetching || enriching || publishing || !workerUrl}
+          disabled={buscarDisabled}
           className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50 w-full sm:w-auto"
         >
           {fetching ? (
@@ -365,6 +432,12 @@ const AdminTelegramImport = () => {
             </>
           )}
         </button>
+
+        {mode === "worker" && !workerUrl && (
+          <p className="text-[11px] text-destructive">
+            Configure e salve a URL do worker acima pra habilitar.
+          </p>
+        )}
       </div>
 
       {/* Etapa 2: preview + revisão */}
@@ -380,7 +453,6 @@ const AdminTelegramImport = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            {/* Capa */}
             <div className="shrink-0 w-full sm:w-40">
               {thumbOverride || fetchResult.thumbnail_url ? (
                 <img
@@ -401,7 +473,6 @@ const AdminTelegramImport = () => {
               />
             </div>
 
-            {/* Campos */}
             <div className="flex-1 space-y-3 min-w-0">
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
@@ -496,23 +567,25 @@ const AdminTelegramImport = () => {
           <div className="flex gap-2">
             <button
               onClick={publish}
-              disabled={publishing || enriching}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50 flex-1"
+              disabled={publishing}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-black text-primary-foreground disabled:opacity-50"
             >
               {publishing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <CheckCircle2 className="w-4 h-4" />
               )}
-              {publishing ? "Publicando…" : "Publicar no catálogo"}
+              Publicar no catálogo
             </button>
             <button
-              onClick={() => fetchResult.caption && enrichWithAI(fetchResult.caption)}
-              disabled={enriching || !fetchResult.caption}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-muted px-4 py-3 text-sm font-bold text-foreground disabled:opacity-50"
-              title="Re-rodar IA"
+              onClick={() => {
+                setFetchResult(null);
+                setMeta(null);
+                setThumbOverride("");
+              }}
+              className="rounded-md bg-muted px-4 py-2.5 text-sm font-bold text-foreground"
             >
-              <Sparkles className="w-4 h-4" />
+              Cancelar
             </button>
           </div>
         </div>
