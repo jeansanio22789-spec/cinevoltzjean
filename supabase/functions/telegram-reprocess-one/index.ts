@@ -128,16 +128,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Vídeo > 20 MB: não dá para baixar via Bot API. Usamos o link público do Telegram
+    // como video_url e seguimos criando/atualizando o filme.
+    let useTelegramPublicLink = false;
     if (video && !externalUrl && (video.file_size ?? 0) > TELEGRAM_DOWNLOAD_LIMIT) {
-      const errMsg = `Vídeo excede 20 MB (${Math.round((video.file_size ?? 0) / 1024 / 1024)} MB). Cole o link direto na legenda.`;
-      await supabase
-        .from("telegram_messages")
-        .update({ processing_status: "error", processing_error: errMsg, processed_at: new Date().toISOString() })
-        .eq("update_id", updateId);
-      return new Response(
-        JSON.stringify({ ok: false, error: errMsg }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      useTelegramPublicLink = true;
     }
 
     // 1. Vídeo
