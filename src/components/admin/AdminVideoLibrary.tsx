@@ -102,11 +102,25 @@ const AdminVideoLibrary = () => {
     load();
   }, []);
 
+  const chatTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    rows.forEach((r) => {
+      const id = String(r.chat_id);
+      if (map.has(id)) return;
+      const title = extractChatTitle(r.raw_update);
+      if (title) map.set(id, title);
+    });
+    return map;
+  }, [rows]);
+
+  const chatLabel = (id: string) => chatTitleMap.get(id) ?? id;
+
   const chats = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((r) => set.add(String(r.chat_id)));
-    return Array.from(set);
-  }, [rows]);
+    return Array.from(set).sort((a, b) => chatLabel(a).localeCompare(chatLabel(b)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, chatTitleMap]);
 
   const months = useMemo(() => {
     const set = new Set<string>();
