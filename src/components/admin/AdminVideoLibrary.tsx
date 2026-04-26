@@ -33,7 +33,15 @@ interface TgRow {
   processing_error: string | null;
   created_at: string;
   movie_id: string | null;
+  raw_update: any;
 }
+
+const extractChatTitle = (raw: any): string | null => {
+  const msg = raw?.message ?? raw?.channel_post ?? raw?.edited_message ?? raw?.my_chat_member;
+  const chat = msg?.chat;
+  if (!chat) return null;
+  return chat.title ?? chat.username ?? (chat.first_name ? `${chat.first_name}${chat.last_name ? " " + chat.last_name : ""}` : null);
+};
 
 const MONTHS_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -82,7 +90,7 @@ const AdminVideoLibrary = () => {
     const { data, error } = await supabase
       .from("telegram_messages")
       .select(
-        "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id",
+        "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id,raw_update",
       )
       .order("created_at", { ascending: false })
       .limit(1000);
@@ -94,11 +102,25 @@ const AdminVideoLibrary = () => {
     load();
   }, []);
 
+  const chatTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    rows.forEach((r) => {
+      const id = String(r.chat_id);
+      if (map.has(id)) return;
+      const title = extractChatTitle(r.raw_update);
+      if (title) map.set(id, title);
+    });
+    return map;
+  }, [rows]);
+
+  const chatLabel = (id: string) => chatTitleMap.get(id) ?? id;
+
   const chats = useMemo(() => {
     const set = new Set<string>();
     rows.forEach((r) => set.add(String(r.chat_id)));
-    return Array.from(set);
-  }, [rows]);
+    return Array.from(set).sort((a, b) => chatLabel(a).localeCompare(chatLabel(b)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, chatTitleMap]);
 
   const months = useMemo(() => {
     const set = new Set<string>();
@@ -187,7 +209,10 @@ const AdminVideoLibrary = () => {
             <SelectItem value="all">Todos os canais</SelectItem>
             {chats.map((c) => (
               <SelectItem key={c} value={c}>
-                {c}
+                {chatLabel(c)}
+                {chatTitleMap.has(c) && (
+                  <span className="text-muted-foreground ml-2 text-xs">({c})</span>
+                )}
               </SelectItem>
             ))}
           </SelectContent>
@@ -270,7 +295,10 @@ const AdminVideoLibrary = () => {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="text-xs font-mono">{r.chat_id}</TableCell>
+                          <TableCell className="text-xs">
+                            <div className="font-medium truncate max-w-[140px]">{chatLabel(String(r.chat_id))}</div>
+                            <div className="text-[10px] font-mono text-muted-foreground truncate">{r.chat_id}</div>
+                          </TableCell>
                           <TableCell className="text-xs">{formatDuration(r.duration)}</TableCell>
                           <TableCell className="text-xs">{formatBytes(r.file_size)}</TableCell>
                           <TableCell>
