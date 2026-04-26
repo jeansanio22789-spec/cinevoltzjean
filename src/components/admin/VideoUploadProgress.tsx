@@ -112,7 +112,7 @@ const VideoUploadProgress = ({ state, onPause, onResume, onCancel, onPick }: Pro
             • {fmtEta(state)}
           </span>
         )}
-        {isRetrying && <span className="text-yellow-600 dark:text-yellow-500">Reconectando...</span>}
+        {isRetrying && <span className="text-primary font-semibold">Reconectando...</span>}
         {isPaused && <span>Pausado</span>}
       </div>
 
