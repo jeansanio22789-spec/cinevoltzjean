@@ -158,8 +158,8 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
             {j.speedMBs > 0 && (
               <span className="text-right">
                 ⚡ {j.speedMBs.toFixed(1)} MB/s
-                {j.etaSec > 0 && j.etaSec < 99999 && (
-                  <> • ⏱ falta {fmtEta(j.etaSec)}</>
+                {displayEta > 0 && displayEta < 99999 && (
+                  <> • ⏱ falta {fmtEta(displayEta)}</>
                 )}
               </span>
             )}
@@ -169,7 +169,7 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
 
       {j.status === "warning" && (
         <p className="text-[11px] text-amber-500">
-          ⚠️ Está demorando mais que 2 minutos, mas continua tentando.
+          ⚠️ Conexão lenta — o envio continua em segundo plano mesmo se você sair do app.
         </p>
       )}
 
