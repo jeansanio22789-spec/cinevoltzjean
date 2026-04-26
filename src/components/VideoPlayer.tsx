@@ -190,8 +190,36 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [subTracks, setSubTracks] = useState<SubtitleTrack[]>([]);
   const [currentSub, setCurrentSub] = useState<number>(-1);
 
+  // Resolução nativa do <video> (para MP4: descobre se é 4K/1080p/etc)
+  const [nativeHeight, setNativeHeight] = useState<number>(0);
+
   const isHls = useMemo(() => /\.m3u8(\?.*)?$/i.test(src), [src]);
   const showSettings = settingsTab !== null;
+
+  // 📺 Lista de qualidades exibida no menu.
+  // Para HLS: usa as do manifest (já em `qualities`).
+  // Para MP4: gera opções fixas até a resolução nativa do arquivo
+  //   (downscale via CSS — útil em telas pequenas e p/ economizar dados/bateria).
+  const FALLBACK_HEIGHTS = [2160, 1440, 1080, 720, 480, 360];
+  const displayQualities: QualityLevel[] = useMemo(() => {
+    if (qualities.length > 0) return qualities;
+    if (!nativeHeight) return [];
+    return FALLBACK_HEIGHTS.filter((h) => h <= nativeHeight).map((h, i) => ({
+      index: i,
+      height: h,
+      bitrate: 0,
+      label: labelForHeight(h),
+    }));
+  }, [qualities, nativeHeight]);
+
+  // Altura efetiva para aplicar downscale CSS (apenas MP4 e quando não-Auto)
+  const cssScaleHeight = useMemo(() => {
+    if (qualities.length > 0) return 0; // HLS lida sozinho
+    if (currentQuality === -1) return 0; // Auto = nativo
+    const q = displayQualities.find((d) => d.index === currentQuality);
+    return q?.height ?? 0;
+  }, [qualities.length, currentQuality, displayQualities]);
+
 
   // ---- Auto-hide controles ----
   const armHide = useCallback(() => {
@@ -209,7 +237,11 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onTime = () => setCurrent(v.currentTime);
-    const onMeta = () => setDuration(v.duration || 0);
+    const onMeta = () => {
+      setDuration(v.duration || 0);
+      // Detecta resolução nativa do arquivo (para MP4 popular menu de qualidade)
+      if (v.videoHeight) setNativeHeight(v.videoHeight);
+    };
     const onWait = () => setWaiting(true);
     const onPlaying = () => setWaiting(false);
     const onProgress = () => {
@@ -247,7 +279,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     };
   }, []);
 
-  // ---- Aplica preferências (volume/velocidade) ao trocar de filme ----
+  // ---- Aplica preferências (volume/velocidade/qualidade) ao trocar de filme ----
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -255,7 +287,20 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     if (typeof prefs.volume === "number") v.volume = prefs.volume;
     if (typeof prefs.muted === "boolean") v.muted = prefs.muted;
     if (typeof prefs.speed === "number") v.playbackRate = prefs.speed;
+    // Reseta qualidade — o useEffect [nativeHeight] aplica a preferência salva
+    setCurrentQuality(-1);
+    setNativeHeight(0);
   }, [src]);
+
+  // Aplica preferência de qualidade salva quando a resolução nativa é detectada (MP4)
+  useEffect(() => {
+    if (qualities.length > 0) return; // HLS lida em outro effect
+    if (!nativeHeight) return;
+    const prefs = getPlayerPrefs();
+    if (!prefs.qualityHeight) return;
+    const idx = pickQualityIndex(displayQualities, prefs.qualityHeight);
+    if (idx !== -1) setCurrentQuality(idx);
+  }, [nativeHeight, qualities.length, displayQualities]);
 
   // ---- HLS: streams adaptativos com qualidade até 4K + faixas de áudio/legendas ----
   useEffect(() => {
@@ -717,7 +762,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                     4K
                   </span>
                 )}
-                {currentQuality !== -1 && qualities[currentQuality]?.height >= 2160 && (
+                {currentQuality !== -1 && (displayQualities.find((d) => d.index === currentQuality)?.height ?? 0) >= 2160 && (
                   <span className="text-[9px] font-bold bg-accent text-accent-foreground px-1 py-0.5 rounded leading-none">
                     4K
                   </span>
@@ -740,11 +785,15 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                           currentQuality === -1
                             ? autoActiveHeight
                               ? `Auto (${autoActiveHeight}p)`
-                              : "Auto"
-                            : qualities[currentQuality]?.label || "—"
+                              : nativeHeight
+                                ? `Auto (${nativeHeight}p)`
+                                : "Auto"
+                            : (qualities[currentQuality]?.label ??
+                                displayQualities.find((d) => d.index === currentQuality)?.label ??
+                                "—")
                         }
                         onClick={() => setSettingsTab("quality")}
-                        disabled={qualities.length === 0}
+                        disabled={displayQualities.length === 0}
                       />
                       <SettingsRow
                         icon={<Languages className="w-4 h-4" />}
@@ -783,9 +832,13 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                         {
                           id: -1,
                           label: "Auto",
-                          hint: autoActiveHeight ? `${autoActiveHeight}p` : undefined,
+                          hint: autoActiveHeight
+                            ? `${autoActiveHeight}p`
+                            : nativeHeight
+                              ? `${nativeHeight}p`
+                              : undefined,
                         },
-                        ...qualities.map((q) => ({
+                        ...displayQualities.map((q) => ({
                           id: q.index,
                           label: q.label,
                           hint: q.height >= 2160 ? "4K" : q.height >= 1080 ? "HD" : undefined,
@@ -796,7 +849,10 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                         setCurrentQuality(id);
                         if (hlsRef.current) hlsRef.current.currentLevel = id;
                         // 💾 Salva preferência (altura ou 0 = Auto)
-                        const h = id === -1 ? 0 : qualities.find((q) => q.index === id)?.height ?? 0;
+                        const h =
+                          id === -1
+                            ? 0
+                            : displayQualities.find((q) => q.index === id)?.height ?? 0;
                         updatePlayerPrefs({ qualityHeight: h });
                         setSettingsTab(null);
                       }}
