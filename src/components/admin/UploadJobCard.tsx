@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -29,12 +30,13 @@ const statusBadge = (j: UploadJob) => {
     case "queued":
       return { label: "Na fila", icon: Clock, color: "text-muted-foreground bg-muted" };
     case "uploading":
-      return { label: "Enviando", icon: Zap, color: "text-primary bg-primary/15" };
+      return { label: "Em andamento", icon: Zap, color: "text-primary bg-primary/15" };
     case "saving":
       return { label: "Publicando", icon: Loader2, color: "text-primary bg-primary/15" };
     case "warning":
+      // Continua marcando como "Em andamento" (não some), só fica âmbar pra indicar lentidão
       return {
-        label: "Demorando…",
+        label: "Em andamento",
         icon: AlertTriangle,
         color: "text-amber-500 bg-amber-500/15",
       };
@@ -56,6 +58,30 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
   const Icon = badge.icon;
   const showProgress =
     j.status === "uploading" || j.status === "saving" || j.status === "warning";
+
+  // Snapshot do ETA / hora prevista no momento em que o upload trava ("warning").
+  // Assim o tempo estimado e a hora prevista ficam PARADOS enquanto a rede está
+  // lenta, em vez de ficar oscilando e confundindo.
+  const frozenRef = useRef<{ etaSec: number; endLabel: string } | null>(null);
+  useEffect(() => {
+    if (j.status === "warning") {
+      if (!frozenRef.current && j.etaSec > 0 && j.etaSec < 99999) {
+        frozenRef.current = {
+          etaSec: j.etaSec,
+          endLabel: fmtEndTime(j.etaSec),
+        };
+      }
+    } else {
+      frozenRef.current = null;
+    }
+  }, [j.status, j.etaSec]);
+
+  const displayEta =
+    j.status === "warning" && frozenRef.current ? frozenRef.current.etaSec : j.etaSec;
+  const displayEndLabel =
+    j.status === "warning" && frozenRef.current
+      ? frozenRef.current.endLabel
+      : fmtEndTime(j.etaSec);
 
   return (
     <div className="bg-background border border-border rounded-lg p-3 space-y-2">
@@ -79,13 +105,11 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
             {j.file.name} • {(j.file.size / 1024 / 1024).toFixed(1)} MB
           </p>
 
-          {/* Hora de lançamento prevista — destaque grande */}
-          {showProgress && j.etaSec > 0 && j.etaSec < 99999 && (
+          {/* Hora de lançamento prevista — destaque grande (congela quando lento) */}
+          {showProgress && displayEta > 0 && displayEta < 99999 && (
             <div className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded">
               🕒 No app às{" "}
-              <span className="font-black tracking-wide">
-                {fmtEndTime(j.etaSec)}
-              </span>
+              <span className="font-black tracking-wide">{displayEndLabel}</span>
             </div>
           )}
         </div>
@@ -134,8 +158,8 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
             {j.speedMBs > 0 && (
               <span className="text-right">
                 ⚡ {j.speedMBs.toFixed(1)} MB/s
-                {j.etaSec > 0 && j.etaSec < 99999 && (
-                  <> • ⏱ falta {fmtEta(j.etaSec)}</>
+                {displayEta > 0 && displayEta < 99999 && (
+                  <> • ⏱ falta {fmtEta(displayEta)}</>
                 )}
               </span>
             )}
@@ -145,7 +169,7 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
 
       {j.status === "warning" && (
         <p className="text-[11px] text-amber-500">
-          ⚠️ Está demorando mais que 2 minutos, mas continua tentando.
+          ⚠️ Conexão lenta — o envio continua em segundo plano mesmo se você sair do app.
         </p>
       )}
 
