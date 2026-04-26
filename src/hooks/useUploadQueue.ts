@@ -14,6 +14,8 @@ export interface UploadJob {
   id: string;
   file: File;
   thumbnail?: File | null;
+  // URL local (object URL) da capa, pra mostrar preview na fila
+  thumbPreviewUrl?: string | null;
   meta: {
     title: string;
     genre: string;
@@ -125,8 +127,10 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      chunkSize: 16 * 1024 * 1024, // 16MB por chunk
-      parallelUploads: 4, // 4 conexões simultâneas
+      // Supabase Storage TUS: precisa ser exatamente 6MB por chunk
+      // (com chunks maiores, ele rejeita partes intermediárias).
+      // O ganho de velocidade vem de enviar VÁRIOS jobs em paralelo (já fazemos).
+      chunkSize: 6 * 1024 * 1024,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         const now = Date.now();
@@ -275,6 +279,9 @@ export const useUploadQueue = (onJobDone?: () => void) => {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       file: inp.file,
       thumbnail: inp.thumbnail ?? null,
+      thumbPreviewUrl: inp.thumbnail
+        ? URL.createObjectURL(inp.thumbnail)
+        : null,
       meta: inp.meta,
       status: "queued",
       progress: 0,
