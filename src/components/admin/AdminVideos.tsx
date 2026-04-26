@@ -54,6 +54,18 @@ const AdminVideos = () => {
     fetchVideos();
   }, []);
 
+  // Avisa o usuário se tentar fechar a aba durante upload
+  useEffect(() => {
+    if (!uploading) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Upload em andamento — se você sair, vai parar!";
+      return e.returnValue;
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [uploading]);
+
   const handleFileSelect = (files: FileList | null) => {
     if (files && files[0]) {
       setSelectedFile(files[0]);
