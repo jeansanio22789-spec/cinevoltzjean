@@ -456,40 +456,154 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
 
             <div className="flex-1" />
 
-            {/* Velocidade */}
+            {/* Configurações: qualidade / áudio / legendas / velocidade */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowSettings((s) => !s)}
+                onClick={toggleSettings}
                 className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors flex items-center gap-1"
                 aria-label="Configurações"
               >
-                <Settings className="w-5 h-5" />
+                <Settings className={cn("w-5 h-5 transition-transform", showSettings && "rotate-90")} />
+                {currentQuality === -1 && autoActiveHeight >= 2160 && (
+                  <span className="text-[9px] font-bold bg-accent text-accent-foreground px-1 py-0.5 rounded leading-none">
+                    4K
+                  </span>
+                )}
+                {currentQuality !== -1 && qualities[currentQuality]?.height >= 2160 && (
+                  <span className="text-[9px] font-bold bg-accent text-accent-foreground px-1 py-0.5 rounded leading-none">
+                    4K
+                  </span>
+                )}
                 {speed !== 1 && (
                   <span className="text-[10px] font-bold bg-primary px-1.5 py-0.5 rounded">
                     {speed}x
                   </span>
                 )}
               </button>
+
               {showSettings && (
-                <div className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-md rounded-lg overflow-hidden ring-1 ring-white/10 shadow-2xl min-w-[120px] animate-in fade-in slide-in-from-bottom-2 duration-150">
-                  <div className="text-[11px] text-white/60 px-3 py-2 border-b border-white/10 font-semibold uppercase tracking-wide">
-                    Velocidade
-                  </div>
-                  {SPEEDS.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setPlaybackRate(r)}
-                      className={cn(
-                        "w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors flex items-center justify-between",
-                        speed === r && "text-primary font-bold",
-                      )}
-                    >
-                      <span>{r === 1 ? "Normal" : `${r}x`}</span>
-                      {speed === r && <span>•</span>}
-                    </button>
-                  ))}
+                <div className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-md rounded-xl overflow-hidden ring-1 ring-white/10 shadow-2xl min-w-[220px] max-h-[60vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150">
+                  {settingsTab === "main" && (
+                    <div className="py-1">
+                      <SettingsRow
+                        icon={<Sparkles className="w-4 h-4" />}
+                        label="Qualidade"
+                        value={
+                          currentQuality === -1
+                            ? autoActiveHeight
+                              ? `Auto (${autoActiveHeight}p)`
+                              : "Auto"
+                            : qualities[currentQuality]?.label || "—"
+                        }
+                        onClick={() => setSettingsTab("quality")}
+                        disabled={qualities.length === 0}
+                      />
+                      <SettingsRow
+                        icon={<Languages className="w-4 h-4" />}
+                        label="Áudio / Dublagem"
+                        value={
+                          audioTracks.find((t) => t.id === currentAudio)?.name ||
+                          "Padrão"
+                        }
+                        onClick={() => setSettingsTab("audio")}
+                        disabled={audioTracks.length <= 1}
+                      />
+                      <SettingsRow
+                        icon={<Captions className="w-4 h-4" />}
+                        label="Legendas"
+                        value={
+                          currentSub === -1
+                            ? "Desligadas"
+                            : subTracks.find((t) => t.id === currentSub)?.name || "Padrão"
+                        }
+                        onClick={() => setSettingsTab("subs")}
+                        disabled={subTracks.length === 0}
+                      />
+                      <SettingsRow
+                        label="Velocidade"
+                        value={speed === 1 ? "Normal" : `${speed}x`}
+                        onClick={() => setSettingsTab("speed")}
+                      />
+                    </div>
+                  )}
+
+                  {settingsTab === "quality" && (
+                    <SettingsList
+                      title="Qualidade"
+                      onBack={() => setSettingsTab("main")}
+                      items={[
+                        {
+                          id: -1,
+                          label: "Auto",
+                          hint: autoActiveHeight ? `${autoActiveHeight}p` : undefined,
+                        },
+                        ...qualities.map((q) => ({
+                          id: q.index,
+                          label: q.label,
+                          hint: q.height >= 2160 ? "4K" : q.height >= 1080 ? "HD" : undefined,
+                        })),
+                      ]}
+                      activeId={currentQuality}
+                      onPick={(id) => {
+                        setCurrentQuality(id);
+                        if (hlsRef.current) hlsRef.current.currentLevel = id;
+                        setSettingsTab(null);
+                      }}
+                    />
+                  )}
+
+                  {settingsTab === "audio" && (
+                    <SettingsList
+                      title="Áudio / Dublagem"
+                      onBack={() => setSettingsTab("main")}
+                      items={audioTracks.map((t) => ({
+                        id: t.id,
+                        label: t.name,
+                        hint: t.lang?.toUpperCase(),
+                      }))}
+                      activeId={currentAudio}
+                      onPick={(id) => {
+                        setCurrentAudio(id);
+                        if (hlsRef.current) hlsRef.current.audioTrack = id;
+                        setSettingsTab(null);
+                      }}
+                    />
+                  )}
+
+                  {settingsTab === "subs" && (
+                    <SettingsList
+                      title="Legendas"
+                      onBack={() => setSettingsTab("main")}
+                      items={[
+                        { id: -1, label: "Desligadas" },
+                        ...subTracks.map((t) => ({
+                          id: t.id,
+                          label: t.name,
+                          hint: t.lang?.toUpperCase(),
+                        })),
+                      ]}
+                      activeId={currentSub}
+                      onPick={(id) => {
+                        setCurrentSub(id);
+                        if (hlsRef.current) hlsRef.current.subtitleTrack = id;
+                        setSettingsTab(null);
+                      }}
+                    />
+                  )}
+
+                  {settingsTab === "speed" && (
+                    <SettingsList
+                      title="Velocidade"
+                      onBack={() => setSettingsTab("main")}
+                      items={SPEEDS.map((r) => ({
+                        id: r,
+                        label: r === 1 ? "Normal" : `${r}x`,
+                      }))}
+                      activeId={speed}
+                      onPick={(id) => setPlaybackRate(id as number)}
+                    />
+                  )}
                 </div>
               )}
             </div>
