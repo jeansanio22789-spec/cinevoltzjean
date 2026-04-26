@@ -23,7 +23,6 @@ const IntroVignette = ({
   duration = 3200,
 }: IntroVignetteProps) => {
   const [phase, setPhase] = useState<"enter" | "hold" | "exit">("enter");
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     // 🔊 Som "tudum" cinematográfico — sintetizado em tempo real
