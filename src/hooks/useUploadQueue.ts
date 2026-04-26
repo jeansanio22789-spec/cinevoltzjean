@@ -73,19 +73,59 @@ const store = {
 };
 
 // Avisa o usuário se tentar fechar a aba durante upload ativo (precisa ser global)
+// + Wake Lock pra evitar que o navegador suspenda a aba quando ela vai pro background
+let wakeLock: WakeLockSentinel | null = null;
+
+const hasActiveUploads = () =>
+  store.jobs.some(
+    (j) =>
+      j.status === "uploading" ||
+      j.status === "saving" ||
+      j.status === "warning" ||
+      j.status === "queued",
+  );
+
+const requestWakeLock = async () => {
+  try {
+    const nav = navigator as Navigator & {
+      wakeLock?: { request: (t: string) => Promise<WakeLockSentinel> };
+    };
+    if (nav.wakeLock && !wakeLock) {
+      wakeLock = await nav.wakeLock.request("screen");
+    }
+  } catch {
+    /* navegador não suporta - ignora */
+  }
+};
+
+const releaseWakeLock = async () => {
+  try {
+    await wakeLock?.release();
+  } catch {
+    /* ignora */
+  }
+  wakeLock = null;
+};
+
 if (typeof window !== "undefined") {
+  // Bloqueia o fechar da aba enquanto tem upload rolando
   window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
-    const active = store.jobs.some(
-      (j) =>
-        j.status === "uploading" ||
-        j.status === "saving" ||
-        j.status === "warning" ||
-        j.status === "queued",
-    );
-    if (!active) return;
+    if (!hasActiveUploads()) return;
     e.preventDefault();
-    e.returnValue = "Uploads em andamento — se você sair, vão parar!";
+    e.returnValue = "Uploads em andamento — se fechar, vão parar!";
   });
+
+  // Quando a aba volta do background, re-pede wake lock (browser solta sozinho)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && hasActiveUploads()) {
+      void requestWakeLock();
+    }
+  });
+}
+
+// Tipo mínimo do WakeLockSentinel pra TS não reclamar
+interface WakeLockSentinel {
+  release(): Promise<void>;
 }
 
 // Callbacks "globais" para notificar quando um job terminar (ex: refetch da lista)
@@ -110,8 +150,10 @@ const uploadFileTus = (
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
 
-    // Chunk maior + várias conexões = muito mais rápido em qualquer tamanho
-    // (o TUS faz pedaços de 16MB enviados em paralelo).
+    // 🚀 Configuração agressiva pra usar 100% da banda:
+    // - chunks grandes (50MB) → menos overhead de rede
+    // - 6 conexões simultâneas → satura links de fibra/5G
+    // Limite real é a SUA INTERNET (upload típico residencial: 5–60 MB/s).
     const upload = new tus.Upload(file, {
       endpoint,
       retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
@@ -127,10 +169,8 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      // Supabase Storage TUS: precisa ser exatamente 6MB por chunk
-      // (com chunks maiores, ele rejeita partes intermediárias).
-      // O ganho de velocidade vem de enviar VÁRIOS jobs em paralelo (já fazemos).
-      chunkSize: 6 * 1024 * 1024,
+      chunkSize: 50 * 1024 * 1024, // 50MB
+      parallelUploads: 6,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         const now = Date.now();
@@ -171,6 +211,9 @@ const uploadFileTus = (
 // Execução do job (continua rodando mesmo se o componente desmontar)
 // ---------------------------------------------------------------------------
 const runJob = async (job: UploadJob) => {
+  // Pede pra tela ficar acordada — ajuda muito em mobile
+  void requestWakeLock();
+
   const timeoutTimer = window.setTimeout(() => {
     const cur = store.jobs.find((j) => j.id === job.id);
     if (cur && (cur.status === "uploading" || cur.status === "saving")) {
@@ -244,6 +287,8 @@ const runJob = async (job: UploadJob) => {
     store.update(job.id, { status: "error", errorMsg: msg });
   } finally {
     window.clearTimeout(timeoutTimer);
+    // Libera o wake lock se não tem mais nada rolando
+    if (!hasActiveUploads()) void releaseWakeLock();
   }
 };
 
