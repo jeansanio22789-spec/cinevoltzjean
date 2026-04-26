@@ -15,10 +15,9 @@ import type { UploadJob } from "@/hooks/useUploadQueue";
 const fmtEta = (sec: number) =>
   sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
 
-// Hora local prevista de término (ex.: 14:32) — usa o ETA pra prever
-const fmtEndTime = (etaSec: number) => {
-  const end = new Date(Date.now() + etaSec * 1000);
-  return end.toLocaleTimeString("pt-BR", {
+// Hora local prevista de término (ex.: 14:32) — recebe um timestamp absoluto
+const fmtEndTimeFromTs = (endAtMs: number) => {
+  return new Date(endAtMs).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   });
