@@ -34,16 +34,72 @@ const IntroVignette = ({
       const ctx = getAudioContext();
       if (!ctx) return;
 
-      // Master gain para volume geral
       const master = ctx.createGain();
-      master.gain.value = 0.9;
-      // Compressor para ficar mais "punchy"
+      master.gain.value = 1.0;
+      // Compressor para ficar mais "punchy" (estilo Netflix)
       const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -18;
-      comp.ratio.value = 6;
-      master.connect(comp).connect(ctx.destination);
+      comp.threshold.value = -14;
+      comp.ratio.value = 8;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.18;
+      // Reverb curto pra dar "sala grande"
+      const convolver = ctx.createConvolver();
+      const sr = ctx.sampleRate;
+      const irLen = Math.floor(sr * 1.6);
+      const ir = ctx.createBuffer(2, irLen, sr);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = ir.getChannelData(ch);
+        for (let i = 0; i < irLen; i++) {
+          // decaimento exponencial com ruído colorido
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 3.2);
+        }
+      }
+      convolver.buffer = ir;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.18;
+      const dry = ctx.createGain();
+      dry.gain.value = 1.0;
+      master.connect(comp);
+      comp.connect(dry).connect(ctx.destination);
+      comp.connect(convolver).connect(wet).connect(ctx.destination);
 
       const t0 = ctx.currentTime + 0.15;
+
+      // 🥁 Thump percussivo (membrana grave): dá o "soco" característico
+      const playThump = (start: number, gain: number) => {
+        // Camada 1: senoide grave com pitch envelope
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(180, t0 + start);
+        osc.frequency.exponentialRampToValueAtTime(38, t0 + start + 0.18);
+        g.gain.setValueAtTime(0, t0 + start);
+        g.gain.linearRampToValueAtTime(gain, t0 + start + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + 0.55);
+        osc.connect(g).connect(master);
+        osc.start(t0 + start);
+        osc.stop(t0 + start + 0.6);
+
+        // Camada 2: ruído curto pra simular a batida da membrana (transiente)
+        const noiseLen = Math.floor(ctx.sampleRate * 0.08);
+        const buf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < noiseLen; i++) {
+          d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / noiseLen, 2);
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 700;
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0, t0 + start);
+        ng.gain.linearRampToValueAtTime(gain * 0.5, t0 + start + 0.002);
+        ng.gain.exponentialRampToValueAtTime(0.0001, t0 + start + 0.12);
+        src.connect(lp).connect(ng).connect(master);
+        src.start(t0 + start);
+        src.stop(t0 + start + 0.15);
+      };
 
       const playLayer = (
         type: OscillatorType,
@@ -69,16 +125,18 @@ const IntroVignette = ({
         osc.stop(t0 + start + dur + 0.05);
       };
 
-      // 🎵 "TU" — pulso grave curto com sweep para baixo
-      playLayer("sine", 140, 70, 0, 0.35, 0.7);
-      playLayer("triangle", 220, 90, 0, 0.3, 0.35);
-      playLayer("sine", 55, 40, 0, 0.4, 0.5); // sub-bass
+      // 🎵 "TU" — batida curta e punchy
+      playThump(0, 0.85);
+      playLayer("sine", 130, 65, 0, 0.32, 0.55);
+      playLayer("triangle", 200, 95, 0, 0.28, 0.28);
+      playLayer("sine", 50, 38, 0, 0.38, 0.45); // sub-bass
 
-      // 🎵 "DUM" — pulso mais grave, mais longo e poderoso
-      playLayer("sine", 110, 50, 0.42, 1.0, 0.85);
-      playLayer("triangle", 165, 75, 0.42, 0.9, 0.4);
-      playLayer("sine", 45, 32, 0.42, 1.1, 0.65); // sub-bass profundo
-      playLayer("sawtooth", 80, 38, 0.42, 0.6, 0.15); // grão/textura
+      // 🎵 "DUM" — batida mais grave, mais longa e com cauda reverberada
+      playThump(0.38, 1.0);
+      playLayer("sine", 100, 45, 0.38, 1.1, 0.9);
+      playLayer("triangle", 150, 70, 0.38, 0.95, 0.35);
+      playLayer("sine", 42, 30, 0.38, 1.3, 0.7); // sub-bass profundo
+      playLayer("sawtooth", 75, 35, 0.38, 0.55, 0.12); // grão/textura
     } catch {
       /* navegador sem áudio — segue silencioso */
     }
