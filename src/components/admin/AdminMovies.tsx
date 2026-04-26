@@ -32,6 +32,8 @@ const AdminMovies = () => {
   const [uploading, setUploading] = useState(false);
   const [importingTg, setImportingTg] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const { state: videoUpload, start: startVideoUpload, pause: pauseVideoUpload, resume: resumeVideoUpload, reset: resetVideoUpload } = useResumableUpload();
   const [form, setForm] = useState({
     title: "",
     video_url: "",
