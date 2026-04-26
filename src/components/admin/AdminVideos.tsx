@@ -367,7 +367,70 @@ const AdminVideos = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  // 📱 Salvar no aparelho: guarda o vídeo no IndexedDB local (sem subir nada).
+  // Vantagem: instantâneo. Limitação: só toca neste celular/navegador.
+  const handleSaveLocal = async () => {
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um arquivo de vídeo");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Título é obrigatório");
+      return;
+    }
+
+    const tId = toast.loading(
+      `Salvando ${selectedFiles.length} ${selectedFiles.length === 1 ? "vídeo" : "vídeos"} no aparelho…`,
+    );
+    try {
+      // Sobe a thumbnail (capa) pra nuvem mesmo, pra todo mundo ver na lista.
+      let thumbnailUrl: string | null = null;
+      if (thumbnailFile) {
+        const ext = thumbnailFile.name.split(".").pop() || "jpg";
+        const path = `thumbnails/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}.${ext}`;
+        const { error: thErr } = await supabase.storage
+          .from("videos")
+          .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
+        if (!thErr) {
+          const { data } = supabase.storage.from("videos").getPublicUrl(path);
+          thumbnailUrl = data.publicUrl;
+        }
+      }
+
+      let ok = 0;
+      for (const file of selectedFiles) {
+        const localUrl = await saveLocalVideo(file);
+        const { error } = await supabase.from("movies").insert({
+          title: form.title,
+          video_url: localUrl,
+          thumbnail_url: thumbnailUrl,
+          genre: form.genre,
+          description: form.description,
+          status: "published",
+        });
+        if (!error) ok++;
+      }
+
+      toast.dismiss(tId);
+      if (ok === 0) {
+        toast.error("Nenhum vídeo pôde ser salvo");
+      } else {
+        toast.success(
+          `📱 ${ok} ${ok === 1 ? "vídeo salvo" : "vídeos salvos"} no aparelho — toca só neste celular`,
+        );
+        setSelectedFiles([]);
+        setThumbnailFile(null);
+        setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+        fetchVideos();
+      }
+    } catch (e) {
+      toast.dismiss(tId);
+      const msg = e instanceof Error ? e.message : "Falha ao salvar no aparelho";
+      toast.error(msg);
+    }
+  };
     if (!confirm("Excluir este vídeo?")) return;
     // Se for vídeo local, limpa o IndexedDB também
     const target = videos.find((v) => v.id === id);
