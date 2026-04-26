@@ -833,8 +833,9 @@ const AdminTelegramImport = () => {
             cada um (capa, nome, vídeo) e clica em <span className="font-bold">Publicar</span>.
           </p>
           <p className="text-[11px] text-muted-foreground">
-            ⚠️ Bot API só baixa arquivos até <span className="font-bold">20 MB</span>. Vídeos
-            maiores serão pulados (precisam do Worker MTProto).
+            ⚠️ Tenta baixar arquivos de qualquer tamanho — vídeos grandes podem
+            demorar bastante. Se o Telegram recusar (limite da Bot API), o erro
+            é registrado e você pode tentar de novo ou usar o Worker MTProto.
           </p>
 
           <button
