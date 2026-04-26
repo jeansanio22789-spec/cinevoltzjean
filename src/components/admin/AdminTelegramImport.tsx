@@ -228,6 +228,71 @@ const AdminTelegramImport = () => {
     size_mb: number | null;
     meta: AIMetadata;
   }
+
+  // Persistência local: edições do usuário sobrevivem a reload e a recarregar
+  // a prévia. Chave por update_id.
+  type EditOverride = {
+    title?: string;
+    synopsis?: string;
+    genre?: string;
+    year?: number | null;
+    season?: number | null;
+    episode?: number | null;
+    kind?: "movie" | "series";
+    thumbnail_url?: string | null;
+    updated_at: number;
+  };
+  const EDITS_STORAGE_KEY = "telegram_preview_edits_v1";
+
+  const loadEdits = (): Record<string, EditOverride> => {
+    try {
+      const raw = localStorage.getItem(EDITS_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, EditOverride>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveEdits = (edits: Record<string, EditOverride>) => {
+    try {
+      localStorage.setItem(EDITS_STORAGE_KEY, JSON.stringify(edits));
+    } catch {
+      // ignora — quota ou modo privado
+    }
+  };
+
+  const mergeEditIntoItem = (item: PreviewItem, edit?: EditOverride): PreviewItem => {
+    if (!edit) return item;
+    return {
+      ...item,
+      thumbnail_url:
+        edit.thumbnail_url !== undefined ? edit.thumbnail_url : item.thumbnail_url,
+      meta: {
+        ...item.meta,
+        title: edit.title ?? item.meta.title,
+        synopsis: edit.synopsis ?? item.meta.synopsis,
+        genre: edit.genre ?? item.meta.genre,
+        year: edit.year !== undefined ? edit.year : item.meta.year,
+        kind: edit.kind ?? item.meta.kind,
+        season: edit.season !== undefined ? edit.season : item.meta.season,
+        episode: edit.episode !== undefined ? edit.episode : item.meta.episode,
+      },
+    };
+  };
+
+  const upsertEdit = (updateId: number, patch: Partial<EditOverride>) => {
+    const all = loadEdits();
+    const current = all[String(updateId)] || { updated_at: 0 };
+    all[String(updateId)] = { ...current, ...patch, updated_at: Date.now() };
+    saveEdits(all);
+  };
+
+  const removeEdit = (updateId: number) => {
+    const all = loadEdits();
+    delete all[String(updateId)];
+    saveEdits(all);
+  };
+
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewItems, setPreviewItems] = useState<PreviewItem[]>([]);
   const [previewSummary, setPreviewSummary] = useState<{
@@ -246,17 +311,21 @@ const AdminTelegramImport = () => {
       if (error) throw new Error(error.message);
       if (!data?.ok) throw new Error(data?.error || "Falha desconhecida");
 
+      const edits = loadEdits();
       const items: PreviewItem[] = (data.results || [])
         .filter((r: any) => r.status === "preview")
-        .map((r: any) => ({
-          update_id: r.update_id,
-          title: r.title,
-          video_url: r.video_url,
-          thumbnail_url: r.thumbnail_url,
-          duration_min: r.duration_min,
-          size_mb: r.size_mb,
-          meta: r.meta,
-        }));
+        .map((r: any) => {
+          const base: PreviewItem = {
+            update_id: r.update_id,
+            title: r.title,
+            video_url: r.video_url,
+            thumbnail_url: r.thumbnail_url,
+            duration_min: r.duration_min,
+            size_mb: r.size_mb,
+            meta: r.meta,
+          };
+          return mergeEditIntoItem(base, edits[String(r.update_id)]);
+        });
       setPreviewItems(items);
       setPreviewSummary({
         skipped: data.skipped || 0,
@@ -268,7 +337,7 @@ const AdminTelegramImport = () => {
         toast({
           title: "Nada pra revisar",
           description: data.still_pending > 0
-            ? `${data.still_pending} pendente(s) — todos falharam ou são >20MB.`
+            ? `${data.still_pending} pendente(s) — todos falharam ao baixar.`
             : "Não há vídeos pendentes do canal.",
         });
       } else {
@@ -292,6 +361,9 @@ const AdminTelegramImport = () => {
     setPreviewItems((prev) =>
       prev.map((it) => (it.update_id === updateId ? { ...it, ...patch } : it)),
     );
+    if (patch.thumbnail_url !== undefined) {
+      upsertEdit(updateId, { thumbnail_url: patch.thumbnail_url });
+    }
   };
 
   const updatePreviewMeta = (updateId: number, patch: Partial<AIMetadata>) => {
@@ -300,6 +372,18 @@ const AdminTelegramImport = () => {
         it.update_id === updateId ? { ...it, meta: { ...it.meta, ...patch } } : it,
       ),
     );
+    // Persiste só os campos editáveis
+    const editPatch: Partial<EditOverride> = {};
+    if (patch.title !== undefined) editPatch.title = patch.title;
+    if (patch.synopsis !== undefined) editPatch.synopsis = patch.synopsis;
+    if (patch.genre !== undefined) editPatch.genre = patch.genre;
+    if (patch.year !== undefined) editPatch.year = patch.year;
+    if (patch.kind !== undefined) editPatch.kind = patch.kind;
+    if (patch.season !== undefined) editPatch.season = patch.season;
+    if (patch.episode !== undefined) editPatch.episode = patch.episode;
+    if (Object.keys(editPatch).length > 0) {
+      upsertEdit(updateId, editPatch);
+    }
   };
 
   const confirmPublish = async (item: PreviewItem) => {
@@ -327,6 +411,7 @@ const AdminTelegramImport = () => {
       if (error) throw new Error(error.message);
       if (!data?.ok) throw new Error(data?.error || "Falha ao publicar");
       toast({ title: "Publicado!", description: data.title });
+      removeEdit(item.update_id);
       setPreviewItems((prev) => prev.filter((it) => it.update_id !== item.update_id));
     } catch (e) {
       toast({
@@ -350,6 +435,7 @@ const AdminTelegramImport = () => {
         })
         .eq("update_id", item.update_id);
       if (error) throw error;
+      removeEdit(item.update_id);
       setPreviewItems((prev) => prev.filter((it) => it.update_id !== item.update_id));
       toast({ title: "Vídeo descartado" });
     } catch (e) {
