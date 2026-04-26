@@ -73,19 +73,58 @@ const store = {
 };
 
 // Avisa o usuário se tentar fechar a aba durante upload ativo (precisa ser global)
+// + Wake Lock pra evitar que o navegador suspenda a aba quando ela vai pro background
+let wakeLock: WakeLockSentinel | null = null;
+
+const hasActiveUploads = () =>
+  store.jobs.some(
+    (j) =>
+      j.status === "uploading" ||
+      j.status === "saving" ||
+      j.status === "warning" ||
+      j.status === "queued",
+  );
+
+const requestWakeLock = async () => {
+  try {
+    // @ts-expect-error - WakeLock API ainda não tipada em todos os browsers
+    if (navigator.wakeLock && !wakeLock) {
+      // @ts-expect-error
+      wakeLock = await navigator.wakeLock.request("screen");
+    }
+  } catch {
+    /* navegador não suporta - ignora */
+  }
+};
+
+const releaseWakeLock = async () => {
+  try {
+    await wakeLock?.release();
+  } catch {
+    /* ignora */
+  }
+  wakeLock = null;
+};
+
 if (typeof window !== "undefined") {
+  // Bloqueia o fechar da aba enquanto tem upload rolando
   window.addEventListener("beforeunload", (e: BeforeUnloadEvent) => {
-    const active = store.jobs.some(
-      (j) =>
-        j.status === "uploading" ||
-        j.status === "saving" ||
-        j.status === "warning" ||
-        j.status === "queued",
-    );
-    if (!active) return;
+    if (!hasActiveUploads()) return;
     e.preventDefault();
-    e.returnValue = "Uploads em andamento — se você sair, vão parar!";
+    e.returnValue = "Uploads em andamento — se fechar, vão parar!";
   });
+
+  // Quando a aba volta do background, re-pede wake lock (browser solta sozinho)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && hasActiveUploads()) {
+      void requestWakeLock();
+    }
+  });
+}
+
+// Tipo mínimo do WakeLockSentinel pra TS não reclamar
+interface WakeLockSentinel {
+  release(): Promise<void>;
 }
 
 // Callbacks "globais" para notificar quando um job terminar (ex: refetch da lista)
