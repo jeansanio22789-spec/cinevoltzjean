@@ -1,14 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2, Download,
+  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
-import { saveLocalVideo, saveLocalBlob, getStorageEstimate, isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
+import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo } from "@/lib/localVideoStore";
 
 interface Video {
   id: string;
@@ -170,8 +169,6 @@ const AdminVideos = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
-  const [downloadingLink, setDownloadingLink] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<{ loaded: number; total: number } | null>(null);
   const [recognizingTitle, setRecognizingTitle] = useState(false);
 
   // Lê o título escrito na capa via IA com visão (OCR semântico).
