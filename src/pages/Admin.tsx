@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, LogOut, Bell, Search } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -47,6 +47,13 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Permite abrir o painel direto numa aba específica via ?tab=videos
+  useEffect(() => {
+    const tab = searchParams.get("tab") as AdminTab | null;
+    if (tab && tab in tabTitles) setActiveTab(tab);
+  }, [searchParams]);
 
   const handleSignOut = async () => {
     await signOut();
