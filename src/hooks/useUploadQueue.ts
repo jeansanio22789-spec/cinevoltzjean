@@ -19,7 +19,6 @@ export interface UploadJob {
     title: string;
     genre: string;
     description: string;
-    audio?: string;
   };
   status: UploadStatus;
   progress: number;
@@ -108,7 +107,7 @@ const uploadFileTus = (
 interface EnqueueInput {
   file: File;
   thumbnail?: File | null;
-  meta: { title: string; genre: string; description: string; audio?: string };
+  meta: { title: string; genre: string; description: string };
 }
 
 export const useUploadQueue = (onJobDone?: () => void) => {
@@ -186,7 +185,6 @@ export const useUploadQueue = (onJobDone?: () => void) => {
           thumbnail_url: thumbnailUrl,
           genre: job.meta.genre,
           description: job.meta.description,
-          audio: job.meta.audio || "Original",
           status: "published",
         });
         if (error) throw error;

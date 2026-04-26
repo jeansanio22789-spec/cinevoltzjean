@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Languages,
+  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,33 +44,55 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-// Detecta faixa de áudio pelo nome do arquivo
-// "Filme.DUAL.1080p.mkv" -> "Dual"   |   "Serie.LEG.mp4" -> "Legendado"
-type AudioTrack = "Dublado" | "Legendado" | "Dual" | "Original";
-const detectAudioFromFilename = (name: string): AudioTrack | null => {
+// Detecta faixa de áudio pelo nome do arquivo (usado p/ anexar ao TÍTULO em MAIÚSCULAS)
+// "Filme.DUAL.1080p.mkv" -> "DUAL"   |   "Serie.LEG.mp4" -> "LEGENDADO"
+type AudioTag = "DUBLADO" | "LEGENDADO" | "DUAL";
+const detectAudioFromFilename = (name: string): AudioTag | null => {
   const n = name.toLowerCase();
-  // Dual primeiro (tem prioridade — quer dizer que tem dublado E legendado)
   if (/\b(dual|dual[\s._-]?audio|multi[\s._-]?audio|2audios?)\b/.test(n))
-    return "Dual";
+    return "DUAL";
   if (
     /\b(dub|dubl|dublad[oa]|dublagem|nacional|português|portugues|pt[\s._-]?br|ptbr|brazilian)\b/.test(
       n,
     )
   )
-    return "Dublado";
+    return "DUBLADO";
   if (/\b(leg|legend|legendad[oa]|sub|subbed|subtitle[ds]?|vose)\b/.test(n))
-    return "Legendado";
+    return "LEGENDADO";
   return null;
 };
 
-// Detecta a primeira faixa que aparecer numa lista de arquivos (consenso simples)
-const detectAudioFromFiles = (files: File[]): AudioTrack | null => {
+const detectAudioFromFiles = (files: File[]): AudioTag | null => {
   for (const f of files) {
     const a = detectAudioFromFilename(f.name);
     if (a) return a;
   }
   return null;
 };
+
+// Tira sufixo de áudio que já esteja no título (pra não duplicar)
+const stripAudioSuffix = (raw: string): string => {
+  let t = raw;
+  t = t.replace(
+    /[\[\(\{][^\]\)\}]*\b(dub(lad[oa])?|leg(endad[oa])?|dual|nacional|pt[\s._-]?br|sub(title[ds]?)?)\b[^\]\)\}]*[\]\)\}]/gi,
+    "",
+  );
+  t = t.replace(
+    /[\s\-\|•·:]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br|sub(?:title[ds]?)?)\b\.?\s*$/gi,
+    "",
+  );
+  return t.replace(/\s{2,}/g, " ").trim();
+};
+
+// Junta o título + tag de áudio, tudo em MAIÚSCULAS
+const buildTitleWithAudio = (title: string, audio: AudioTag | null): string => {
+  const clean = stripAudioSuffix(title).toUpperCase();
+  if (!audio) return clean;
+  // Evita duplicar se a palavra já estiver lá
+  if (new RegExp(`\\b${audio}\\b`).test(clean)) return clean;
+  return `${clean} ${audio}`.trim();
+};
+
 
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
@@ -105,19 +127,19 @@ const AdminVideos = () => {
     genre: string;
     type: string;
     description: string;
-    audio: AudioTrack;
   }>({
     title: "",
     genre: "Ação",
     type: "Filme",
     description: "",
-    audio: "Original",
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [recognizingTitle, setRecognizingTitle] = useState(false);
 
-  // Lê o título escrito na capa via IA com visão (OCR semântico)
+  // Lê o título escrito na capa via IA com visão (OCR semântico).
+  // O título final fica TUDO MAIÚSCULO e, se a capa indicar áudio
+  // (DUBLADO / LEGENDADO / DUAL), a palavra é colada no fim do título.
   const recognizeTitleFromCover = async (file: File) => {
     setRecognizingTitle(true);
     try {
@@ -129,46 +151,30 @@ const AdminVideos = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Limpa qualquer marcação de áudio que a IA possa ter colado no título
-      // Ex.: "Vingadores Dublado", "Matrix [LEG]", "One Piece - DUAL ÁUDIO"
-      const stripAudioFromTitle = (raw: string) => {
-        let t = raw;
-        // Remove blocos entre [], () ou {} contendo dub/leg/dual
-        t = t.replace(
-          /[\[\(\{][^\]\)\}]*\b(dub(lad[oa])?|leg(endad[oa])?|dual|nacional|pt[\s._-]?br|sub(title[ds]?)?)\b[^\]\)\}]*[\]\)\}]/gi,
-          "",
-        );
-        // Remove sufixos soltos no fim/meio: " - Dublado", " • LEG", " | DUAL"
-        t = t.replace(
-          /[\s\-\|•·:]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br|sub(?:title[ds]?)?)\b\.?\s*$/gi,
-          "",
-        );
-        // Remove a mesma palavra solta no meio cercada por separadores
-        t = t.replace(
-          /[\s\-\|•·]+\b(dublad[oa]|dub|legendad[oa]|leg|dual(?:\s*[áa]udio)?|nacional|pt[\s._-]?br)\b[\s\-\|•·]+/gi,
-          " ",
-        );
-        return t.replace(/\s{2,}/g, " ").trim();
-      };
-      const title = stripAudioFromTitle((data?.title || "").trim());
-      const audio = data?.audio as AudioTrack | undefined;
-      if (!title) {
+      const rawTitle = (data?.title || "").trim();
+      if (!rawTitle) {
         toast.warning("Não consegui ler nenhum título nessa capa.");
         return;
       }
-      // Trocar capa = trocar nome (sobrescreve) e atualiza áudio se a capa indicou
-      setForm((prev) => ({
-        ...prev,
-        title,
-        audio: audio && audio !== "Original" ? audio : prev.audio,
-      }));
 
-      const audioMsg =
-        audio && audio !== "Original" ? ` • áudio: ${audio}` : "";
+      // Normaliza o áudio devolvido pela IA pra nossa tag em maiúsculas
+      const audioRaw = (data?.audio || "").toString().toLowerCase();
+      let audioTag: AudioTag | null = null;
+      if (audioRaw === "dublado") audioTag = "DUBLADO";
+      else if (audioRaw === "legendado") audioTag = "LEGENDADO";
+      else if (audioRaw === "dual") audioTag = "DUAL";
+      // Se a IA não viu áudio, tenta pelo nome do arquivo do vídeo (fallback)
+      if (!audioTag) audioTag = detectAudioFromFiles(selectedFiles);
+
+      const finalTitle = buildTitleWithAudio(rawTitle, audioTag);
+
+      // Trocar capa = trocar nome (sobrescreve sempre)
+      setForm((prev) => ({ ...prev, title: finalTitle }));
+
       toast.success(
         data?.confidence === "high"
-          ? `Lido da capa: "${title}"${audioMsg}`
-          : `Lido (confiança ${data?.confidence}): "${title}"${audioMsg} — confira`,
+          ? `Lido da capa: "${finalTitle}"`
+          : `Lido (confiança ${data?.confidence}): "${finalTitle}" — confira`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha ao ler capa";
@@ -211,18 +217,16 @@ const AdminVideos = () => {
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const arr = Array.from(files);
-    setSelectedFiles((prev) => {
-      const next = [...prev, ...arr];
-      // Auto-detecta a faixa de áudio se ainda estiver no padrão "Original"
-      // (não sobrescreve se o usuário já escolheu manualmente)
-      setForm((f) => {
-        if (f.audio !== "Original") return f;
-        const detected = detectAudioFromFiles(arr);
-        if (!detected) return f;
-        toast.success(`Áudio detectado: ${detected}`);
-        return { ...f, audio: detected };
-      });
-      return next;
+    setSelectedFiles((prev) => [...prev, ...arr]);
+    // Se o título já tiver sido lido da capa e ainda não tiver tag de áudio,
+    // tenta inferir pelo nome do arquivo e anexa
+    setForm((f) => {
+      if (!f.title) return f;
+      if (/\b(DUBLADO|LEGENDADO|DUAL)\b/.test(f.title)) return f;
+      const detected = detectAudioFromFiles(arr);
+      if (!detected) return f;
+      toast.success(`Áudio detectado: ${detected}`);
+      return { ...f, title: buildTitleWithAudio(f.title, detected) };
     });
   };
 
@@ -249,7 +253,6 @@ const AdminVideos = () => {
         title: form.title,
         genre: form.genre,
         description: form.description,
-        audio: form.audio,
       },
     }));
 
@@ -267,7 +270,6 @@ const AdminVideos = () => {
       genre: "Ação",
       type: "Filme",
       description: "",
-      audio: "Original",
     });
   };
 
@@ -407,28 +409,6 @@ const AdminVideos = () => {
                 <option>Série - Episódio</option>
                 <option>Trailer</option>
                 <option>Documentário</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
-                <Languages className="w-3.5 h-3.5" /> Áudio
-                {form.audio !== "Original" && (
-                  <span className="text-[10px] text-accent font-normal">
-                    (detectado pelo nome do arquivo)
-                  </span>
-                )}
-              </label>
-              <select
-                className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                value={form.audio}
-                onChange={(e) =>
-                  setForm({ ...form, audio: e.target.value as AudioTrack })
-                }
-              >
-                <option value="Original">Original</option>
-                <option value="Dublado">Dublado</option>
-                <option value="Legendado">Legendado</option>
-                <option value="Dual">Dual (Dub + Leg)</option>
               </select>
             </div>
             <div>
