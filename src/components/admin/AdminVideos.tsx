@@ -543,7 +543,29 @@ const AdminVideos = () => {
           return "video.mp4";
         }
       })();
-      const localUrl = await saveLocalBlob(blob, filename, blob.type);
+      // Tenta subir o blob baixado pra nuvem (todos os clientes assistem)
+      let videoUrl: string | null = null;
+      let savedToCloud = false;
+      try {
+        const safeName = filename.replace(/[^\w.-]+/g, "_").slice(0, 60);
+        const path = `uploads/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("videos")
+          .upload(path, blob, {
+            upsert: false,
+            cacheControl: "3600",
+            contentType: blob.type || "video/mp4",
+          });
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from("videos").getPublicUrl(path);
+        videoUrl = data.publicUrl;
+        savedToCloud = true;
+      } catch (cloudErr) {
+        console.warn("Upload pra nuvem falhou, salvando local:", cloudErr);
+        videoUrl = await saveLocalBlob(blob, filename, blob.type);
+      }
 
       // Sobe a thumbnail se houver
       let thumbnailUrl: string | null = null;
@@ -561,7 +583,7 @@ const AdminVideos = () => {
 
       const { error } = await supabase.from("movies").insert({
         title: form.title,
-        video_url: localUrl,
+        video_url: videoUrl,
         thumbnail_url: thumbnailUrl,
         genre: form.genre,
         description: form.description,
@@ -570,7 +592,11 @@ const AdminVideos = () => {
       if (error) throw error;
 
       toast.dismiss(tId);
-      toast.success(`📥 Baixado e salvo no aparelho (${sizeMB.toFixed(1)} MB)`);
+      if (savedToCloud) {
+        toast.success(`☁️ Baixado e publicado para todos (${sizeMB.toFixed(1)} MB)`);
+      } else {
+        toast.warning(`📱 Nuvem indisponível — salvo só neste aparelho (${sizeMB.toFixed(1)} MB)`);
+      }
       setLinkUrl("");
       setThumbnailFile(null);
       setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
