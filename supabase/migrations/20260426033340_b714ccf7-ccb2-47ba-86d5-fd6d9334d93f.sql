@@ -1,0 +1,1 @@
+DELETE FROM movies WHERE id = '23a0a7ba-fe5c-4a05-91c5-4deca27e2e30';
