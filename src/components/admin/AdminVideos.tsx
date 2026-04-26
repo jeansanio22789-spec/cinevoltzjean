@@ -275,6 +275,81 @@ const AdminVideos = () => {
     });
   };
 
+  // 🚀 Modo "Local": salva o arquivo direto no IndexedDB do navegador.
+  // Não envia nada pra nuvem — fica disponível instantaneamente, mas só
+  // toca no aparelho que importou.
+  const handleLocalSave = async () => {
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um arquivo");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Título é obrigatório");
+      return;
+    }
+
+    const est = await getStorageEstimate();
+    const totalMB = selectedFiles.reduce((s, f) => s + f.size, 0) / 1024 / 1024;
+    if (est && est.quotaMB - est.usageMB < totalMB) {
+      toast.error(
+        `Espaço local insuficiente: precisa de ${totalMB.toFixed(0)} MB, disponível ${(
+          est.quotaMB - est.usageMB
+        ).toFixed(0)} MB`,
+      );
+      return;
+    }
+
+    const tId = toast.loading(
+      `Salvando ${selectedFiles.length} arquivo(s) no dispositivo…`,
+    );
+    let okCount = 0;
+    for (const file of selectedFiles) {
+      try {
+        const localUrl = await saveLocalVideo(file);
+        // Sobe a thumbnail (pequena) pra nuvem pra aparecer pra todo mundo
+        let thumbnailUrl: string | null = null;
+        if (thumbnailFile) {
+          const ext = thumbnailFile.name.split(".").pop() || "jpg";
+          const path = `thumbnails/${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}.${ext}`;
+          const { error: thErr } = await supabase.storage
+            .from("videos")
+            .upload(path, thumbnailFile, { upsert: true, cacheControl: "3600" });
+          if (!thErr) {
+            const { data } = supabase.storage.from("videos").getPublicUrl(path);
+            thumbnailUrl = data.publicUrl;
+          }
+        }
+
+        const { error } = await supabase.from("movies").insert({
+          title: form.title,
+          video_url: localUrl,
+          thumbnail_url: thumbnailUrl,
+          genre: form.genre,
+          description: form.description,
+          status: "published",
+        });
+        if (error) throw error;
+        okCount++;
+      } catch (e) {
+        console.error("Erro ao salvar local:", e);
+      }
+    }
+    toast.dismiss(tId);
+    if (okCount > 0) {
+      toast.success(
+        `⚡ ${okCount} vídeo(s) publicado(s) instantaneamente (modo local)`,
+      );
+      setSelectedFiles([]);
+      setThumbnailFile(null);
+      setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+      fetchVideos();
+    } else {
+      toast.error("Não foi possível salvar localmente");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir este vídeo?")) return;
     const { error } = await supabase.from("movies").delete().eq("id", id);
