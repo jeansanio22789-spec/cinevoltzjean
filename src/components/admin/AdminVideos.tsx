@@ -183,7 +183,20 @@ const AdminVideos = () => {
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setSelectedFiles((prev) => [...prev, ...Array.from(files)]);
+    const arr = Array.from(files);
+    setSelectedFiles((prev) => {
+      const next = [...prev, ...arr];
+      // Auto-detecta a faixa de áudio se ainda estiver no padrão "Original"
+      // (não sobrescreve se o usuário já escolheu manualmente)
+      setForm((f) => {
+        if (f.audio !== "Original") return f;
+        const detected = detectAudioFromFiles(arr);
+        if (!detected) return f;
+        toast.success(`Áudio detectado: ${detected}`);
+        return { ...f, audio: detected };
+      });
+      return next;
+    });
   };
 
   const removeSelected = (idx: number) => {
