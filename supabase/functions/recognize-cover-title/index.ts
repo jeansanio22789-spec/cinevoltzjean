@@ -77,12 +77,16 @@ Deno.serve(async (req) => {
                   properties: {
                     title: { type: "string" },
                     original_title: { type: ["string", "null"] },
+                    audio: {
+                      type: "string",
+                      enum: ["Dublado", "Legendado", "Dual", "Original"],
+                    },
                     confidence: {
                       type: "string",
                       enum: ["high", "medium", "low"],
                     },
                   },
-                  required: ["title", "confidence"],
+                  required: ["title", "audio", "confidence"],
                   additionalProperties: false,
                 },
               },
