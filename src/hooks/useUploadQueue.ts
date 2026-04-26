@@ -279,6 +279,9 @@ export const useUploadQueue = (onJobDone?: () => void) => {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       file: inp.file,
       thumbnail: inp.thumbnail ?? null,
+      thumbPreviewUrl: inp.thumbnail
+        ? URL.createObjectURL(inp.thumbnail)
+        : null,
       meta: inp.meta,
       status: "queued",
       progress: 0,
