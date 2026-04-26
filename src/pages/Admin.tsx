@@ -112,7 +112,6 @@ const Admin = () => {
             {activeTab === "movies" && <AdminMovies />}
             {activeTab === "content" && <AdminMovies />}
             {activeTab === "channels" && <AdminChannels />}
-            {activeTab === "telegram" && <AdminTelegramImport />}
             {activeTab === "videos" && <AdminVideos />}
             {activeTab === "billing" && <AdminBilling />}
             {activeTab === "sponsors" && <AdminSponsors />}
