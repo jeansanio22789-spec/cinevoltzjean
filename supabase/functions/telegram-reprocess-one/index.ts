@@ -139,6 +139,19 @@ Deno.serve(async (req) => {
     let videoUrl: string;
     if (externalUrl && !isTelegramInternal) {
       videoUrl = externalUrl;
+    } else if (useTelegramPublicLink) {
+      // Monta link público do Telegram. Para canais privados usa /c/<internal_id>/<msg_id>
+      const chatId = msg.chat?.id as number | undefined;
+      const username = msg.chat?.username as string | undefined;
+      const messageId = msg.message_id as number | undefined;
+      if (username && messageId) {
+        videoUrl = `https://t.me/${username}/${messageId}`;
+      } else if (chatId && messageId) {
+        const internal = String(chatId).replace(/^-100/, "");
+        videoUrl = `https://t.me/c/${internal}/${messageId}`;
+      } else {
+        throw new Error("Vídeo > 20 MB e sem link público disponível");
+      }
     } else {
       const fileInfo = await tg("getFile", { file_id: video.file_id }, LOVABLE_API_KEY, TELEGRAM_API_KEY);
       const dl = await fetch(`${GATEWAY_URL}/file/${fileInfo.file_path}`, {
