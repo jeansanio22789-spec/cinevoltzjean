@@ -175,9 +175,12 @@ const Watch = () => {
     );
   }
 
-  // ✅ Tem acesso. Se há link do Telegram, abre direto.
-  if (movie.telegram_url) {
-    return <TelegramPlayer movie={movie} onBack={() => navigate(-1)} />;
+  // ✅ Tem acesso. Detecta link do Telegram em qualquer um dos campos.
+  const isTelegram = (u: string | null | undefined) =>
+    !!u && /^https?:\/\/(t\.me|telegram\.me)\//i.test(u);
+  if (isTelegram(movie.telegram_url) || isTelegram(movie.video_url)) {
+    const movieForTg = { ...movie, telegram_url: movie.telegram_url || movie.video_url };
+    return <TelegramPlayer movie={movieForTg} onBack={() => navigate(-1)} />;
   }
 
   const source = resolveVideoSource(movie.video_url);
