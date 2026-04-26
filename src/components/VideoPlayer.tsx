@@ -190,8 +190,36 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [subTracks, setSubTracks] = useState<SubtitleTrack[]>([]);
   const [currentSub, setCurrentSub] = useState<number>(-1);
 
+  // Resolução nativa do <video> (para MP4: descobre se é 4K/1080p/etc)
+  const [nativeHeight, setNativeHeight] = useState<number>(0);
+
   const isHls = useMemo(() => /\.m3u8(\?.*)?$/i.test(src), [src]);
   const showSettings = settingsTab !== null;
+
+  // 📺 Lista de qualidades exibida no menu.
+  // Para HLS: usa as do manifest (já em `qualities`).
+  // Para MP4: gera opções fixas até a resolução nativa do arquivo
+  //   (downscale via CSS — útil em telas pequenas e p/ economizar dados/bateria).
+  const FALLBACK_HEIGHTS = [2160, 1440, 1080, 720, 480, 360];
+  const displayQualities: QualityLevel[] = useMemo(() => {
+    if (qualities.length > 0) return qualities;
+    if (!nativeHeight) return [];
+    return FALLBACK_HEIGHTS.filter((h) => h <= nativeHeight).map((h, i) => ({
+      index: i,
+      height: h,
+      bitrate: 0,
+      label: labelForHeight(h),
+    }));
+  }, [qualities, nativeHeight]);
+
+  // Altura efetiva para aplicar downscale CSS (apenas MP4 e quando não-Auto)
+  const cssScaleHeight = useMemo(() => {
+    if (qualities.length > 0) return 0; // HLS lida sozinho
+    if (currentQuality === -1) return 0; // Auto = nativo
+    const q = displayQualities.find((d) => d.index === currentQuality);
+    return q?.height ?? 0;
+  }, [qualities.length, currentQuality, displayQualities]);
+
 
   // ---- Auto-hide controles ----
   const armHide = useCallback(() => {
