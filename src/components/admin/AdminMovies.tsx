@@ -294,10 +294,70 @@ const AdminMovies = () => {
                 </label>
                 <input
                   className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  placeholder="https://... (YouTube, Telegram t.me/c/..., link direto)"
+                  placeholder="https://... (YouTube, link direto .mp4/.m3u8)"
                   value={form.video_url}
                   onChange={(e) => setForm({ ...form, video_url: e.target.value })}
                 />
+
+                {/* Upload direto do arquivo de vídeo (toca inline no app) */}
+                <div className="mt-2">
+                  <input
+                    id="video-file-input"
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploading(true);
+                      const tId = toast.loading(`Enviando ${file.name}...`);
+                      try {
+                        const ext = file.name.split(".").pop() || "mp4";
+                        const path = `manual/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+                        const { error } = await supabase.storage
+                          .from("videos")
+                          .upload(path, file, {
+                            contentType: file.type || "video/mp4",
+                            upsert: false,
+                          });
+                        if (error) throw error;
+                        const { data: urlData } = supabase.storage
+                          .from("videos")
+                          .getPublicUrl(path);
+                        setForm((f) => ({ ...f, video_url: urlData.publicUrl }));
+                        toast.success("Vídeo enviado!", { id: tId });
+                      } catch (err) {
+                        toast.error(
+                          err instanceof Error ? err.message : "Erro ao enviar",
+                          { id: tId },
+                        );
+                      } finally {
+                        setUploading(false);
+                        (e.target as HTMLInputElement).value = "";
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() =>
+                      document.getElementById("video-file-input")?.click()
+                    }
+                    className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-2.5 rounded text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    Enviar arquivo de vídeo (toca inline no app)
+                  </button>
+                  <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                    Baixe o vídeo do Telegram no celular/PC e envie aqui. O arquivo
+                    fica hospedado e o player abre direto no app, sem redirecionar.
+                  </p>
+                </div>
+
                 {/^https?:\/\/(t\.me|telegram\.me)\//i.test(form.video_url) && (
                   <button
                     type="button"
@@ -363,7 +423,7 @@ const AdminMovies = () => {
                     className="mt-2 w-full flex items-center justify-center gap-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 px-3 py-2 rounded text-xs font-semibold transition-colors disabled:opacity-50"
                   >
                     {importingTg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    Importar vídeo do Telegram
+                    Tentar importar do Telegram (se < 20 MB)
                   </button>
                 )}
               </div>
