@@ -4,11 +4,22 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import {
   Loader2, Save, Download, Server, ExternalLink, CheckCircle2,
-  Sparkles, Search, Film, Tv, Bot, Cpu,
+  Sparkles, Search, Film, Tv, Bot, Cpu, Radar, Copy,
 } from "lucide-react";
 
 const WORKER_URL_KEY = "telegram_worker_url";
 const WORKER_TOKEN_KEY = "telegram_worker_token";
+const DORAMAS_CHAT_KEY = "telegram_doramas_chat_id";
+const DORAMAS_CHAT_TITLE_KEY = "telegram_doramas_chat_title";
+
+interface DiscoveredChat {
+  chat_id: number;
+  title: string;
+  type: string;
+  username?: string;
+  last_message_preview?: string;
+  last_message_date?: number;
+}
 
 type ImportMode = "bot" | "worker";
 
@@ -57,15 +68,24 @@ const AdminTelegramImport = () => {
   const [meta, setMeta] = useState<AIMetadata | null>(null);
   const [thumbOverride, setThumbOverride] = useState("");
 
+  // Descoberta de grupos
+  const [savedChatId, setSavedChatId] = useState("");
+  const [savedChatTitle, setSavedChatTitle] = useState("");
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveredChats, setDiscoveredChats] = useState<DiscoveredChat[]>([]);
+  const [discoverHint, setDiscoverHint] = useState("");
+
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
         .from("platform_settings")
         .select("key, value")
-        .in("key", [WORKER_URL_KEY, WORKER_TOKEN_KEY]);
+        .in("key", [WORKER_URL_KEY, WORKER_TOKEN_KEY, DORAMAS_CHAT_KEY, DORAMAS_CHAT_TITLE_KEY]);
       const map = new Map((data || []).map((r) => [r.key, r.value || ""]));
       setWorkerUrl(map.get(WORKER_URL_KEY) || "");
       setWorkerToken(map.get(WORKER_TOKEN_KEY) || "");
+      setSavedChatId(map.get(DORAMAS_CHAT_KEY) || "");
+      setSavedChatTitle(map.get(DORAMAS_CHAT_TITLE_KEY) || "");
       setLoadingConfig(false);
     };
     load();
@@ -125,6 +145,74 @@ const AdminTelegramImport = () => {
       toast({
         title: "Não consegui conectar no worker",
         description: e instanceof Error ? e.message : "Verifique URL e CORS",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const discoverChats = async () => {
+    setDiscovering(true);
+    setDiscoverHint("");
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-discover-chats", {
+        body: {},
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok) throw new Error(data?.error || "Falha ao buscar grupos");
+      setDiscoveredChats(data.chats || []);
+      setDiscoverHint(data.hint || "");
+      if ((data.chats || []).length === 0) {
+        toast({
+          title: "Nenhum grupo detectado",
+          description: "Mande uma mensagem no grupo (com o bot dentro) e tente de novo.",
+        });
+      } else {
+        toast({
+          title: `${data.chats.length} chat(s) detectado(s)`,
+          description: "Escolha o grupo Doramas VIP e clique em salvar.",
+        });
+      }
+    } catch (e) {
+      toast({
+        title: "Erro ao descobrir grupos",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const saveChat = async (chat: DiscoveredChat) => {
+    try {
+      await upsertSetting(DORAMAS_CHAT_KEY, String(chat.chat_id));
+      await upsertSetting(DORAMAS_CHAT_TITLE_KEY, chat.title);
+      setSavedChatId(String(chat.chat_id));
+      setSavedChatTitle(chat.title);
+      toast({
+        title: "Grupo salvo",
+        description: `${chat.title} (${chat.chat_id}) está cadastrado.`,
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao salvar",
+        description: e instanceof Error ? e.message : "Tente novamente",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const clearSavedChat = async () => {
+    try {
+      await upsertSetting(DORAMAS_CHAT_KEY, "");
+      await upsertSetting(DORAMAS_CHAT_TITLE_KEY, "");
+      setSavedChatId("");
+      setSavedChatTitle("");
+      toast({ title: "Grupo removido" });
+    } catch (e) {
+      toast({
+        title: "Erro ao remover",
+        description: e instanceof Error ? e.message : "Tente novamente",
         variant: "destructive",
       });
     }
@@ -394,6 +482,112 @@ const AdminTelegramImport = () => {
           </div>
         </div>
       )}
+
+      {/* Descobrir grupos via getUpdates */}
+      <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Radar className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm">Descobrir grupos do bot</h2>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Mande qualquer mensagem no grupo Doramas VIP (com o bot dentro), depois
+          clique em <span className="font-bold">Detectar grupos</span>. O sistema lê
+          as últimas mensagens do bot via <code className="text-[10px]">getUpdates</code> e
+          lista os chats encontrados.
+        </p>
+
+        {savedChatId && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-primary font-bold">
+                Grupo cadastrado
+              </p>
+              <p className="text-sm font-bold truncate">{savedChatTitle || "Sem título"}</p>
+              <p className="text-[11px] text-muted-foreground font-mono">{savedChatId}</p>
+            </div>
+            <button
+              onClick={clearSavedChat}
+              className="rounded-md bg-muted px-3 py-1.5 text-[11px] font-bold text-foreground shrink-0"
+            >
+              Remover
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={discoverChats}
+          disabled={discovering}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-50 w-full sm:w-auto"
+        >
+          {discovering ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Buscando...</>
+          ) : (
+            <><Radar className="w-4 h-4" /> Detectar grupos</>
+          )}
+        </button>
+
+        {discoverHint && (
+          <p className="text-[11px] text-muted-foreground italic">{discoverHint}</p>
+        )}
+
+        {discoveredChats.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+              Chats encontrados ({discoveredChats.length})
+            </p>
+            {discoveredChats.map((c) => {
+              const isSaved = String(c.chat_id) === savedChatId;
+              return (
+                <div
+                  key={c.chat_id}
+                  className={`rounded-md border p-3 flex items-center justify-between gap-3 ${
+                    isSaved
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-[hsl(var(--admin-border))]"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold truncate">{c.title}</p>
+                      <span className="text-[9px] uppercase tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                        {c.type}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground font-mono">
+                      {c.chat_id}
+                      {c.username ? ` · @${c.username}` : ""}
+                    </p>
+                    {c.last_message_preview && (
+                      <p className="text-[11px] text-muted-foreground truncate mt-1">
+                        “{c.last_message_preview}”
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      onClick={() => saveChat(c)}
+                      disabled={isSaved}
+                      className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-50"
+                    >
+                      {isSaved ? <CheckCircle2 className="w-3 h-3" /> : <Save className="w-3 h-3" />}
+                      {isSaved ? "Salvo" : "Salvar"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(String(c.chat_id));
+                        toast({ title: "chat_id copiado" });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md bg-muted px-3 py-1.5 text-[11px] font-bold text-foreground"
+                    >
+                      <Copy className="w-3 h-3" /> ID
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Etapa 1: cola link */}
       <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
