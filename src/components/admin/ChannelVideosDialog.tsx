@@ -145,7 +145,7 @@ const ChannelVideosDialog = ({ open, onOpenChange, chatId, chatTitle }: Props) =
   const reprocess = async (updateId: number) => {
     setProcessing((p) => ({ ...p, [updateId]: true }));
     try {
-      const { data, error } = await supabase.functions.invoke("telegram-publish-one", {
+      const { data, error } = await supabase.functions.invoke("telegram-reprocess-one", {
         body: { update_id: updateId },
       });
       if (error) throw error;
