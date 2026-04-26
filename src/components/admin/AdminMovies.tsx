@@ -218,21 +218,29 @@ const AdminMovies = () => {
                   </p>
                 )}
                 <div className="flex items-center justify-between gap-1 mt-3">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const link = buildShareLink(movie.id);
-                      try {
-                        await navigator.clipboard.writeText(link);
-                        toast.success("Link copiado!", { description: link });
-                      } catch {
-                        toast.error("Não foi possível copiar");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded transition-colors"
-                  >
-                    <Share2 className="w-3.5 h-3.5" /> Copiar link
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const link = buildShareLink(movie.id);
+                        try {
+                          await navigator.clipboard.writeText(link);
+                          toast.success("Link copiado!", { description: link });
+                        } catch {
+                          toast.error("Não foi possível copiar");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded transition-colors"
+                    >
+                      <Share2 className="w-3.5 h-3.5" /> Link
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAccessFor(movie); }}
+                      className="flex items-center gap-1.5 text-xs text-accent hover:bg-accent/10 px-2 py-1 rounded transition-colors"
+                    >
+                      <Users className="w-3.5 h-3.5" /> Acessos
+                    </button>
+                  </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => { e.stopPropagation(); openEdit(movie); }}
