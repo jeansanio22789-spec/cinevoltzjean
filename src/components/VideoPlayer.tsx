@@ -816,6 +816,9 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
                       onPick={(id) => {
                         setCurrentAudio(id);
                         if (hlsRef.current) hlsRef.current.audioTrack = id;
+                        // 💾 Salva por idioma (mais portável entre filmes)
+                        const t = audioTracks.find((tr) => tr.id === id);
+                        updatePlayerPrefs({ audioLang: t?.lang, audioName: t?.name });
                         setSettingsTab(null);
                       }}
                     />
