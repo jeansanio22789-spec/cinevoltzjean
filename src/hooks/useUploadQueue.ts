@@ -19,6 +19,7 @@ export interface UploadJob {
     title: string;
     genre: string;
     description: string;
+    audio?: string;
   };
   status: UploadStatus;
   progress: number;
