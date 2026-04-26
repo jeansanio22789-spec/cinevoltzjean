@@ -17,9 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Search, RefreshCcw, Film } from "lucide-react";
+import { Loader2, Search, RefreshCcw, Film, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ChannelVideosDialog from "./ChannelVideosDialog";
+
+interface FeaturedChannel {
+  id: number;
+  title: string;
+}
 
 interface TgRow {
   update_id: number;
@@ -86,17 +91,46 @@ const AdminVideoLibrary = () => {
   const [chatFilter, setChatFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all"); // YYYY-MM
   const [openChat, setOpenChat] = useState<{ id: number; title: string } | null>(null);
+  const [featured, setFeatured] = useState<FeaturedChannel[]>([]);
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("telegram_messages")
-      .select(
-        "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id,raw_update",
-      )
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    const [{ data, error }, { data: settings }] = await Promise.all([
+      supabase
+        .from("telegram_messages")
+        .select(
+          "update_id,chat_id,message_id,caption,text,mime_type,duration,file_size,processing_status,processing_error,created_at,movie_id,raw_update",
+        )
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      supabase
+        .from("platform_settings")
+        .select("key,value")
+        .like("key", "telegram_%_chat_id"),
+    ]);
     if (!error) setRows((data as TgRow[]) || []);
+
+    // Build featured channels list from platform_settings keys like
+    // telegram_doramas_chat_id + telegram_doramas_chat_title
+    if (settings) {
+      const idRows = settings as { key: string; value: string | null }[];
+      const titleKeys = idRows.map((r) => r.key.replace("_chat_id", "_chat_title"));
+      const { data: titles } = await supabase
+        .from("platform_settings")
+        .select("key,value")
+        .in("key", titleKeys);
+      const titleMap = new Map<string, string>();
+      (titles ?? []).forEach((t: any) => titleMap.set(t.key, t.value ?? ""));
+      const list: FeaturedChannel[] = idRows
+        .filter((r) => r.value && /^-?\d+$/.test(r.value))
+        .map((r) => ({
+          id: Number(r.value),
+          title:
+            titleMap.get(r.key.replace("_chat_id", "_chat_title")) ||
+            `Canal ${r.value}`,
+        }));
+      setFeatured(list);
+    }
     setLoading(false);
   };
 
@@ -239,6 +273,40 @@ const AdminVideoLibrary = () => {
           </Button>
         </div>
       </div>
+
+      {featured.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Star className="w-3.5 h-3.5 text-primary" />
+            Canais favoritos
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {featured.map((c) => {
+              const count = rows.filter((r) => r.chat_id === c.id).length;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setOpenChat({ id: c.id, title: c.title })}
+                  className="group flex items-center gap-2 px-3 py-2 rounded-lg border bg-card hover:border-primary hover:bg-accent transition-colors text-left"
+                >
+                  <div className="w-8 h-8 rounded-md bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                    <Film className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="leading-tight">
+                    <div className="text-sm font-semibold group-hover:text-primary transition-colors">
+                      {c.title}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {count} mensagem(ns) • ID {c.id}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="text-xs text-muted-foreground">
         {filtered.length} de {rows.length} vídeos
