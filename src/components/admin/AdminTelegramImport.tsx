@@ -734,77 +734,205 @@ const AdminTelegramImport = () => {
         )}
       </div>
 
-      {/* Import em massa: processa o que o cron já capturou */}
+      {/* Fila de revisão: prepara prévia (capa+título+vídeo) e admin confirma */}
       {savedChatId && (
         <div className="rounded-lg border border-primary/40 bg-[hsl(var(--admin-panel))] p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            <h2 className="font-bold text-sm">Importar mensagens capturadas</h2>
+            <h2 className="font-bold text-sm">Revisar & publicar do canal</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            Processa até 5 vídeos pendentes de <span className="font-bold">{savedChatTitle}</span>:
-            baixa o vídeo, sobe pro storage, IA detecta título/ano/gênero e publica
-            no catálogo automaticamente.
+            Carrega até 5 vídeos pendentes de <span className="font-bold">{savedChatTitle}</span>:
+            baixa, sobe pro storage e a IA sugere título/gênero/sinopse. Você revisa
+            cada um (capa, nome, vídeo) e clica em <span className="font-bold">Publicar</span>.
           </p>
           <p className="text-[11px] text-muted-foreground">
             ⚠️ Bot API só baixa arquivos até <span className="font-bold">20 MB</span>. Vídeos
-            maiores serão marcados como "too_large" e precisam do Worker MTProto.
+            maiores serão pulados (precisam do Worker MTProto).
           </p>
 
           <button
-            onClick={runBulkImport}
-            disabled={bulkRunning}
+            onClick={loadPreviewQueue}
+            disabled={previewLoading}
             className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50 w-full sm:w-auto"
           >
-            {bulkRunning ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Processando lote...</>
+            {previewLoading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Preparando prévia...</>
             ) : (
-              <><Download className="w-4 h-4" /> Importar próximos 5</>
+              <><Download className="w-4 h-4" /> Carregar próximos 5 pra revisar</>
             )}
           </button>
 
-          {bulkResults && (
-            <div className="space-y-2 text-xs">
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="rounded-md bg-primary/10 p-2">
-                  <p className="text-lg font-black text-primary">{bulkResults.imported}</p>
-                  <p className="text-[10px] uppercase text-muted-foreground">Publicados</p>
-                </div>
-                <div className="rounded-md bg-muted p-2">
-                  <p className="text-lg font-black">{bulkResults.skipped}</p>
-                  <p className="text-[10px] uppercase text-muted-foreground">Pulados</p>
-                </div>
-                <div className="rounded-md bg-destructive/10 p-2">
-                  <p className="text-lg font-black text-destructive">{bulkResults.errors}</p>
-                  <p className="text-[10px] uppercase text-muted-foreground">Erros</p>
-                </div>
-                <div className="rounded-md bg-muted p-2">
-                  <p className="text-lg font-black">{bulkResults.still_pending}</p>
-                  <p className="text-[10px] uppercase text-muted-foreground">Restam</p>
-                </div>
-              </div>
-              {bulkResults.results.length > 0 && (
-                <ul className="space-y-1 max-h-48 overflow-auto rounded-md border border-[hsl(var(--admin-border))] p-2">
-                  {bulkResults.results.map((r, i) => (
-                    <li
-                      key={i}
-                      className={`text-[11px] flex items-start gap-2 ${
-                        r.status === "imported"
-                          ? "text-primary"
-                          : r.status === "error"
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      <span className="font-bold uppercase shrink-0">{r.status}</span>
-                      <span className="truncate">{r.title || r.reason || "—"}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {bulkResults.still_pending > 0 && (
+          {previewSummary && previewItems.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic">
+              Pulados: {previewSummary.skipped} · Erros: {previewSummary.errors} · Pendentes: {previewSummary.still_pending}
+            </p>
+          )}
+
+          {previewItems.length > 0 && (
+            <div className="space-y-4">
+              {previewItems.map((item) => {
+                const isBusy = publishingId === item.update_id;
+                return (
+                  <div
+                    key={item.update_id}
+                    className="rounded-lg border border-[hsl(var(--admin-border))] bg-background p-4 space-y-3"
+                  >
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      {/* Capa */}
+                      <div className="shrink-0 w-full sm:w-32">
+                        {item.thumbnail_url ? (
+                          <img
+                            src={item.thumbnail_url}
+                            alt={item.meta.title}
+                            className="w-full sm:w-32 aspect-[2/3] object-cover rounded-md border border-[hsl(var(--admin-border))]"
+                          />
+                        ) : (
+                          <div className="w-full sm:w-32 aspect-[2/3] bg-muted rounded-md flex items-center justify-center text-[10px] text-muted-foreground text-center p-2">
+                            Sem capa
+                          </div>
+                        )}
+                        <Input
+                          value={item.thumbnail_url || ""}
+                          onChange={(e) =>
+                            updatePreviewItem(item.update_id, { thumbnail_url: e.target.value })
+                          }
+                          placeholder="URL da capa"
+                          className="mt-2 text-[11px] h-8"
+                        />
+                      </div>
+
+                      {/* Vídeo + dados */}
+                      <div className="flex-1 space-y-2 min-w-0">
+                        <video
+                          src={item.video_url}
+                          controls
+                          preload="metadata"
+                          className="w-full max-h-48 rounded-md bg-black"
+                        />
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                            Título
+                          </label>
+                          <Input
+                            value={item.meta.title}
+                            onChange={(e) =>
+                              updatePreviewMeta(item.update_id, { title: e.target.value })
+                            }
+                            className="mt-1 font-bold"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                              Ano
+                            </label>
+                            <Input
+                              type="number"
+                              value={item.meta.year || ""}
+                              onChange={(e) =>
+                                updatePreviewMeta(item.update_id, {
+                                  year: parseInt(e.target.value) || null,
+                                })
+                              }
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="col-span-2 sm:col-span-1">
+                            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                              Gênero
+                            </label>
+                            <Input
+                              value={item.meta.genre}
+                              onChange={(e) =>
+                                updatePreviewMeta(item.update_id, { genre: e.target.value })
+                              }
+                              className="mt-1"
+                            />
+                          </div>
+                          {item.meta.kind === "series" && (
+                            <>
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                  Temp.
+                                </label>
+                                <Input
+                                  type="number"
+                                  value={item.meta.season || ""}
+                                  onChange={(e) =>
+                                    updatePreviewMeta(item.update_id, {
+                                      season: parseInt(e.target.value) || null,
+                                    })
+                                  }
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                  Ep.
+                                </label>
+                                <Input
+                                  type="number"
+                                  value={item.meta.episode || ""}
+                                  onChange={(e) =>
+                                    updatePreviewMeta(item.update_id, {
+                                      episode: parseInt(e.target.value) || null,
+                                    })
+                                  }
+                                  className="mt-1"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                            Sinopse
+                          </label>
+                          <textarea
+                            value={item.meta.synopsis}
+                            onChange={(e) =>
+                              updatePreviewMeta(item.update_id, { synopsis: e.target.value })
+                            }
+                            rows={2}
+                            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          {item.meta.kind === "series" ? "Série" : "Filme"}
+                          {item.size_mb ? ` · ${item.size_mb} MB` : ""}
+                          {item.duration_min ? ` · ${item.duration_min} min` : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => confirmPublish(item)}
+                        disabled={isBusy}
+                        className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-xs font-black text-primary-foreground disabled:opacity-50"
+                      >
+                        {isBusy ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3 h-3" />
+                        )}
+                        Confirmar e publicar
+                      </button>
+                      <button
+                        onClick={() => discardItem(item)}
+                        disabled={isBusy}
+                        className="rounded-md bg-muted px-4 py-2 text-xs font-bold text-foreground disabled:opacity-50"
+                      >
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {previewSummary && previewSummary.still_pending > 0 && (
                 <p className="text-[11px] text-muted-foreground italic">
-                  Clique de novo pra processar os próximos {Math.min(5, bulkResults.still_pending)}.
+                  Mais {previewSummary.still_pending} pendente(s) — publique/descarte estes e clique em "Carregar próximos" de novo.
                 </p>
               )}
             </div>
