@@ -21,6 +21,7 @@ import MaintenanceGate from "@/components/MaintenanceGate";
 import InstallAppPrompt from "@/components/InstallAppPrompt";
 import { useEffect } from "react";
 import { installAudioUnlock } from "@/lib/audioUnlock";
+import { initUploadQueue } from "@/hooks/useUploadQueue";
 
 
 const queryClient = new QueryClient();
@@ -28,6 +29,9 @@ const queryClient = new QueryClient();
 const App = () => {
   useEffect(() => {
     installAudioUnlock();
+    // Garante que uploads em andamento continuem mesmo se o usuário sair
+    // do painel admin ou recarregar o app.
+    initUploadQueue();
   }, []);
   return (
   <QueryClientProvider client={queryClient}>

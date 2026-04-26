@@ -152,11 +152,22 @@ if (typeof window !== "undefined") {
     e.returnValue = "Uploads em andamento — se fechar, vão parar!";
   });
 
-  // Quando a aba volta do background, re-pede wake lock (browser solta sozinho)
+  // Quando a aba volta do background, re-pede wake lock e retoma
+  // qualquer job que estava rodando mas perdeu o XHR vivo.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && hasActiveUploads()) {
-      void requestWakeLock();
-    }
+    if (document.visibilityState !== "visible") return;
+    if (hasActiveUploads()) void requestWakeLock();
+    // Retoma jobs que estavam ativos mas não têm runner vivo (ex.: aba foi
+    // pro background no mobile e o navegador matou o XHR).
+    store.jobs.forEach((j) => {
+      const isActive =
+        j.status === "uploading" ||
+        j.status === "warning" ||
+        j.status === "queued";
+      if (isActive && !runningJobIds.has(j.id)) {
+        void runJob(j);
+      }
+    });
   });
 }
 
@@ -422,6 +433,35 @@ interface EnqueueInput {
 }
 
 // ---------------------------------------------------------------------------
+// Inicialização global — chame UMA vez no boot do app (App.tsx) para garantir
+// que jobs persistidos sejam retomados mesmo se nenhum componente que usa o
+// hook estiver montado ainda.
+// ---------------------------------------------------------------------------
+export const initUploadQueue = () => {
+  if (store.initialized) return;
+  store.initialized = true;
+  void loadPersistedUploadJobs().then((saved) => {
+    if (!saved.length || store.jobs.length > 0) return;
+    const restoredJobs: UploadJob[] = saved
+      .filter((j) => j.status !== "done")
+      .map((j) => ({
+        ...j,
+        status: j.status === "error" ? "error" : "queued",
+        progress: j.status === "error" ? j.progress : 0,
+        speedMBs: 0,
+        etaSec: 0,
+        timedOut: false,
+        thumbPreviewUrl: j.thumbnail ? URL.createObjectURL(j.thumbnail) : null,
+      }));
+
+    store.hydrate(restoredJobs);
+    restoredJobs
+      .filter((j) => j.status !== "error")
+      .forEach((j) => void runJob(j));
+  });
+};
+
+// ---------------------------------------------------------------------------
 // Hook que apenas se "pluga" no store global
 // ---------------------------------------------------------------------------
 export const useUploadQueue = (onJobDone?: () => void) => {
@@ -429,30 +469,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
 
   useEffect(() => {
     const unsub = store.subscribe(setJobs);
-
-    if (!store.initialized) {
-      store.initialized = true;
-      void loadPersistedUploadJobs().then((saved) => {
-        if (!saved.length || store.jobs.length > 0) return;
-        const restoredJobs: UploadJob[] = saved
-          .filter((j) => j.status !== "done")
-          .map((j) => ({
-            ...j,
-            status: j.status === "error" ? "error" : "queued",
-            progress: j.status === "error" ? j.progress : 0,
-            speedMBs: 0,
-            etaSec: 0,
-            timedOut: false,
-            thumbPreviewUrl: j.thumbnail ? URL.createObjectURL(j.thumbnail) : null,
-          }));
-
-        store.hydrate(restoredJobs);
-        restoredJobs
-          .filter((j) => j.status !== "error")
-          .forEach((j) => void runJob(j));
-      });
-    }
-
+    initUploadQueue();
     return () => {
       unsub();
     };
