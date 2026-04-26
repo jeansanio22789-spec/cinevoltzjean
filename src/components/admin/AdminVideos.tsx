@@ -265,7 +265,7 @@ const AdminVideos = () => {
               <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5"><Type className="w-3.5 h-3.5" /> Título</label>
               <input
                 className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={selectedFiles.length > 1 ? "Título base (vai virar 'Título (1)', 'Título (2)'…)" : "Nome do filme ou série"}
+                placeholder="Nome do filme ou série"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
