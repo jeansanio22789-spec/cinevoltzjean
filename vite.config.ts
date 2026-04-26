@@ -18,27 +18,35 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      workbox: {
-        navigateFallbackDenylist: [/^\/~oauth/],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,webp}"],
+      // Use the static public/manifest.webmanifest instead of generating one
+      manifest: false,
+      devOptions: {
+        enabled: false,
       },
-      includeAssets: ["favicon.ico"],
-      manifest: {
-        name: "StreamFlix",
-        short_name: "StreamFlix",
-        description: "Assista filmes e séries ilimitados",
-        theme_color: "#0a0a0a",
-        background_color: "#0a0a0a",
-        display: "standalone",
-        orientation: "portrait",
-        scope: "/",
-        start_url: "/",
-        icons: [
-          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      workbox: {
+        navigateFallbackDenylist: [/^\/~oauth/, /^\/api/, /^\/functions/],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,webmanifest}"],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith("/icons/"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "pwa-icons",
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
         ],
       },
+      includeAssets: [
+        "favicon.ico",
+        "apple-touch-icon.png",
+        "manifest.webmanifest",
+        "icons/*.png",
+        "screenshot-mobile.png",
+      ],
     }),
   ].filter(Boolean),
   resolve: {
