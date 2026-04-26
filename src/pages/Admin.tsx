@@ -21,7 +21,7 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   movies: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   content: { title: "Catálogo", subtitle: "Gerencie filmes, séries e conteúdos" },
   channels: { title: "Canais Ao Vivo", subtitle: "Cadastre emissoras com nome, logo e stream" },
-  telegram: { title: "Importar do Telegram", subtitle: "Login MTProto e streaming sem download" },
+  videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
   sponsors: { title: "Patrocinadores", subtitle: "Anunciantes pagos no player e na página Ao Vivo" },
