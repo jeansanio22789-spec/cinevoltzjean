@@ -207,6 +207,7 @@ export type Database = {
       }
       movies: {
         Row: {
+          audio: string | null
           created_at: string
           description: string | null
           duration: string | null
@@ -222,6 +223,7 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          audio?: string | null
           created_at?: string
           description?: string | null
           duration?: string | null
@@ -237,6 +239,7 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          audio?: string | null
           created_at?: string
           description?: string | null
           duration?: string | null

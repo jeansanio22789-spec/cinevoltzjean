@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
-  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw,
+  FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Languages,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,6 +44,34 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+// Detecta faixa de áudio pelo nome do arquivo
+// "Filme.DUAL.1080p.mkv" -> "Dual"   |   "Serie.LEG.mp4" -> "Legendado"
+type AudioTrack = "Dublado" | "Legendado" | "Dual" | "Original";
+const detectAudioFromFilename = (name: string): AudioTrack | null => {
+  const n = name.toLowerCase();
+  // Dual primeiro (tem prioridade — quer dizer que tem dublado E legendado)
+  if (/\b(dual|dual[\s._-]?audio|multi[\s._-]?audio|2audios?)\b/.test(n))
+    return "Dual";
+  if (
+    /\b(dub|dubl|dublad[oa]|dublagem|nacional|português|portugues|pt[\s._-]?br|ptbr|brazilian)\b/.test(
+      n,
+    )
+  )
+    return "Dublado";
+  if (/\b(leg|legend|legendad[oa]|sub|subbed|subtitle[ds]?|vose)\b/.test(n))
+    return "Legendado";
+  return null;
+};
+
+// Detecta a primeira faixa que aparecer numa lista de arquivos (consenso simples)
+const detectAudioFromFiles = (files: File[]): AudioTrack | null => {
+  for (const f of files) {
+    const a = detectAudioFromFilename(f.name);
+    if (a) return a;
+  }
+  return null;
+};
+
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
     case "queued":
@@ -72,11 +100,18 @@ const AdminVideos = () => {
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    genre: string;
+    type: string;
+    description: string;
+    audio: AudioTrack;
+  }>({
     title: "",
     genre: "Ação",
     type: "Filme",
     description: "",
+    audio: "Original",
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -148,7 +183,20 @@ const AdminVideos = () => {
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setSelectedFiles((prev) => [...prev, ...Array.from(files)]);
+    const arr = Array.from(files);
+    setSelectedFiles((prev) => {
+      const next = [...prev, ...arr];
+      // Auto-detecta a faixa de áudio se ainda estiver no padrão "Original"
+      // (não sobrescreve se o usuário já escolheu manualmente)
+      setForm((f) => {
+        if (f.audio !== "Original") return f;
+        const detected = detectAudioFromFiles(arr);
+        if (!detected) return f;
+        toast.success(`Áudio detectado: ${detected}`);
+        return { ...f, audio: detected };
+      });
+      return next;
+    });
   };
 
   const removeSelected = (idx: number) => {
@@ -174,6 +222,7 @@ const AdminVideos = () => {
         title: form.title,
         genre: form.genre,
         description: form.description,
+        audio: form.audio,
       },
     }));
 
@@ -186,7 +235,13 @@ const AdminVideos = () => {
     // Limpa o formulário, mas mantém o painel aberto para a fila
     setSelectedFiles([]);
     setThumbnailFile(null);
-    setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+    setForm({
+      title: "",
+      genre: "Ação",
+      type: "Filme",
+      description: "",
+      audio: "Original",
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -325,6 +380,28 @@ const AdminVideos = () => {
                 <option>Série - Episódio</option>
                 <option>Trailer</option>
                 <option>Documentário</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                <Languages className="w-3.5 h-3.5" /> Áudio
+                {form.audio !== "Original" && (
+                  <span className="text-[10px] text-accent font-normal">
+                    (detectado pelo nome do arquivo)
+                  </span>
+                )}
+              </label>
+              <select
+                className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                value={form.audio}
+                onChange={(e) =>
+                  setForm({ ...form, audio: e.target.value as AudioTrack })
+                }
+              >
+                <option value="Original">Original</option>
+                <option value="Dublado">Dublado</option>
+                <option value="Legendado">Legendado</option>
+                <option value="Dual">Dual (Dub + Leg)</option>
               </select>
             </div>
             <div>
