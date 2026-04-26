@@ -149,6 +149,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const body = await req.json().catch(() => ({}));
     const limit = Math.min(Number(body?.limit) || 5, 10);
+    const dryRun = Boolean(body?.dryRun);
 
     // 1) Carrega o chat_id salvo
     const { data: settingRow } = await supabase
