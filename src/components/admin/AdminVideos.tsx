@@ -46,6 +46,38 @@ const fileToBase64 = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
+// Redimensiona a capa pra no máximo 1024px e comprime em JPEG.
+// Capas grandes (4–10 MB) viravam base64 enorme e a IA falhava silenciosamente.
+const resizeCoverForAI = (file: File): Promise<{ base64: string; mimeType: string }> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 1024;
+        const scale = Math.min(maxDim / img.width, maxDim / img.height, 1);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas indisponível"));
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const comma = dataUrl.indexOf(",");
+        resolve({
+          base64: comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl,
+          mimeType: "image/jpeg",
+        });
+      };
+      img.onerror = () => reject(new Error("Imagem inválida"));
+      img.src = reader.result as string;
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
 // Detecta faixa de áudio pelo nome do arquivo (usado p/ anexar ao TÍTULO em MAIÚSCULAS)
 // "Filme.DUAL.1080p.mkv" -> "DUAL"   |   "Serie.LEG.mp4" -> "LEGENDADO"
 type AudioTag = "DUBLADO" | "LEGENDADO" | "DUAL";
@@ -148,10 +180,11 @@ const AdminVideos = () => {
   const recognizeTitleFromCover = async (file: File) => {
     setRecognizingTitle(true);
     try {
-      const imageBase64 = await fileToBase64(file);
+      // Redimensiona+comprime antes de enviar (evita 413/timeout no gateway)
+      const { base64: imageBase64, mimeType } = await resizeCoverForAI(file);
       const { data, error } = await supabase.functions.invoke(
         "recognize-cover-title",
-        { body: { imageBase64, mimeType: file.type || "image/jpeg" } },
+        { body: { imageBase64, mimeType } },
       );
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
