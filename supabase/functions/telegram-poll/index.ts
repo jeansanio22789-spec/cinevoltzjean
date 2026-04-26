@@ -140,7 +140,11 @@ Deno.serve(async (req) => {
         const captionOrText = (msg.caption ?? msg.text ?? "").trim();
         const externalUrl = extractVideoUrl(captionOrText);
 
-        const hasContent = !!(video || externalUrl);
+        // Bloqueia links internos do Telegram (t.me/c/... ou t.me/+...) — não são streamáveis
+        const isTelegramInternal = externalUrl &&
+          /^https?:\/\/t\.me\//i.test(externalUrl);
+
+        const hasContent = !!(video || (externalUrl && !isTelegramInternal));
         const tooBig =
           !!video && !externalUrl &&
           (video.file_size ?? 0) > TELEGRAM_DOWNLOAD_LIMIT;
@@ -188,6 +192,31 @@ Deno.serve(async (req) => {
                   `📝 Para vídeos maiores, hospede em Drive/Bunny/R2 e mande:\n` +
                   `Título do filme\nDescrição\nhttps://link-direto-do-video.mp4\n\n` +
                   `Pode mandar a CAPA junto na mesma mensagem.`,
+              },
+              LOVABLE_API_KEY,
+              TELEGRAM_API_KEY,
+            );
+          } catch (_) { /* ignora */ }
+          continue;
+        }
+
+        // Avisa que link interno do Telegram não funciona
+        if (isTelegramInternal) {
+          try {
+            await tg(
+              "sendMessage",
+              {
+                chat_id: msg.chat.id,
+                reply_to_message_id: msg.message_id,
+                text:
+                  `⚠️ Link do Telegram (t.me/...) não funciona como vídeo.\n\n` +
+                  `Esse link só abre o app do Telegram, não toca como filme.\n\n` +
+                  `📝 Use um link DIRETO do arquivo, terminando em .mp4 / .m3u8 / .mkv:\n` +
+                  `• Bunny.net Storage\n` +
+                  `• Cloudflare R2 (público)\n` +
+                  `• Google Drive: \`https://drive.google.com/uc?export=download&id=ID_DO_ARQUIVO\`\n\n` +
+                  `Mande assim:\n` +
+                  `Título do filme\nDescrição\nhttps://meusite.com/filme.mp4`,
               },
               LOVABLE_API_KEY,
               TELEGRAM_API_KEY,
