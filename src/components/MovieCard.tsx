@@ -13,7 +13,7 @@ const MovieCard = ({ movie }: MovieCardProps) => {
   return (
     <div
       onClick={goToWatch}
-      className="poster-card relative flex-shrink-0 w-[140px] md:w-[180px] rounded-md overflow-hidden cursor-pointer group"
+      className="poster-card relative w-full rounded-md overflow-hidden cursor-pointer group"
     >
       <div className="aspect-[2/3] relative bg-muted">
         {movie.thumbnail_url ? (
