@@ -17,18 +17,26 @@ interface TelegramPlayerProps {
 }
 
 /**
- * Converte uma URL t.me/canal/123 no formato de embed oficial do Telegram.
- * Retorna null se for um link de canal sem mensagem específica
- * (não dá pra embedar canal inteiro).
+ * Converte qualquer URL t.me em formato de embed.
+ * - t.me/canal/123 → embed do post (com player de vídeo)
+ * - t.me/canal     → embed do canal inteiro
+ * Forçamos sempre algum embed para o player abrir dentro do app.
  */
 const buildEmbedUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
-  // Suporta https://t.me/canal/123 e https://telegram.me/canal/123
-  const m = url.match(/^https?:\/\/(?:t|telegram)\.me\/([^/?#]+)\/(\d+)(?:[/?#].*)?$/i);
-  if (!m) return null;
-  const [, channel, msgId] = m;
-  // mode=tme = post embebido com player de vídeo nativo do Telegram
-  return `https://t.me/${channel}/${msgId}?embed=1&mode=tme`;
+  const clean = url.trim();
+  // Post específico: t.me/canal/123 ou t.me/c/123456/45
+  const post = clean.match(/^https?:\/\/(?:t|telegram)\.me\/([^/?#]+(?:\/\d+)?)\/(\d+)(?:[/?#].*)?$/i);
+  if (post) {
+    return `https://t.me/${post[1]}/${post[2]}?embed=1&mode=tme`;
+  }
+  // Canal inteiro: t.me/canal
+  const channel = clean.match(/^https?:\/\/(?:t|telegram)\.me\/([^/?#]+)\/?$/i);
+  if (channel) {
+    return `https://t.me/s/${channel[1]}`;
+  }
+  // Última tentativa: força embed mesmo assim
+  return `${clean}${clean.includes("?") ? "&" : "?"}embed=1&mode=tme`;
 };
 
 const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
