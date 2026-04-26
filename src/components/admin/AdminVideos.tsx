@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
+import { saveLocalVideo, getStorageEstimate } from "@/lib/localVideoStore";
 
 interface Video {
   id: string;
