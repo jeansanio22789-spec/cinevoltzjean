@@ -209,7 +209,10 @@ const AdminVideoLibrary = () => {
             <SelectItem value="all">Todos os canais</SelectItem>
             {chats.map((c) => (
               <SelectItem key={c} value={c}>
-                {c}
+                {chatLabel(c)}
+                {chatTitleMap.has(c) && (
+                  <span className="text-muted-foreground ml-2 text-xs">({c})</span>
+                )}
               </SelectItem>
             ))}
           </SelectContent>
