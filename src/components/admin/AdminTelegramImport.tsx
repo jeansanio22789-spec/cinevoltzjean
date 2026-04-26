@@ -2,39 +2,55 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Loader2, Save, Download, Server, ExternalLink, CheckCircle2 } from "lucide-react";
+import {
+  Loader2, Save, Download, Server, ExternalLink, CheckCircle2,
+  Sparkles, Search, Film, Tv,
+} from "lucide-react";
 
 const WORKER_URL_KEY = "telegram_worker_url";
 const WORKER_TOKEN_KEY = "telegram_worker_token";
 
-interface ImportResult {
+interface WorkerFetchResult {
   ok: boolean;
   file_id?: string;
   stream_url?: string;
-  title?: string;
+  caption?: string;
+  thumbnail_url?: string;
   duration?: number;
   size?: number;
-  thumbnail_url?: string;
   error?: string;
+}
+
+interface AIMetadata {
+  title: string;
+  original_title?: string | null;
+  year?: number | null;
+  genre: string;
+  kind: "movie" | "series";
+  season?: number | null;
+  episode?: number | null;
+  synopsis: string;
 }
 
 const AdminTelegramImport = () => {
   const { toast } = useToast();
 
-  // Config do worker
+  // Config
   const [workerUrl, setWorkerUrl] = useState("");
   const [workerToken, setWorkerToken] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [workerStatus, setWorkerStatus] = useState<"unknown" | "ok" | "down">("unknown");
 
-  // Form de importação
+  // Fluxo de import
   const [telegramLink, setTelegramLink] = useState("");
-  const [movieTitle, setMovieTitle] = useState("");
-  const [genre, setGenre] = useState("Ação");
-  const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [importing, setImporting] = useState(false);
-  const [lastResult, setLastResult] = useState<ImportResult | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  const [fetchResult, setFetchResult] = useState<WorkerFetchResult | null>(null);
+  const [meta, setMeta] = useState<AIMetadata | null>(null);
+  const [thumbOverride, setThumbOverride] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -50,28 +66,27 @@ const AdminTelegramImport = () => {
     load();
   }, []);
 
+  const upsertSetting = async (key: string, value: string) => {
+    const { data: existing } = await supabase
+      .from("platform_settings")
+      .select("id")
+      .eq("key", key)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from("platform_settings").update({ value }).eq("id", existing.id);
+    } else {
+      await supabase.from("platform_settings").insert({ key, value });
+    }
+  };
+
   const saveConfig = async () => {
     setSavingConfig(true);
     try {
       const cleanUrl = workerUrl.trim().replace(/\/+$/, "");
-      const upserts = [
-        { key: WORKER_URL_KEY, value: cleanUrl },
-        { key: WORKER_TOKEN_KEY, value: workerToken.trim() },
-      ];
-      for (const row of upserts) {
-        const { data: existing } = await supabase
-          .from("platform_settings")
-          .select("id")
-          .eq("key", row.key)
-          .maybeSingle();
-        if (existing) {
-          await supabase.from("platform_settings").update({ value: row.value }).eq("id", existing.id);
-        } else {
-          await supabase.from("platform_settings").insert(row);
-        }
-      }
+      await upsertSetting(WORKER_URL_KEY, cleanUrl);
+      await upsertSetting(WORKER_TOKEN_KEY, workerToken.trim());
       setWorkerUrl(cleanUrl);
-      toast({ title: "Configuração salva", description: "Worker atualizado." });
+      toast({ title: "Configuração salva" });
     } catch (e) {
       toast({
         title: "Erro ao salvar",
@@ -95,7 +110,7 @@ const AdminTelegramImport = () => {
       });
       if (res.ok) {
         setWorkerStatus("ok");
-        toast({ title: "Worker online", description: "Conexão OK." });
+        toast({ title: "Worker online" });
       } else {
         setWorkerStatus("down");
         toast({ title: `Worker respondeu ${res.status}`, variant: "destructive" });
@@ -104,13 +119,13 @@ const AdminTelegramImport = () => {
       setWorkerStatus("down");
       toast({
         title: "Não consegui conectar no worker",
-        description: e instanceof Error ? e.message : "Verifique a URL e CORS",
+        description: e instanceof Error ? e.message : "Verifique URL e CORS",
         variant: "destructive",
       });
     }
   };
 
-  const runImport = async () => {
+  const fetchFromTelegram = async () => {
     if (!workerUrl) {
       toast({ title: "Configure o worker antes", variant: "destructive" });
       return;
@@ -120,8 +135,11 @@ const AdminTelegramImport = () => {
       return;
     }
 
-    setImporting(true);
-    setLastResult(null);
+    setFetching(true);
+    setFetchResult(null);
+    setMeta(null);
+    setThumbOverride("");
+
     try {
       const res = await fetch(`${workerUrl}/import`, {
         method: "POST",
@@ -131,39 +149,114 @@ const AdminTelegramImport = () => {
         },
         body: JSON.stringify({ url: telegramLink.trim() }),
       });
-      const data = (await res.json()) as ImportResult;
+      const data = (await res.json()) as WorkerFetchResult;
       if (!res.ok || !data.ok || !data.stream_url) {
         throw new Error(data.error || `Worker retornou ${res.status}`);
       }
-      setLastResult(data);
+      setFetchResult(data);
+      setThumbOverride(data.thumbnail_url || "");
 
-      // Cria o filme apontando o video_url pro stream do worker
-      const { error: insertError } = await supabase.from("movies").insert({
-        title: movieTitle.trim() || data.title || "Sem título",
-        video_url: data.stream_url,
-        thumbnail_url: data.thumbnail_url || null,
-        genre,
-        year,
-        duration: data.duration ? `${Math.round(data.duration / 60)}min` : null,
-        status: "published",
-        description: `Importado do Telegram via worker MTProto.`,
-      });
-      if (insertError) throw insertError;
-
-      toast({
-        title: "Filme importado!",
-        description: "Já aparece no catálogo e toca direto no site.",
-      });
-      setTelegramLink("");
-      setMovieTitle("");
+      // Auto-roda IA com o caption
+      if (data.caption) {
+        await enrichWithAI(data.caption);
+      } else {
+        toast({
+          title: "Vídeo encontrado",
+          description: "Sem caption — preencha os dados manualmente.",
+        });
+        setMeta({
+          title: "",
+          year: new Date().getFullYear(),
+          genre: "Ação",
+          kind: "movie",
+          synopsis: "",
+        });
+      }
     } catch (e) {
       toast({
-        title: "Falha na importação",
+        title: "Falha ao buscar do Telegram",
         description: e instanceof Error ? e.message : "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
-      setImporting(false);
+      setFetching(false);
+    }
+  };
+
+  const enrichWithAI = async (caption: string) => {
+    setEnriching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-movie-metadata", {
+        body: { caption },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.ok || !data.metadata) throw new Error(data?.error || "IA não respondeu");
+      setMeta(data.metadata as AIMetadata);
+      toast({
+        title: "Metadados detectados",
+        description: `${data.metadata.title}${data.metadata.year ? ` (${data.metadata.year})` : ""}`,
+      });
+    } catch (e) {
+      toast({
+        title: "IA não conseguiu extrair",
+        description: e instanceof Error ? e.message : "Preencha manualmente",
+        variant: "destructive",
+      });
+      setMeta({
+        title: "",
+        year: new Date().getFullYear(),
+        genre: "Ação",
+        kind: "movie",
+        synopsis: "",
+      });
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  const publish = async () => {
+    if (!meta || !fetchResult?.stream_url) return;
+    if (!meta.title.trim()) {
+      toast({ title: "Título obrigatório", variant: "destructive" });
+      return;
+    }
+
+    setPublishing(true);
+    try {
+      const fullTitle =
+        meta.kind === "series" && meta.season && meta.episode
+          ? `${meta.title} — T${meta.season}E${meta.episode}`
+          : meta.title;
+
+      const { error: insertError } = await supabase.from("movies").insert({
+        title: fullTitle,
+        video_url: fetchResult.stream_url,
+        thumbnail_url: thumbOverride || fetchResult.thumbnail_url || null,
+        genre: meta.genre,
+        year: meta.year || null,
+        duration: fetchResult.duration ? `${Math.round(fetchResult.duration / 60)}min` : null,
+        status: "published",
+        description: meta.synopsis || "Importado do Telegram.",
+      });
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Publicado!",
+        description: `${fullTitle} já está no catálogo.`,
+      });
+      // Reset
+      setTelegramLink("");
+      setFetchResult(null);
+      setMeta(null);
+      setThumbOverride("");
+    } catch (e) {
+      toast({
+        title: "Erro ao publicar",
+        description: e instanceof Error ? e.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -191,12 +284,6 @@ const AdminTelegramImport = () => {
             <span className="text-[10px] font-bold text-destructive">OFFLINE</span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">
-          O worker roda em VPS/Railway/Fly.io e expõe os endpoints{" "}
-          <code className="text-foreground">/health</code>,{" "}
-          <code className="text-foreground">/import</code> e{" "}
-          <code className="text-foreground">/stream</code>. Configure aqui o endereço público.
-        </p>
 
         <div className="grid gap-3">
           <div>
@@ -212,7 +299,7 @@ const AdminTelegramImport = () => {
           </div>
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-              Token (opcional, header Bearer)
+              Token (opcional)
             </label>
             <Input
               type="password"
@@ -241,91 +328,195 @@ const AdminTelegramImport = () => {
         </div>
       </div>
 
-      {/* Importação */}
+      {/* Etapa 1: cola link */}
       <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Download className="w-4 h-4 text-primary" />
-          <h2 className="font-bold text-sm">Importar filme do Telegram</h2>
+          <Search className="w-4 h-4 text-primary" />
+          <h2 className="font-bold text-sm">1. Cole o link do Telegram</h2>
         </div>
         <p className="text-xs text-muted-foreground">
-          Cole o link da mensagem (ex.{" "}
-          <code className="text-foreground">https://t.me/c/123456789/42</code>). O worker baixa via
-          MTProto, gera URL de streaming com Range/HLS e cria o filme aqui.
+          A IA vai detectar título, ano, gênero e sinopse do caption. A capa vem da
+          thumbnail nativa da mensagem.
         </p>
 
-        <div className="grid gap-3">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-              Link da mensagem do Telegram
-            </label>
-            <Input
-              value={telegramLink}
-              onChange={(e) => setTelegramLink(e.target.value)}
-              placeholder="https://t.me/c/123456789/42"
-              className="mt-1"
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                Título (opcional)
-              </label>
-              <Input
-                value={movieTitle}
-                onChange={(e) => setMovieTitle(e.target.value)}
-                placeholder="Detectar do caption se vazio"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-                Ano
-              </label>
-              <Input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(parseInt(e.target.value) || year)}
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-              Gênero
-            </label>
-            <Input
-              value={genre}
-              onChange={(e) => setGenre(e.target.value)}
-              placeholder="Ação, Drama, Comédia..."
-              className="mt-1"
-            />
-          </div>
+        <Input
+          value={telegramLink}
+          onChange={(e) => setTelegramLink(e.target.value)}
+          placeholder="https://t.me/c/123456789/42"
+          disabled={fetching || enriching || publishing}
+        />
 
-          <button
-            onClick={runImport}
-            disabled={importing || !workerUrl}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50"
-          >
-            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {importing ? "Importando…" : "Importar e publicar"}
-          </button>
-        </div>
-
-        {lastResult?.ok && (
-          <div className="rounded-md border border-primary/30 bg-primary/10 p-3 text-xs">
-            <p className="font-bold text-primary mb-1">✓ Importado</p>
-            <p className="text-muted-foreground break-all">
-              <span className="text-foreground">URL:</span> {lastResult.stream_url}
-            </p>
-            {lastResult.size && (
-              <p className="text-muted-foreground">
-                <span className="text-foreground">Tamanho:</span>{" "}
-                {(lastResult.size / 1024 / 1024).toFixed(1)} MB
-              </p>
-            )}
-          </div>
-        )}
+        <button
+          onClick={fetchFromTelegram}
+          disabled={fetching || enriching || publishing || !workerUrl}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50 w-full sm:w-auto"
+        >
+          {fetching ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" /> Baixando do Telegram…
+            </>
+          ) : enriching ? (
+            <>
+              <Sparkles className="w-4 h-4 animate-pulse" /> IA detectando metadados…
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" /> Buscar e detectar
+            </>
+          )}
+        </button>
       </div>
+
+      {/* Etapa 2: preview + revisão */}
+      {meta && fetchResult && (
+        <div className="rounded-lg border border-primary/40 bg-[hsl(var(--admin-panel))] p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h2 className="font-bold text-sm">2. Revise e publique</h2>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-wider">
+              {meta.kind === "series" ? <Tv className="w-3 h-3" /> : <Film className="w-3 h-3" />}
+              {meta.kind === "series" ? "Série / Dorama" : "Filme"}
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Capa */}
+            <div className="shrink-0 w-full sm:w-40">
+              {thumbOverride || fetchResult.thumbnail_url ? (
+                <img
+                  src={thumbOverride || fetchResult.thumbnail_url}
+                  alt={meta.title}
+                  className="w-full sm:w-40 aspect-[2/3] object-cover rounded-md shadow-lg border border-[hsl(var(--admin-border))]"
+                />
+              ) : (
+                <div className="w-full sm:w-40 aspect-[2/3] bg-muted rounded-md flex items-center justify-center text-muted-foreground text-xs">
+                  Sem capa
+                </div>
+              )}
+              <Input
+                value={thumbOverride}
+                onChange={(e) => setThumbOverride(e.target.value)}
+                placeholder="URL custom da capa"
+                className="mt-2 text-xs"
+              />
+            </div>
+
+            {/* Campos */}
+            <div className="flex-1 space-y-3 min-w-0">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                  Título
+                </label>
+                <Input
+                  value={meta.title}
+                  onChange={(e) => setMeta({ ...meta, title: e.target.value })}
+                  className="mt-1 font-bold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                    Ano
+                  </label>
+                  <Input
+                    type="number"
+                    value={meta.year || ""}
+                    onChange={(e) =>
+                      setMeta({ ...meta, year: parseInt(e.target.value) || null })
+                    }
+                    className="mt-1"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                    Gênero
+                  </label>
+                  <Input
+                    value={meta.genre}
+                    onChange={(e) => setMeta({ ...meta, genre: e.target.value })}
+                    className="mt-1"
+                  />
+                </div>
+                {meta.kind === "series" && (
+                  <>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                        Temp.
+                      </label>
+                      <Input
+                        type="number"
+                        value={meta.season || ""}
+                        onChange={(e) =>
+                          setMeta({ ...meta, season: parseInt(e.target.value) || null })
+                        }
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                        Ep.
+                      </label>
+                      <Input
+                        type="number"
+                        value={meta.episode || ""}
+                        onChange={(e) =>
+                          setMeta({ ...meta, episode: parseInt(e.target.value) || null })
+                        }
+                        className="mt-1"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                  Sinopse
+                </label>
+                <textarea
+                  value={meta.synopsis}
+                  onChange={(e) => setMeta({ ...meta, synopsis: e.target.value })}
+                  rows={3}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+
+              {fetchResult.size && (
+                <p className="text-[10px] text-muted-foreground">
+                  {(fetchResult.size / 1024 / 1024).toFixed(1)} MB
+                  {fetchResult.duration
+                    ? ` · ${Math.round(fetchResult.duration / 60)} min`
+                    : ""}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={publish}
+              disabled={publishing || enriching}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-50 flex-1"
+            >
+              {publishing ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4" />
+              )}
+              {publishing ? "Publicando…" : "Publicar no catálogo"}
+            </button>
+            <button
+              onClick={() => fetchResult.caption && enrichWithAI(fetchResult.caption)}
+              disabled={enriching || !fetchResult.caption}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-muted px-4 py-3 text-sm font-bold text-foreground disabled:opacity-50"
+              title="Re-rodar IA"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
