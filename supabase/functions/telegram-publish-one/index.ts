@@ -69,11 +69,16 @@ Deno.serve(async (req) => {
         ? `${body.title.trim()} — T${body.season}E${body.episode}`
         : body.title.trim();
 
+    // Quando o video_url é um link público do Telegram (t.me/c/...), grava
+    // também em telegram_url pra que o player use TelegramPlayer.
+    const isTelegramLink = /^https?:\/\/(t\.me|telegram\.me)\//i.test(body.video_url);
+
     const { data: movie, error: movieErr } = await supabase
       .from('movies')
       .insert({
         title: fullTitle,
         video_url: body.video_url,
+        telegram_url: isTelegramLink ? body.video_url : null,
         thumbnail_url: body.thumbnail_url || null,
         genre: body.genre || 'Drama',
         year: body.year || null,
