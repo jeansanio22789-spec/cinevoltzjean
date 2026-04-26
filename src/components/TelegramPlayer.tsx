@@ -46,22 +46,32 @@ const TelegramPlayer = ({ movie, onBack }: TelegramPlayerProps) => {
     if (!movie.telegram_url) return;
     setImporting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("telegram-fetch", {
-        body: { url: movie.telegram_url },
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-fetch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ url: movie.telegram_url }),
       });
-      if (error) throw error;
-      const videoUrl = (data as { video_url?: string })?.video_url;
-      if (!videoUrl) throw new Error("Sem URL de vídeo retornada");
 
-      // Salva no banco pra próxima vez já abrir direto no player nativo
+      const payload = await response.json().catch(() => null) as { video_url?: string; error?: string } | null;
+      const videoUrl = payload?.video_url;
+      if (!response.ok || !videoUrl) {
+        throw new Error(payload?.error || "O Telegram bloqueou a importação desse vídeo.");
+      }
+
       await supabase.from("movies").update({ video_url: videoUrl }).eq("id", movie.id);
 
       setImportedUrl(videoUrl);
       toast.success("Vídeo importado! Tocando aqui mesmo.");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Falha ao importar";
-      toast.error(msg, {
-        description: "Vídeos acima de 20MB não são suportados pela API do Telegram.",
+      const msg = e instanceof Error ? e.message : "O Telegram bloqueou a importação desse vídeo.";
+      toast.error("Não deu para tocar esse vídeo dentro do app", {
+        description: msg.includes("message to forward not found")
+          ? "O bot não consegue acessar essa mensagem. Adicione o bot como admin do canal/grupo e tente novamente."
+          : msg,
       });
     } finally {
       setImporting(false);
