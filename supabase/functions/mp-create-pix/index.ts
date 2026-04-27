@@ -1,4 +1,7 @@
-// Cria pagamento PIX no Mercado Pago e devolve QR Code para o cliente
+// Cria pagamento PIX no Mercado Pago e devolve QR Code para o cliente.
+// Suporta dois modos:
+//   1) Compra de plano: { plan: "Básico" | "Padrão" | "Premium" }
+//   2) Compra de título individual: { movie_id: "<uuid>" } → cobra movies.price
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -10,7 +13,6 @@ const PLANS: Record<string, { amount: number; days: number }> = {
   "Básico":   { amount: 18.90, days: 30 },
   "Padrão":   { amount: 39.90, days: 30 },
   "Premium":  { amount: 55.90, days: 30 },
-  "Série":    { amount: 10.00, days: 30 },
 };
 
 Deno.serve(async (req) => {
@@ -41,16 +43,53 @@ Deno.serve(async (req) => {
     });
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    const { plan } = await req.json();
-    const planCfg = PLANS[plan];
-    if (!planCfg) {
-      return new Response(JSON.stringify({ error: "Plano inválido" }), {
+    const body = await req.json();
+    const { plan, movie_id } = body as { plan?: string; movie_id?: string };
+
+    let amount = 0;
+    let label = "";
+    let purchasePlan = "";
+    let movieRecord: { id: string; title: string; price: number | null } | null = null;
+
+    if (movie_id) {
+      const { data: m, error: mErr } = await admin
+        .from("movies")
+        .select("id, title, price")
+        .eq("id", movie_id)
+        .maybeSingle();
+      if (mErr || !m) {
+        return new Response(JSON.stringify({ error: "Título não encontrado" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      movieRecord = { id: m.id as string, title: m.title as string, price: m.price as number | null };
+      amount = Number(m.price ?? 10);
+      if (amount <= 0) amount = 10;
+      label = `Título: ${m.title}`;
+      purchasePlan = `Título: ${m.title}`;
+    } else if (plan) {
+      const planCfg = PLANS[plan];
+      if (!planCfg) {
+        return new Response(JSON.stringify({ error: "Plano inválido" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      amount = planCfg.amount;
+      label = `Plano ${plan}`;
+      purchasePlan = plan;
+    } else {
+      return new Response(JSON.stringify({ error: "Informe plan ou movie_id" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Usuário (opcional — pode pagar sem login)
+    // Usuário (opcional — pode pagar sem login para planos; obrigatório p/ título individual)
     const { data: { user } } = await userClient.auth.getUser();
+    if (movie_id && !user) {
+      return new Response(JSON.stringify({ error: "Faça login para comprar um título individual." }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Cria registro de compra pendente
     const { data: purchase, error: pErr } = await admin
@@ -58,10 +97,11 @@ Deno.serve(async (req) => {
       .insert({
         user_id: user?.id ?? null,
         user_email: user?.email ?? null,
-        plan,
-        amount: planCfg.amount,
+        plan: purchasePlan,
+        amount,
         method: "PIX",
         status: "pending",
+        movie_id: movie_id ?? null,
       })
       .select()
       .single();
@@ -81,8 +121,8 @@ Deno.serve(async (req) => {
         "X-Idempotency-Key": idemKey,
       },
       body: JSON.stringify({
-        transaction_amount: planCfg.amount,
-        description: `Plano ${plan} - Cinevolt`,
+        transaction_amount: amount,
+        description: `${label} - Cinevolt`,
         payment_method_id: "pix",
         notification_url: notifUrl,
         external_reference: purchase.id,
@@ -114,8 +154,9 @@ Deno.serve(async (req) => {
       qr_code: qr?.qr_code,
       qr_code_base64: qr?.qr_code_base64,
       ticket_url: qr?.ticket_url,
-      amount: planCfg.amount,
-      plan,
+      amount,
+      plan: purchasePlan,
+      movie: movieRecord ? { id: movieRecord.id, title: movieRecord.title } : null,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error(e);

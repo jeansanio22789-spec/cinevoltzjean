@@ -8,6 +8,7 @@ import { useLocalVideoSrc } from "@/hooks/useLocalVideoSrc";
 import TelegramPlayer from "@/components/TelegramPlayer";
 import VideoPlayer from "@/components/VideoPlayer";
 import IntroVignette from "@/components/IntroVignette";
+import PixCheckout from "@/components/PixCheckout";
 
 interface WatchMovie {
   id: string;
@@ -21,6 +22,7 @@ interface WatchMovie {
   genre: string | null;
   rating: string | null;
   status: string | null;
+  price: number | null;
 }
 
 const Watch = () => {
@@ -34,6 +36,7 @@ const Watch = () => {
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [tokenAccess, setTokenAccess] = useState(false);
   const [introDone, setIntroDone] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const token = params.get("token");
 
@@ -154,6 +157,8 @@ const Watch = () => {
   }
 
   if (!hasAccess) {
+    const price = movie.price ?? 10;
+    const priceFmt = `R$ ${price.toFixed(2).replace(".", ",")}`;
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center gap-5">
         {movie.thumbnail_url && (
@@ -167,24 +172,39 @@ const Watch = () => {
         <div>
           <h1 className="text-2xl font-bold mb-2">{movie.title}</h1>
           <p className="text-muted-foreground text-sm max-w-md">
-            Você não tem acesso a este conteúdo. Fale com o administrador para liberar
+            Você ainda não tem acesso. Compre só este título por{" "}
+            <span className="font-bold text-foreground">{priceFmt}</span> (acesso vitalício)
             ou assine um plano para ver tudo.
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          <button
+            onClick={() => setShowCheckout(true)}
+            className="bg-primary text-primary-foreground px-5 py-3 rounded font-bold text-sm flex items-center justify-center gap-2"
+          >
+            <Play className="w-4 h-4 fill-current" /> Comprar por {priceFmt}
+          </button>
           <button
             onClick={() => navigate("/planos")}
-            className="flex-1 bg-primary text-primary-foreground px-5 py-3 rounded font-bold text-sm flex items-center justify-center gap-2"
+            className="bg-secondary text-secondary-foreground px-5 py-3 rounded font-semibold text-sm"
           >
-            <Play className="w-4 h-4 fill-current" /> Assinar
+            Ver planos de assinatura
           </button>
           <button
             onClick={() => navigate("/")}
-            className="flex-1 bg-muted text-foreground px-5 py-3 rounded font-semibold text-sm"
+            className="bg-muted text-foreground px-5 py-3 rounded font-semibold text-sm"
           >
             Voltar
           </button>
         </div>
+        {showCheckout && (
+          <PixCheckout
+            movieId={movie.id}
+            movieTitle={movie.title}
+            moviePrice={price}
+            onClose={() => setShowCheckout(false)}
+          />
+        )}
       </div>
     );
   }
