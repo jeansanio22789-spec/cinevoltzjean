@@ -72,6 +72,7 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   errorMsg: job.errorMsg,
   startedAt: job.startedAt,
   timedOut: false,
+  uploadPath: job.uploadPath,
 });
 
 const store = {
