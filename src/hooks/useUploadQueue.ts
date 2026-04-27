@@ -432,8 +432,46 @@ const uploadFileFast = async (
 // ---------------------------------------------------------------------------
 const runningJobIds = new Set<string>();
 
+// 🚦 Fila sequencial inteligente
+// Em conexões lentas, vários uploads em paralelo dividem a banda e o overhead
+// do TUS (round-trip por chunk) explode — o usuário sente que "travou".
+// Solução: se a última velocidade medida for < 2 MB/s, segura novos jobs
+// até o atual terminar. Em conexões rápidas, libera paralelo total.
+const SLOW_THRESHOLD_MBS = 2;
+const pendingJobIds: string[] = [];
+
+const isConnectionSlow = (): boolean => {
+  // Olha pro job ativo mais recente. Se ele tá indo < 2 MB/s, é lenta.
+  const active = store.jobs.find(
+    (j) =>
+      runningJobIds.has(j.id) &&
+      (j.status === "uploading" || j.status === "warning") &&
+      j.progress > 5, // só conta depois que estabilizou
+  );
+  if (!active) return false;
+  return active.speedMBs > 0 && active.speedMBs < SLOW_THRESHOLD_MBS;
+};
+
+const drainPending = () => {
+  while (pendingJobIds.length > 0 && !isConnectionSlow()) {
+    const nextId = pendingJobIds.shift()!;
+    const next = store.jobs.find((j) => j.id === nextId);
+    if (next && !runningJobIds.has(next.id)) {
+      void runJob(next);
+    }
+  }
+};
+
 const runJob = async (job: UploadJob) => {
   if (runningJobIds.has(job.id)) return;
+
+  // Se já tem upload rodando E a conexão tá lenta, espera na fila.
+  if (runningJobIds.size > 0 && isConnectionSlow()) {
+    if (!pendingJobIds.includes(job.id)) pendingJobIds.push(job.id);
+    store.update(job.id, { status: "queued" });
+    return;
+  }
+
   runningJobIds.add(job.id);
   // Pede pra tela ficar acordada — ajuda muito em mobile
   void requestWakeLock();
@@ -558,6 +596,8 @@ const runJob = async (job: UploadJob) => {
     window.clearTimeout(timeoutTimer);
     // Libera o wake lock se não tem mais nada rolando
     if (!hasActiveUploads()) void releaseWakeLock();
+    // 🚦 Liberou um slot — tenta puxar o próximo da fila sequencial
+    drainPending();
   }
 };
 
