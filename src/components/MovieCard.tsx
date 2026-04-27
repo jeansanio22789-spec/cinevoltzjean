@@ -70,31 +70,22 @@ const MovieCard = ({ movie }: MovieCardProps) => {
           </div>
         )}
 
-        {/* Selo "CHEGANDO" + barra de progresso para itens em envio */}
+        {/* Selo "ESTREIA" + horário previsto (sem progresso) */}
         {isPending && (
           <>
             <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-[10px] font-black tracking-wider px-2 py-0.5 rounded uppercase shadow">
-              Chegando
+              Estreia
             </div>
             {endLabel && (
-              <div className="absolute top-2 right-2 inline-flex items-center gap-1 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                <Clock className="w-3 h-3" />
-                {endLabel}
+              <div className="absolute inset-x-0 bottom-0 p-2 pt-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
+                <p className="text-white text-[11px] font-semibold truncate">
+                  {movie.title}
+                </p>
+                <p className="text-[11px] text-primary-foreground bg-primary/90 inline-block px-1.5 py-0.5 rounded mt-1 font-bold">
+                  🕒 No app às {endLabel}
+                </p>
               </div>
             )}
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
-              <div
-                className={`h-full transition-all ${
-                  pending!.status === "warning" ? "bg-amber-500" : "bg-primary"
-                }`}
-                style={{ width: `${pending!.progress}%` }}
-              />
-            </div>
-            <div className="absolute inset-x-0 bottom-1 px-2 pt-4 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
-              <p className="text-white text-[11px] font-semibold truncate">
-                {pending!.progress.toFixed(0)}% enviado
-              </p>
-            </div>
           </>
         )}
 
