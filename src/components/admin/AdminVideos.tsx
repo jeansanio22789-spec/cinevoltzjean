@@ -735,7 +735,7 @@ const AdminVideos = () => {
           <p className="text-xs text-muted-foreground">Publicados</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4 text-center">
-          <p className="text-2xl font-black">{drafts}</p>
+          <p className="text-2xl font-black">{draftCount}</p>
           <p className="text-xs text-muted-foreground">Rascunhos</p>
         </div>
       </div>
