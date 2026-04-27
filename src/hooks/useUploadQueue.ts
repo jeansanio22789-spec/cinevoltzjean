@@ -327,7 +327,9 @@ const uploadFileTus = (
 
 // Limite acima do qual usamos TUS desde o início (paralelismo + retomada).
 // Abaixo disso, POST direto é mais rápido (sem overhead de criação de sessão).
-const TUS_THRESHOLD_BYTES = 50 * 1024 * 1024; // 50 MB
+// Reduzido para 20 MB porque até esse tamanho o paralelismo do TUS já compensa
+// o overhead de criar a sessão — fica MUITO mais rápido em 4G/5G.
+const TUS_THRESHOLD_BYTES = 20 * 1024 * 1024; // 20 MB
 
 const uploadFileFast = async (
   bucket: string,
