@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
           status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      movieRecord = m as typeof movieRecord;
+      movieRecord = { id: m.id as string, title: m.title as string, price: m.price as number | null };
       amount = Number(m.price ?? 10);
       if (amount <= 0) amount = 10;
       label = `Título: ${m.title}`;
