@@ -88,6 +88,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_nfc_challenges: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          tag_uid: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          tag_uid: string
+          token?: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          tag_uid?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_nfc_tags: {
         Row: {
           created_at: string
@@ -876,6 +906,7 @@ export type Database = {
       }
       check_admin_login_status: { Args: { _request_id: string }; Returns: Json }
       consume_access_token: { Args: { _token: string }; Returns: undefined }
+      consume_admin_nfc_challenge: { Args: { _token: string }; Returns: Json }
       decide_admin_login: {
         Args: { _decision: string; _request_id: string }
         Returns: Json
@@ -898,6 +929,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_device_authorized: { Args: { _device_id: string }; Returns: boolean }
+      issue_admin_nfc_challenge: { Args: { _tag_uid: string }; Returns: Json }
       lookup_email_by_nfc: { Args: { _tag_uid: string }; Returns: Json }
       redeem_access_token: {
         Args: { _movie_id: string; _token: string }
