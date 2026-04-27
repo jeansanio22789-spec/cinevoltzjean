@@ -40,6 +40,9 @@ export interface UploadJob {
   startedAt?: number;
   timedOut: boolean;
   abort?: () => void;
+  /** Caminho fixo do arquivo no Storage. Persistido para que o TUS consiga
+   *  retomar exatamente o mesmo upload após o app ser recarregado. */
+  uploadPath?: string;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
