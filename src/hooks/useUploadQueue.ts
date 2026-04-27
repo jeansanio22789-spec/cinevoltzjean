@@ -278,10 +278,23 @@ const uploadFileTus = (
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
 
+    // 🚀 Detecta conexão pra ajustar agressividade.
+    const conn = (navigator as Navigator & {
+      connection?: { effectiveType?: string; downlink?: number };
+    }).connection;
+    const effType = conn?.effectiveType ?? "4g";
+    const downlinkMbps = conn?.downlink ?? 10;
+    const isFast = effType === "4g" || downlinkMbps >= 5;
+
+    // Em redes rápidas: chunks grandes + muito paralelismo.
+    // Em redes lentas (3g/2g): chunks menores pra não travar e perder retry.
+    const chunkSize = isFast ? 32 * 1024 * 1024 : 8 * 1024 * 1024;
+    const parallelUploads = isFast ? 6 : 2;
+
     const upload = new tus.Upload(file, {
       endpoint,
-      // Retries mais agressivos para não travar em quedas de rede
-      retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000],
+      // Retries rápidos no começo, vão crescendo pra não martelar a rede
+      retryDelays: [0, 300, 1000, 2500, 5000, 10000, 20000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
@@ -294,11 +307,8 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      // 🚀 Chunks maiores = menos overhead de requisições
-      chunkSize: 16 * 1024 * 1024,
-      // 🚀 Sobe múltiplas partes em paralelo (acelera muito em redes
-      // com latência alta como 4G/5G).
-      parallelUploads: 4,
+      chunkSize,
+      parallelUploads,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         updateProgress(startTime, samples, bytesUploaded, bytesTotal, onProgress);
@@ -317,7 +327,9 @@ const uploadFileTus = (
 
 // Limite acima do qual usamos TUS desde o início (paralelismo + retomada).
 // Abaixo disso, POST direto é mais rápido (sem overhead de criação de sessão).
-const TUS_THRESHOLD_BYTES = 50 * 1024 * 1024; // 50 MB
+// Reduzido para 20 MB porque até esse tamanho o paralelismo do TUS já compensa
+// o overhead de criar a sessão — fica MUITO mais rápido em 4G/5G.
+const TUS_THRESHOLD_BYTES = 20 * 1024 * 1024; // 20 MB
 
 const uploadFileFast = async (
   bucket: string,
