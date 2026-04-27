@@ -6,7 +6,7 @@ import { logAudit } from "@/lib/auditLog";
 import { supabase } from "@/integrations/supabase/client";
 import { isNfcSupported, readNfcOnce } from "@/lib/nfcReader";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+// sr-only wrapper replaces VisuallyHidden
 import { toast } from "sonner";
 
 const normalizeUid = (uid: string) => uid.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
@@ -417,12 +417,12 @@ const Login = () => {
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
-          <VisuallyHidden>
+          <span className="sr-only">
             <DialogTitle>Leitura de crachá NFC</DialogTitle>
             <DialogDescription>
               Aproxime o crachá NFC da parte de trás do celular para entrar.
             </DialogDescription>
-          </VisuallyHidden>
+          </span>
           <div className="flex flex-col items-center text-center py-4 space-y-5">
             <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold">
               Aguardando crachá
