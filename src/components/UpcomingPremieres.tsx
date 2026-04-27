@@ -39,7 +39,6 @@ const UpcomingPremieres = () => {
           const endAt =
             j.lockedEndAt ?? (j.etaSec > 0 ? Date.now() + j.etaSec * 1000 : 0);
           const endLabel = endAt > 0 ? fmtEndTimeFromTs(endAt) : null;
-          const isWaiting = j.status === "queued" || j.status === "saving";
           return (
             <div
               key={j.id}
@@ -62,28 +61,14 @@ const UpcomingPremieres = () => {
                 Estreia
               </div>
 
-              {/* Barra de progresso embutida */}
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
-                <div
-                  className={`h-full transition-all ${
-                    j.status === "warning" ? "bg-amber-500" : "bg-primary"
-                  }`}
-                  style={{ width: `${j.progress}%` }}
-                />
-              </div>
-
-              {/* Overlay inferior com título + horário previsto */}
-              <div className="absolute inset-x-0 bottom-1 p-2 pt-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
+              {/* Overlay inferior só com título + horário previsto */}
+              <div className="absolute inset-x-0 bottom-0 p-2 pt-6 bg-gradient-to-t from-black/95 via-black/70 to-transparent">
                 <p className="text-white text-xs font-semibold truncate">
                   {j.meta.title}
                 </p>
-                {endLabel ? (
+                {endLabel && (
                   <p className="text-[11px] text-primary-foreground bg-primary/90 inline-block px-1.5 py-0.5 rounded mt-1 font-bold">
                     🕒 No app às {endLabel}
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-white/80 mt-1">
-                    {isWaiting ? "Preparando…" : `${j.progress.toFixed(0)}% enviado`}
                   </p>
                 )}
               </div>
