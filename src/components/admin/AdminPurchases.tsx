@@ -31,12 +31,7 @@ const AdminPurchases = () => {
   const [search, setSearch] = useState("");
   const [refundingId, setRefundingId] = useState<string | null>(null);
 
-  const handleRefund = async (p: Purchase) => {
-    const ok = window.confirm(
-      `Reembolsar R$ ${Number(p.amount).toFixed(2)} para ${p.user_email || "usuário"}?\n\n` +
-      `O dinheiro volta para o cliente e o acesso é cancelado. Esta ação não pode ser desfeita.`
-    );
-    if (!ok) return;
+  const doRefund = async (p: Purchase) => {
     setRefundingId(p.id);
     try {
       const { data, error } = await supabase.functions.invoke("mp-refund", {
@@ -44,7 +39,7 @@ const AdminPurchases = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success("Reembolso processado com sucesso");
+      toast.success(`Reembolso de R$ ${Number(p.amount).toFixed(2)} processado`);
       await load();
     } catch (e: any) {
       toast.error(e?.message || "Erro ao processar reembolso");
@@ -52,6 +47,28 @@ const AdminPurchases = () => {
       setRefundingId(null);
     }
   };
+
+  const handleRefund = (p: Purchase) => {
+    // Reembolso rápido: dispara em 4s, com botão "Desfazer" no toast
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (!cancelled) doRefund(p);
+    }, 4000);
+
+    toast(`Reembolsando R$ ${Number(p.amount).toFixed(2)}...`, {
+      description: p.user_email || p.user_name || "Cliente",
+      duration: 4000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          cancelled = true;
+          clearTimeout(timer);
+          toast.info("Reembolso cancelado");
+        },
+      },
+    });
+  };
+
 
   const load = async () => {
     setLoading(true);
