@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -11,6 +12,8 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { UploadJob } from "@/hooks/useUploadQueue";
+
+const STUCK_THRESHOLD_MS = 30_000; // 30s sem progresso = travado
 
 const fmtEta = (sec: number) =>
   sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
