@@ -4,11 +4,11 @@ import { useRemoteUploadJobs } from "@/hooks/useRemoteUploadJobs";
 const statusIcon = (status: string) => {
   switch (status) {
     case "done":
-      return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      return <CheckCircle2 className="w-4 h-4 text-primary" />;
     case "error":
       return <XCircle className="w-4 h-4 text-destructive" />;
     case "warning":
-      return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      return <AlertTriangle className="w-4 h-4 text-accent" />;
     case "saving":
       return <Loader2 className="w-4 h-4 animate-spin text-primary" />;
     case "uploading":
