@@ -323,9 +323,11 @@ const uploadFileFast = async (
   file: File,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
+  forceTus = false,
 ): Promise<string> => {
-  // Arquivos grandes vão direto pro TUS com paralelismo de chunks → muito mais rápido.
-  if (file.size >= TUS_THRESHOLD_BYTES) {
+  // Retomada (após refresh) ou arquivos grandes vão direto pro TUS — só assim
+  // dá pra continuar de onde parou em vez de recomeçar do zero.
+  if (forceTus || file.size >= TUS_THRESHOLD_BYTES) {
     return uploadFileTus(bucket, path, file, onProgress, registerAbort);
   }
   try {
