@@ -91,21 +91,27 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) 
       });
       if (data?.status === "approved") {
         setPaid(true);
-        toast.success("Pagamento confirmado! Liberando acesso…");
-        setTimeout(() => {
-          onClose();
-          if (isMovie && movieId) {
-            // hard reload pra recarregar checagem de acesso
-            window.location.href = `/assistir/${movieId}`;
-          } else {
-            window.location.href = "/minha-conta";
-          }
-        }, 800);
+        toast.success("Pagamento confirmado!");
+        if (pollRef.current) clearInterval(pollRef.current);
       }
     };
     pollRef.current = window.setInterval(tick, 4000) as unknown as number;
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [pix?.purchase_id, paid, navigate, onClose, isMovie, movieId]);
+
+  const handleGoToContent = () => {
+    onClose();
+    if (isMovie && movieId) {
+      window.location.href = `/assistir/${movieId}`;
+    } else {
+      window.location.href = "/minha-conta";
+    }
+  };
+
+  const paidAtLabel = new Date().toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
 
   const handleCopy = () => {
     if (!pix?.qr_code) return;
