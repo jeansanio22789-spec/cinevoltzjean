@@ -136,16 +136,24 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
         )}
       </div>
 
-      {/* Botão de Retomar envio — aparece em erro ou travado/lento */}
-      {(j.status === "error" || j.status === "warning") && (
+      {/* Botão de Continuar/Retomar envio — aparece em erro, lento ou travado */}
+      {(j.status === "error" || j.status === "warning" || isStuck) && (
         <button
           onClick={onRetry}
           className="w-full inline-flex items-center justify-center gap-2 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors py-2 rounded"
-          title="Reiniciar este envio do zero"
+          title="Continuar este envio de onde parou"
         >
           <RotateCw className="w-3.5 h-3.5" />
-          Retomar envio
+          {isStuck && j.status !== "error"
+            ? "Continuar envio (travado)"
+            : "Retomar envio"}
         </button>
+      )}
+
+      {isStuck && j.status !== "error" && (
+        <p className="text-[11px] text-amber-500">
+          ⚠️ Sem progresso há mais de 30s — toque em "Continuar envio" para destravar.
+        </p>
       )}
 
       {showProgress && (
