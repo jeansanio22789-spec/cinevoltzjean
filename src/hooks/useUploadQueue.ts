@@ -415,6 +415,7 @@ const runJob = async (job: UploadJob) => {
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
+      isResuming, // forceTus quando estamos retomando após refresh
     );
 
     let thumbnailUrl: string | null = null;
