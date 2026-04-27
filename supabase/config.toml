@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.nfc-login]
 verify_jwt = false
+
+[functions.notify-unknown-device]
+verify_jwt = false
