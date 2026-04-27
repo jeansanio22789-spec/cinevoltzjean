@@ -364,12 +364,25 @@ const Login = () => {
               Lendo…
             </div>
 
-            <button
-              onClick={cancelScan}
-              className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
-            >
-              <X className="w-3.5 h-3.5" /> Cancelar
-            </button>
+            <div className="w-full pt-2 border-t border-border/50 space-y-2">
+              <button
+                onClick={async () => {
+                  await cancelScan();
+                  toast.info("Entre com email e senha. Depois vá em Sistema → Crachás NFC.");
+                  switchMode("client");
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                Cadastrar novo crachá
+              </button>
+              <button
+                onClick={cancelScan}
+                className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="w-3.5 h-3.5" /> Cancelar
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
