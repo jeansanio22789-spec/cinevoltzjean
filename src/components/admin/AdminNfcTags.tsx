@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { isNfcSupported, readNfcOnce, isInIframe } from "@/lib/nfcReader";
 import { Capacitor } from "@capacitor/core";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 interface NfcTag {
   id: string;
@@ -141,19 +142,28 @@ const AdminNfcTags = () => {
       {blockedByIframe && (
         <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <div className="space-y-2 min-w-0">
-            <p className="text-xs font-semibold">Abra o app fora do preview</p>
+          <div className="space-y-2 min-w-0 flex-1">
+            <p className="text-xs font-semibold">NFC bloqueado pelo preview</p>
             <p className="text-[11px] text-muted-foreground leading-snug">
-              O leitor NFC do navegador só funciona quando o site está aberto
-              direto, sem estar dentro do editor. Toque abaixo para abrir em
-              nova aba e cadastre o crachá lá.
+              O leitor NFC do navegador exige a aba principal. Você está vendo o
+              site dentro do editor (iframe), por isso o navegador bloqueia.
+              Abra o link abaixo numa aba normal do Chrome do celular e
+              cadastre o crachá lá.
             </p>
-            <button
-              onClick={() => window.open(window.location.href, "_blank", "noopener")}
-              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+            <a
+              href={window.location.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-semibold"
             >
               <ExternalLink className="w-3.5 h-3.5" /> Abrir em nova aba
-            </button>
+            </a>
+            <div className="text-[10px] text-muted-foreground bg-background border border-border rounded p-2 break-all font-mono select-all">
+              {window.location.href}
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Dica: ou use o app instalado no celular (Android) — lá funciona direto.
+            </p>
           </div>
         </div>
       )}
@@ -178,6 +188,12 @@ const AdminNfcTags = () => {
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
+          <VisuallyHidden>
+            <DialogTitle>Leitura de crachá NFC</DialogTitle>
+            <DialogDescription>
+              Aproxime o crachá NFC da parte de trás do celular para cadastrá-lo.
+            </DialogDescription>
+          </VisuallyHidden>
           <div className="flex flex-col items-center text-center py-4 space-y-5">
             <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold">
               Aguardando crachá
