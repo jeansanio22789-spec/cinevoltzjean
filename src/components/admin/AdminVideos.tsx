@@ -2,12 +2,14 @@ import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
   FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2,
+  Save, FolderOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
 import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo, saveLocalVideo } from "@/lib/localVideoStore";
+import { loadDrafts, saveDraft, deleteDraft, newDraftId, type VideoDraft } from "@/lib/draftsStore";
 import { Smartphone } from "lucide-react";
 
 interface Video {
@@ -127,7 +129,6 @@ const buildTitleWithAudio = (title: string, audio: AudioTag | null): string => {
   return `${clean} ${audio}`.trim();
 };
 
-
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
     case "queued":
@@ -171,6 +172,17 @@ const AdminVideos = () => {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [recognizingTitle, setRecognizingTitle] = useState(false);
+  const [drafts, setDrafts] = useState<VideoDraft[]>([]);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+
+  const refreshDrafts = async () => {
+    const list = await loadDrafts();
+    setDrafts(list);
+  };
+
+  useEffect(() => {
+    void refreshDrafts();
+  }, []);
 
   // Lê o título escrito na capa via IA com visão (OCR semântico).
   // O título final fica TUDO MAIÚSCULO e, se a capa indicar áudio
@@ -432,6 +444,82 @@ const AdminVideos = () => {
     }
   };
 
+  // 💾 Salvar como rascunho — guarda vídeo+capa+metadados localmente,
+  // sem enviar nada. Permite continuar mais tarde sem reescolher tudo.
+  const handleSaveDraft = async () => {
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um arquivo de vídeo");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Dê um título antes de salvar o rascunho");
+      return;
+    }
+    const id = editingDraftId ?? newDraftId();
+    const now = Date.now();
+    const draft: VideoDraft = {
+      id,
+      files: selectedFiles,
+      thumbnail: thumbnailFile,
+      meta: {
+        title: form.title,
+        genre: form.genre,
+        description: form.description,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+    await saveDraft(draft);
+    await refreshDrafts();
+    toast.success(
+      editingDraftId
+        ? "Rascunho atualizado"
+        : "💾 Rascunho salvo — continue quando quiser",
+    );
+    setSelectedFiles([]);
+    setThumbnailFile(null);
+    setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+    setEditingDraftId(null);
+  };
+
+  // 📂 Carrega um rascunho no formulário pra continuar editando/enviar
+  const handleLoadDraft = (d: VideoDraft) => {
+    setSelectedFiles(d.files);
+    setThumbnailFile(d.thumbnail ?? null);
+    setForm((prev) => ({
+      ...prev,
+      title: d.meta.title,
+      genre: d.meta.genre,
+      description: d.meta.description,
+    }));
+    setEditingDraftId(d.id);
+    setShowUpload(true);
+    toast.success(`Rascunho carregado: "${d.meta.title}"`);
+  };
+
+  const handleDeleteDraft = async (id: string) => {
+    if (!confirm("Excluir este rascunho?")) return;
+    await deleteDraft(id);
+    if (editingDraftId === id) setEditingDraftId(null);
+    await refreshDrafts();
+    toast.success("Rascunho excluído");
+  };
+
+  // ⚡ Envia direto da lista de rascunhos sem precisar carregar no formulário
+  const handleSendDraft = async (d: VideoDraft) => {
+    const items = d.files.map((file) => ({
+      file,
+      thumbnail: d.thumbnail,
+      meta: d.meta,
+    }));
+    enqueue(items);
+    await deleteDraft(d.id);
+    await refreshDrafts();
+    toast.success(
+      `${items.length} ${items.length === 1 ? "envio iniciado" : "envios iniciados"}`,
+    );
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir este vídeo?")) return;
     // Se for vídeo local, limpa o IndexedDB também
@@ -451,7 +539,7 @@ const AdminVideos = () => {
 
   const totalSize = videos.length;
   const published = videos.filter((v) => v.status === "published").length;
-  const drafts = videos.filter((v) => v.status === "draft").length;
+  const draftCount = videos.filter((v) => v.status === "draft").length;
   const doneCount = jobs.filter((j) => j.status === "done").length;
 
   return (
@@ -660,11 +748,96 @@ const AdminVideos = () => {
               Salvar no Aparelho
               {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
             </button>
+            <button
+              onClick={handleSaveDraft}
+              disabled={selectedFiles.length === 0}
+              className="px-6 py-2 bg-muted text-foreground rounded text-sm font-semibold hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 border border-border"
+              title="Salva o vídeo + capa + título no aparelho para enviar depois — sem usar internet agora."
+            >
+              <Save className="w-4 h-4" />
+              {editingDraftId ? "Atualizar Rascunho" : "Salvar Rascunho"}
+            </button>
             <p className="text-xs text-muted-foreground self-center w-full">
-              💡 <strong>Enviar</strong>: nuvem, todos veem. <strong>Salvar Link</strong>: instantâneo p/ todos. <strong>Salvar no Aparelho</strong>: instantâneo, só neste celular.
+              💡 <strong>Enviar</strong>: nuvem, todos veem. <strong>Salvar Link</strong>: instantâneo p/ todos. <strong>Salvar no Aparelho</strong>: instantâneo, só neste celular. <strong>Salvar Rascunho</strong>: guarda local pra enviar depois.
             </p>
           </div>
 
+        </div>
+      )}
+
+      {/* Rascunhos salvos */}
+      {drafts.length > 0 && (
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-primary" />
+              Rascunhos salvos
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                {drafts.length}
+              </span>
+            </h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Vídeos prontos para enviar quando você quiser — capa, título e tudo já preenchidos.
+          </p>
+          <div className="space-y-2">
+            {drafts.map((d) => {
+              const totalMB = d.files.reduce((s, f) => s + f.size, 0) / 1024 / 1024;
+              const thumbUrl = d.thumbnail ? URL.createObjectURL(d.thumbnail) : null;
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center gap-3 bg-background rounded-lg p-3 border border-border"
+                >
+                  {thumbUrl ? (
+                    <img
+                      src={thumbUrl}
+                      alt={d.meta.title}
+                      className="w-14 h-20 object-cover rounded shrink-0"
+                      onLoad={() => URL.revokeObjectURL(thumbUrl)}
+                    />
+                  ) : (
+                    <div className="w-14 h-20 bg-muted rounded shrink-0 flex items-center justify-center">
+                      <FileVideo className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{d.meta.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {d.files.length} {d.files.length === 1 ? "arquivo" : "arquivos"} •{" "}
+                      {totalMB.toFixed(1)} MB • {d.meta.genre}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Salvo em {new Date(d.updatedAt).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleSendDraft(d)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-semibold hover:bg-primary/90 flex items-center gap-1"
+                      title="Enviar agora"
+                    >
+                      <Upload className="w-3 h-3" /> Enviar
+                    </button>
+                    <button
+                      onClick={() => handleLoadDraft(d)}
+                      className="px-3 py-1.5 bg-muted text-foreground rounded text-xs font-medium hover:bg-muted/80 flex items-center gap-1"
+                      title="Carregar no formulário pra editar"
+                    >
+                      <FolderOpen className="w-3 h-3" /> Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDraft(d.id)}
+                      className="px-3 py-1.5 bg-destructive/10 text-destructive rounded text-xs font-medium hover:bg-destructive/20 flex items-center gap-1"
+                      title="Excluir rascunho"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -722,7 +895,7 @@ const AdminVideos = () => {
           <p className="text-xs text-muted-foreground">Publicados</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4 text-center">
-          <p className="text-2xl font-black">{drafts}</p>
+          <p className="text-2xl font-black">{draftCount}</p>
           <p className="text-xs text-muted-foreground">Rascunhos</p>
         </div>
       </div>
