@@ -6,7 +6,13 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
+import {
+  useUploadQueue,
+  type UploadJob,
+  getTurboMode,
+  setTurboMode,
+  subscribeTurboMode,
+} from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
 import RemoteUploadsPanel from "@/components/admin/RemoteUploadsPanel";
 import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo, saveLocalVideo } from "@/lib/localVideoStore";
