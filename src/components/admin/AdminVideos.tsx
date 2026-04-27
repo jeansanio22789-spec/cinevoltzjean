@@ -127,9 +127,84 @@ const buildTitleWithAudio = (title: string, audio: AudioTag | null): string => {
   // Evita duplicar se a palavra já estiver lá
   if (new RegExp(`\\b${audio}\\b`).test(clean)) return clean;
   return `${clean} ${audio}`.trim();
-};
+  };
 
+  // 💾 Salvar como rascunho — guarda vídeo+capa+metadados localmente,
+  // sem enviar nada. Permite continuar mais tarde sem reescolher tudo.
+  const handleSaveDraft = async () => {
+    if (selectedFiles.length === 0) {
+      toast.error("Selecione pelo menos um arquivo de vídeo");
+      return;
+    }
+    if (!form.title.trim()) {
+      toast.error("Dê um título antes de salvar o rascunho");
+      return;
+    }
+    const id = editingDraftId ?? newDraftId();
+    const now = Date.now();
+    const draft: VideoDraft = {
+      id,
+      files: selectedFiles,
+      thumbnail: thumbnailFile,
+      meta: {
+        title: form.title,
+        genre: form.genre,
+        description: form.description,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+    await saveDraft(draft);
+    await refreshDrafts();
+    toast.success(
+      editingDraftId
+        ? "Rascunho atualizado"
+        : "💾 Rascunho salvo — continue quando quiser",
+    );
+    // Limpa o formulário pra ficar pronto pra próximo
+    setSelectedFiles([]);
+    setThumbnailFile(null);
+    setForm({ title: "", genre: "Ação", type: "Filme", description: "" });
+    setEditingDraftId(null);
+  };
 
+  // 📂 Carrega um rascunho no formulário pra continuar editando/enviar
+  const handleLoadDraft = (d: VideoDraft) => {
+    setSelectedFiles(d.files);
+    setThumbnailFile(d.thumbnail ?? null);
+    setForm((prev) => ({
+      ...prev,
+      title: d.meta.title,
+      genre: d.meta.genre,
+      description: d.meta.description,
+    }));
+    setEditingDraftId(d.id);
+    setShowUpload(true);
+    toast.success(`Rascunho carregado: "${d.meta.title}"`);
+  };
+
+  const handleDeleteDraft = async (id: string) => {
+    if (!confirm("Excluir este rascunho?")) return;
+    await deleteDraft(id);
+    if (editingDraftId === id) setEditingDraftId(null);
+    await refreshDrafts();
+    toast.success("Rascunho excluído");
+  };
+
+  // ⚡ Envia direto da lista de rascunhos sem precisar carregar no formulário
+  const handleSendDraft = async (d: VideoDraft) => {
+    const items = d.files.map((file) => ({
+      file,
+      thumbnail: d.thumbnail,
+      meta: d.meta,
+    }));
+    enqueue(items);
+    await deleteDraft(d.id);
+    await refreshDrafts();
+    toast.success(
+      `${items.length} ${items.length === 1 ? "envio iniciado" : "envios iniciados"}`,
+    );
+  };
 const statusBadge = (j: UploadJob) => {
   switch (j.status) {
     case "queued":
