@@ -43,6 +43,8 @@ export interface UploadJob {
   /** Caminho fixo do arquivo no Storage. Persistido para que o TUS consiga
    *  retomar exatamente o mesmo upload após o app ser recarregado. */
   uploadPath?: string;
+  /** Timestamp do último progresso recebido — usado para detectar travamento. */
+  lastProgressAt?: number;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
