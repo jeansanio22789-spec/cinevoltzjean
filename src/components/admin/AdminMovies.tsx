@@ -20,6 +20,7 @@ interface Movie {
   duration: string | null;
   rating: string | null;
   status: string | null;
+  price: number | null;
 }
 
 const AdminMovies = () => {
@@ -45,6 +46,7 @@ const AdminMovies = () => {
     duration: "",
     rating: "14+",
     status: "draft",
+    price: 10,
   });
 
   const fetchMovies = async () => {
