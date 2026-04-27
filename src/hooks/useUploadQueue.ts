@@ -266,7 +266,8 @@ const uploadFileTus = (
 
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000],
+      // Retries mais agressivos para não travar em quedas de rede
+      retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
@@ -279,7 +280,11 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      chunkSize: 6 * 1024 * 1024,
+      // 🚀 Chunks maiores = menos overhead de requisições
+      chunkSize: 16 * 1024 * 1024,
+      // 🚀 Sobe múltiplas partes em paralelo (acelera muito em redes
+      // com latência alta como 4G/5G).
+      parallelUploads: 4,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         updateProgress(startTime, samples, bytesUploaded, bytesTotal, onProgress);
@@ -296,6 +301,10 @@ const uploadFileTus = (
     upload.start();
   });
 
+// Limite acima do qual usamos TUS desde o início (paralelismo + retomada).
+// Abaixo disso, POST direto é mais rápido (sem overhead de criação de sessão).
+const TUS_THRESHOLD_BYTES = 50 * 1024 * 1024; // 50 MB
+
 const uploadFileFast = async (
   bucket: string,
   path: string,
@@ -303,6 +312,10 @@ const uploadFileFast = async (
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
 ): Promise<string> => {
+  // Arquivos grandes vão direto pro TUS com paralelismo de chunks → muito mais rápido.
+  if (file.size >= TUS_THRESHOLD_BYTES) {
+    return uploadFileTus(bucket, path, file, onProgress, registerAbort);
+  }
   try {
     return await uploadFileDirect(bucket, path, file, onProgress, registerAbort);
   } catch (err) {
