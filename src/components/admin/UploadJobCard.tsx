@@ -60,11 +60,11 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
   const showProgress =
     j.status === "uploading" || j.status === "saving" || j.status === "warning";
 
-  // 🔁 Tick periódico para reavaliar "travado" mesmo sem update do hook.
-  const [, setNow] = useState(Date.now());
+  // 🔁 Tick a cada 1s para atualizar o "falta Xs" sem oscilar a hora prevista.
+  const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!showProgress) return;
-    const id = window.setInterval(() => setNow(Date.now()), 5000);
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [showProgress]);
 
@@ -72,14 +72,14 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
   const isStuck =
     showProgress &&
     !!j.lastProgressAt &&
-    Date.now() - j.lastProgressAt > STUCK_THRESHOLD_MS;
+    now - j.lastProgressAt > STUCK_THRESHOLD_MS;
 
-  // Estimativas FIXAS vindas do hook (não oscilam).
-  // Se ainda não foi travada (uploads muito rápidos ou início), usa o ETA atual.
-  const displayEta = j.lockedEtaSec ?? j.etaSec;
+  // Hora prevista FIXA (não oscila). "Falta" é derivado dela em tempo real.
   const displayEndAt =
     j.lockedEndAt ?? (j.etaSec > 0 ? Date.now() + j.etaSec * 1000 : 0);
   const displayEndLabel = displayEndAt > 0 ? fmtEndTimeFromTs(displayEndAt) : "";
+  const displayEta =
+    displayEndAt > 0 ? Math.max(0, Math.round((displayEndAt - now) / 1000)) : 0;
 
   return (
     <div className="bg-background border border-border rounded-lg p-3 space-y-2">
