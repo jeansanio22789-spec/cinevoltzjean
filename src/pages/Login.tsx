@@ -137,7 +137,12 @@ const Login = () => {
         document.querySelector<HTMLInputElement>("input[name='admin-password']")?.focus();
       }, 100);
     } catch (err: any) {
-      if (err?.message) toast.error(err.message);
+      // Em scan silencioso, não enche a tela com toasts; só reagenda
+      if (!opts.silent && err?.message) toast.error(err.message);
+      // Reagenda nova tentativa silenciosa após pequeno delay
+      if (opts.silent) {
+        setTimeout(() => setAutoScanTick((t) => t + 1), 1500);
+      }
     } finally {
       setScanning(false);
       setCancelFn(null);
