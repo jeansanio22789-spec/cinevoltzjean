@@ -303,7 +303,7 @@ const Login = () => {
                   </p>
                   <button
                     type="button"
-                    onClick={startNfcScan}
+                    onClick={() => startNfcScan({ silent: false })}
                     disabled={!nfcSupported}
                     className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
