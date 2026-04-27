@@ -863,7 +863,7 @@ const AdminVideos = () => {
       {/* Fila de uploads */}
       {jobs.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-semibold flex items-center gap-2">
               <Zap className="w-4 h-4 text-primary" />
               Fila de envios
@@ -871,21 +871,49 @@ const AdminVideos = () => {
                 {activeCount} ativo{activeCount === 1 ? "" : "s"} • {doneCount} concluído{doneCount === 1 ? "" : "s"}
               </span>
             </h3>
-            {doneCount > 0 && (
+            <div className="flex items-center gap-2">
+              {/* ⚡ Modo Turbo — força 1 upload por vez pra usar 100% da banda */}
               <button
-                onClick={clearDone}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setTurboMode(!turboOn)}
+                className={`text-xs font-bold px-2.5 py-1 rounded inline-flex items-center gap-1 transition-colors ${
+                  turboOn
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+                title={
+                  turboOn
+                    ? "Turbo ligado: envia 1 vídeo por vez usando toda a banda"
+                    : "Liga modo turbo: 1 vídeo por vez para acelerar quando a conexão cai"
+                }
               >
-                Limpar concluídos
+                <Rocket className="w-3 h-3" />
+                {turboOn ? "Turbo ON" : "Forçar Turbo"}
               </button>
-            )}
+              {doneCount > 0 && (
+                <button
+                  onClick={clearDone}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Limpar concluídos
+                </button>
+              )}
+            </div>
           </div>
 
-          {activeCount > 0 && (
+          {turboOn && (
+            <div className="flex items-start gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
+              <Rocket className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <p>
+                <strong>Turbo ativo:</strong> enviando 1 vídeo por vez para usar 100% da sua internet. Os outros aguardam na fila.
+              </p>
+            </div>
+          )}
+
+          {activeCount > 0 && !turboOn && (
             <div className="flex items-start gap-2 text-xs text-primary bg-primary/10 p-2 rounded">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <p>
-                O envio fica salvo e retoma sozinho se o app recarregar. Mantenha a tela ligada para puxar o máximo da internet.
+                O envio fica salvo e retoma sozinho se o app recarregar. Se a velocidade cair, toque em <strong>Forçar Turbo</strong>.
               </p>
             </div>
           )}
