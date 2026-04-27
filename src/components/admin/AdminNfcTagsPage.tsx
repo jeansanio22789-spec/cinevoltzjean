@@ -182,10 +182,10 @@ const AdminNfcTagsPage = () => {
     const { error } = await supabase.from("admin_nfc_tags").delete().eq("id", tag.id);
     if (error) { toast.error("Erro: " + error.message); return; }
     await logAudit({
-      action: "nfc_tag_delete",
-      resource_type: "admin_nfc_tag",
+      action: "delete",
+      resource_type: "settings",
       description: `Crachá NFC "${tag.label || tag.tag_uid}" removido`,
-      metadata: { tag_uid: tag.tag_uid },
+      metadata: { type: "admin_nfc_tag", tag_uid: tag.tag_uid },
     });
     toast.success("Crachá removido.");
     load();
