@@ -841,6 +841,9 @@ const AdminVideos = () => {
         </div>
       )}
 
+      {/* Uploads vindos de OUTROS dispositivos do admin (sincronizados via Supabase) */}
+      <RemoteUploadsPanel localJobIds={new Set(jobs.map((j) => j.id))} />
+
       {/* Fila de uploads */}
       {jobs.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
