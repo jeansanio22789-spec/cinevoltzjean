@@ -2,12 +2,14 @@ import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
   FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2,
+  Save, FolderOpen,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
 import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo, saveLocalVideo } from "@/lib/localVideoStore";
+import { loadDrafts, saveDraft, deleteDraft, newDraftId, type VideoDraft } from "@/lib/draftsStore";
 import { Smartphone } from "lucide-react";
 
 interface Video {
