@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Plus, Loader2, Trash2, Radio, ExternalLink, AlertTriangle } from "lucide-react";
+import { CreditCard, Plus, Loader2, Trash2, Radio, ExternalLink, AlertTriangle, X, Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { isNfcSupported, readNfcOnce, isInIframe } from "@/lib/nfcReader";
 import { Capacitor } from "@capacitor/core";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface NfcTag {
   id: string;
@@ -39,20 +40,19 @@ const AdminNfcTags = () => {
 
   const startEnroll = async () => {
     if (!supported) {
-      toast.error("Este aparelho/navegador não suporta NFC. Use o app Android.");
+      toast.error("NFC indisponível. Use o app Android ou abra fora do preview.");
       return;
     }
+    // Pede o nome ANTES, pra UX ficar igual a uma maquininha:
+    // confirma → mostra "aproxime" → lê → grava.
+    const label = window.prompt("Nome para este crachá (ex: Crachá da carteira)", "Crachá");
+    if (!label) return;
+
     setScanning(true);
     const session = readNfcOnce();
     setCancelFn(() => session.cancel);
     try {
       const uid = await session.uid;
-      const label = window.prompt("Nome para este crachá (ex: Crachá da carteira)", "Crachá");
-      if (!label) {
-        setScanning(false);
-        setCancelFn(null);
-        return;
-      }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error("Sessão expirada");
@@ -158,33 +158,62 @@ const AdminNfcTags = () => {
         </div>
       )}
 
-      {scanning ? (
-        <div className="mt-4 p-4 rounded-lg bg-primary/10 border border-primary/30 flex flex-col items-center gap-3">
-          <Radio className="w-8 h-8 text-primary animate-pulse" />
-          <p className="text-sm font-semibold text-center">
-            Encoste o crachá no celular agora…
-          </p>
-          <button
-            onClick={cancelScan}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            Cancelar
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={startEnroll}
-          disabled={!supported}
-          className="mt-4 flex items-center gap-2 text-xs text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
+      <button
+        onClick={startEnroll}
+        disabled={!supported}
+        className="mt-4 flex items-center gap-2 text-xs text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        {supported
+          ? "Cadastrar novo crachá"
+          : blockedByIframe
+            ? "Disponível ao abrir em nova aba"
+            : "NFC indisponível neste aparelho"}
+      </button>
+
+      {/* Modal estilo "maquininha de cartão" durante a leitura */}
+      <Dialog open={scanning} onOpenChange={(o) => { if (!o) cancelScan(); }}>
+        <DialogContent
+          className="max-w-sm border-primary/40 bg-gradient-to-b from-card to-background"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
         >
-          <Plus className="w-3.5 h-3.5" />
-          {supported
-            ? "Cadastrar novo crachá"
-            : blockedByIframe
-              ? "Disponível ao abrir em nova aba"
-              : "NFC indisponível neste aparelho"}
-        </button>
-      )}
+          <div className="flex flex-col items-center text-center py-4 space-y-5">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold">
+              Aguardando crachá
+            </p>
+
+            {/* "Visor" da maquininha com ícone pulsante */}
+            <div className="relative w-40 h-40 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-primary/15 animate-ping" />
+              <div className="absolute inset-4 rounded-full bg-primary/20 animate-ping [animation-delay:200ms]" />
+              <div className="absolute inset-8 rounded-full bg-primary/25 animate-ping [animation-delay:400ms]" />
+              <div className="relative w-24 h-24 rounded-full bg-primary/90 flex items-center justify-center shadow-2xl shadow-primary/40">
+                <Wifi className="w-12 h-12 text-primary-foreground rotate-90" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-2xl font-black">Aproxime o crachá</h3>
+              <p className="text-sm text-muted-foreground">
+                Encoste ou passe o cartão NFC<br />na parte de trás do celular
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Lendo…
+            </div>
+
+            <button
+              onClick={cancelScan}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Cancelar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
