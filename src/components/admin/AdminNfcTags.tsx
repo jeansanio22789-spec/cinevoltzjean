@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Plus, Loader2, Trash2, Radio, ExternalLink, AlertTriangle } from "lucide-react";
+import { CreditCard, Plus, Loader2, Trash2, Radio, ExternalLink, AlertTriangle, X, Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { isNfcSupported, readNfcOnce, isInIframe } from "@/lib/nfcReader";
 import { Capacitor } from "@capacitor/core";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 interface NfcTag {
   id: string;
