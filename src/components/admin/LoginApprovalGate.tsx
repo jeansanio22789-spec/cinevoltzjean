@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ShieldAlert, Check, X, Smartphone, Clock } from "lucide-react";
+import { ShieldAlert, Check, X, Smartphone, Clock, CreditCard, Radio } from "lucide-react";
 import { toast } from "sonner";
+import { isNfcSupported, readNfcOnce } from "@/lib/nfcReader";
 
 interface LoginRequest {
   id: string;
@@ -28,6 +29,9 @@ const LoginApprovalGate = () => {
   const [pending, setPending] = useState<LoginRequest | null>(null);
   const [acting, setActing] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [nfcAvailable, setNfcAvailable] = useState(false);
+  const [scanningNfc, setScanningNfc] = useState(false);
+  const [nfcCancel, setNfcCancel] = useState<null | (() => void | Promise<void>)>(null);
 
   // Carrega solicitações pendentes existentes ao logar
   useEffect(() => {
@@ -92,6 +96,11 @@ const LoginApprovalGate = () => {
     return () => clearInterval(t);
   }, [pending]);
 
+  // Detecta suporte NFC e auto-inicia leitura quando há pendente
+  useEffect(() => {
+    isNfcSupported().then(setNfcAvailable);
+  }, []);
+
   const decide = async (decision: "approve" | "deny") => {
     if (!pending) return;
     setActing(true);
@@ -111,6 +120,46 @@ const LoginApprovalGate = () => {
     } else {
       toast.error(`Falha: ${result.reason}`);
     }
+  };
+
+  const approveWithNfc = async () => {
+    if (!pending) return;
+    setScanningNfc(true);
+    const session = readNfcOnce();
+    setNfcCancel(() => session.cancel);
+    try {
+      const uid = await session.uid;
+      setActing(true);
+      const { data, error } = await supabase.rpc("approve_admin_login_with_nfc", {
+        _request_id: pending.id,
+        _tag_uid: uid,
+      });
+      setActing(false);
+      if (error) {
+        toast.error("Erro ao validar crachá.");
+        return;
+      }
+      const result = data as { ok: boolean; reason?: string };
+      if (result.ok) {
+        toast.success("Liberado pelo crachá NFC!");
+        setPending(null);
+      } else if (result.reason === "unknown_tag") {
+        toast.error("Crachá não reconhecido. Cadastre primeiro em Configurações.");
+      } else {
+        toast.error(`Falha: ${result.reason}`);
+      }
+    } catch (err: any) {
+      if (err?.message) toast.error(err.message);
+    } finally {
+      setScanningNfc(false);
+      setNfcCancel(null);
+    }
+  };
+
+  const cancelNfc = async () => {
+    if (nfcCancel) await nfcCancel();
+    setScanningNfc(false);
+    setNfcCancel(null);
   };
 
   if (!pending) return null;
@@ -156,19 +205,46 @@ const LoginApprovalGate = () => {
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => decide("deny")}
-            disabled={acting}
+            disabled={acting || scanningNfc}
             className="flex items-center justify-center gap-2 py-3 rounded-lg bg-destructive text-destructive-foreground font-semibold text-sm hover:bg-destructive/90 transition-colors disabled:opacity-50"
           >
             <X className="w-4 h-4" /> Não fui eu
           </button>
           <button
             onClick={() => decide("approve")}
-            disabled={acting}
+            disabled={acting || scanningNfc}
             className="flex items-center justify-center gap-2 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             <Check className="w-4 h-4" /> Sou eu, liberar
           </button>
         </div>
+
+        {nfcAvailable && (
+          <div className="mt-2">
+            {scanningNfc ? (
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 flex flex-col items-center gap-2">
+                <Radio className="w-6 h-6 text-primary animate-pulse" />
+                <p className="text-xs font-semibold text-center">
+                  Encoste o crachá NFC no celular…
+                </p>
+                <button
+                  onClick={cancelNfc}
+                  className="text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  Cancelar leitura
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={approveWithNfc}
+                disabled={acting}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent text-accent-foreground font-semibold text-sm hover:bg-accent/90 transition-colors disabled:opacity-50"
+              >
+                <CreditCard className="w-4 h-4" /> Aprovar com crachá NFC
+              </button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

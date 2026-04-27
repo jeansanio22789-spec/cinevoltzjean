@@ -3,6 +3,7 @@ import { Globe, Bell, Shield, Save, Loader2, Smartphone, Trash2, Plus, Radio } f
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
+import AdminNfcTags from "@/components/admin/AdminNfcTags";
 
 interface Device {
   id: string;
@@ -189,6 +190,8 @@ const AdminSettings = () => {
             <Plus className="w-3.5 h-3.5" /> Autorizar este aparelho
           </button>
         </div>
+
+        <AdminNfcTags />
 
         <div className="bg-card border border-border rounded-lg p-5">
           <div className="flex items-center gap-3 mb-4">
