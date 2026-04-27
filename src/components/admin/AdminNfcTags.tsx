@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Plus, Loader2, Trash2, Radio } from "lucide-react";
+import { CreditCard, Plus, Loader2, Trash2, Radio, ExternalLink, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { isNfcSupported, readNfcOnce } from "@/lib/nfcReader";
+import { isNfcSupported, readNfcOnce, isInIframe } from "@/lib/nfcReader";
+import { Capacitor } from "@capacitor/core";
 
 interface NfcTag {
   id: string;
@@ -18,6 +19,7 @@ const AdminNfcTags = () => {
   const [supported, setSupported] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [cancelFn, setCancelFn] = useState<null | (() => void | Promise<void>)>(null);
+  const [blockedByIframe, setBlockedByIframe] = useState(false);
 
   const load = async () => {
     const { data } = await supabase
@@ -30,6 +32,8 @@ const AdminNfcTags = () => {
 
   useEffect(() => {
     isNfcSupported().then(setSupported);
+    // Web NFC bloqueado quando estamos no preview (iframe) e não é o app nativo
+    setBlockedByIframe(!Capacitor.isNativePlatform() && isInIframe());
     load();
   }, []);
 
@@ -134,6 +138,26 @@ const AdminNfcTags = () => {
         </ul>
       )}
 
+      {blockedByIframe && (
+        <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="space-y-2 min-w-0">
+            <p className="text-xs font-semibold">Abra o app fora do preview</p>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              O leitor NFC do navegador só funciona quando o site está aberto
+              direto, sem estar dentro do editor. Toque abaixo para abrir em
+              nova aba e cadastre o crachá lá.
+            </p>
+            <button
+              onClick={() => window.open(window.location.href, "_blank", "noopener")}
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Abrir em nova aba
+            </button>
+          </div>
+        </div>
+      )}
+
       {scanning ? (
         <div className="mt-4 p-4 rounded-lg bg-primary/10 border border-primary/30 flex flex-col items-center gap-3">
           <Radio className="w-8 h-8 text-primary animate-pulse" />
@@ -154,7 +178,11 @@ const AdminNfcTags = () => {
           className="mt-4 flex items-center gap-2 text-xs text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed"
         >
           <Plus className="w-3.5 h-3.5" />
-          {supported ? "Cadastrar novo crachá" : "NFC indisponível neste aparelho"}
+          {supported
+            ? "Cadastrar novo crachá"
+            : blockedByIframe
+              ? "Disponível ao abrir em nova aba"
+              : "NFC indisponível neste aparelho"}
         </button>
       )}
     </div>

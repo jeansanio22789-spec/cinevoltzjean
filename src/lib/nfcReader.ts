@@ -27,8 +27,19 @@ const bytesToHex = (bytes: ArrayBuffer | number[] | Uint8Array): string => {
     .toUpperCase();
 };
 
+/** Detecta se a página está rodando dentro de um iframe (preview do Lovable, etc.). */
+export const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true; // se nem dá pra checar, é cross-origin → é iframe
+  }
+};
+
 export const isNfcSupported = async (): Promise<boolean> => {
   if (Capacitor.isNativePlatform()) return Capacitor.getPlatform() === "android";
+  // Web NFC só funciona em top-level browsing context (sem iframe)
+  if (isInIframe()) return false;
   return typeof (globalThis as any).NDEFReader !== "undefined";
 };
 
