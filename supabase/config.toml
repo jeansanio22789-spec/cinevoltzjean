@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.proxy-stream]
 verify_jwt = false
+
+[functions.nfc-login]
+verify_jwt = false
