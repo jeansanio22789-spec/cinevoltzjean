@@ -33,6 +33,7 @@ export type AdminTab =
   | "notifications"
   | "branding"
   | "audit"
+  | "nfc"
   | "settings";
 
 const sections = [
