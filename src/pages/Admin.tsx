@@ -45,16 +45,31 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
 };
 
 const Admin = () => {
-  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Permite abrir o painel direto numa aba específica via ?tab=videos
+  // Aba inicial vem da URL (ex.: /admin?tab=videos). Se F5 acontecer,
+  // continuamos exatamente onde o admin estava.
+  const initialTab = (() => {
+    const t = searchParams.get("tab") as AdminTab | null;
+    return t && t in tabTitles ? t : "dashboard";
+  })();
+  const [activeTab, setActiveTabState] = useState<AdminTab>(initialTab);
+
+  // Sincroniza a URL sempre que a aba muda (sem empurrar histórico).
+  const setActiveTab = (tab: AdminTab) => {
+    setActiveTabState(tab);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", tab);
+    setSearchParams(next, { replace: true });
+  };
+
+  // Mantém o state em sincronia se a URL mudar por outro caminho (link externo)
   useEffect(() => {
     const tab = searchParams.get("tab") as AdminTab | null;
-    if (tab && tab in tabTitles) setActiveTab(tab);
-  }, [searchParams]);
+    if (tab && tab in tabTitles && tab !== activeTab) setActiveTabState(tab);
+  }, [searchParams, activeTab]);
 
   const handleSignOut = async () => {
     await signOut();
