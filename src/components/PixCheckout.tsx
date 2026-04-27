@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { X, QrCode, Copy, CheckCheck, Loader2, CheckCircle2, Play, User, Receipt } from "lucide-react";
+import { X, QrCode, Copy, CheckCheck, Loader2, CheckCircle2, Play, User, Receipt, CreditCard } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import CardCheckout from "@/components/CardCheckout";
 
 interface Plan {
   name: string;
@@ -63,10 +64,16 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix
   };
 
   useEffect(() => {
+    // Cartão é tratado pelo CardCheckout embutido (não precisa criar PIX)
+    if (paymentMode === "card") {
+      setLoading(false);
+      return;
+    }
+
     const create = async () => {
       try {
-        // Cartão / Carteira → Checkout Pro do Mercado Pago (redirect)
-        if (paymentMode === "card" || paymentMode === "wallet") {
+        // Carteira → Checkout Pro do Mercado Pago (redirect — saldo MP não funciona embutido)
+        if (paymentMode === "wallet") {
           const body: Record<string, unknown> = {
             methods: paymentMode,
             origin: window.location.origin,
