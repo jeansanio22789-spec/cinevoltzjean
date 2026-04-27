@@ -69,7 +69,7 @@ const AdminMovies = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft" });
+    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft", price: 10 });
     setShowForm(true);
   };
 
@@ -86,6 +86,7 @@ const AdminMovies = () => {
       duration: movie.duration || "",
       rating: movie.rating || "14+",
       status: movie.status || "draft",
+      price: movie.price ?? 10,
     });
     setShowForm(true);
   };
@@ -550,6 +551,22 @@ const AdminMovies = () => {
                     <option>18+</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Preço individual (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  placeholder="10.00"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: parseFloat(e.target.value) || 0 })}
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Quanto o usuário paga via PIX para liberar só este título (não afeta assinantes).
+                </p>
               </div>
 
               <div>
