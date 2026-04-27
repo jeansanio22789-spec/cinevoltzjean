@@ -562,7 +562,9 @@ export const useUploadQueue = (onJobDone?: () => void) => {
     runningJobIds.delete(id);
     store.update(id, {
       status: "queued",
-      progress: 0,
+      // Mantém o progresso atual — o TUS vai retomar de onde parou,
+      // não faz sentido voltar a barra para 0.
+      progress: target.uploadPath ? target.progress : 0,
       speedMBs: 0,
       etaSec: 0,
       lockedEtaSec: undefined,
@@ -570,6 +572,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
       errorMsg: undefined,
       timedOut: false,
       abort: undefined,
+      lastProgressAt: Date.now(),
     });
     // Pequeno delay pra garantir que o abort propagou antes de redisparar
     setTimeout(() => {
