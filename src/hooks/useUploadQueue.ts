@@ -370,6 +370,7 @@ const uploadFileTus = (
     const endpoint = `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`;
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
+    let lastProgressAt = 0;
 
     const upload = new tus.Upload(file, {
       endpoint,
@@ -393,6 +394,11 @@ const uploadFileTus = (
       chunkSize: 6 * 1024 * 1024,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
+        // Throttle: só notifica a UI a cada 250ms para evitar re-renders
+        // excessivos durante chunks grandes (que disparam progresso byte-a-byte)
+        const now = Date.now();
+        if (now - lastProgressAt < 250 && bytesUploaded < bytesTotal) return;
+        lastProgressAt = now;
         updateProgress(startTime, samples, bytesUploaded, bytesTotal, onProgress);
       },
       onSuccess: () => {
