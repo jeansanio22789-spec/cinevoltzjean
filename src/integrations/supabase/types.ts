@@ -898,6 +898,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_device_authorized: { Args: { _device_id: string }; Returns: boolean }
+      lookup_email_by_nfc: { Args: { _tag_uid: string }; Returns: Json }
       redeem_access_token: {
         Args: { _movie_id: string; _token: string }
         Returns: Json
