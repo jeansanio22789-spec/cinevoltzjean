@@ -596,6 +596,8 @@ const runJob = async (job: UploadJob) => {
     window.clearTimeout(timeoutTimer);
     // Libera o wake lock se não tem mais nada rolando
     if (!hasActiveUploads()) void releaseWakeLock();
+    // 🚦 Liberou um slot — tenta puxar o próximo da fila sequencial
+    drainPending();
   }
 };
 
