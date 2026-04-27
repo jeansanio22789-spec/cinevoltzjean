@@ -54,8 +54,16 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   file: job.file,
   thumbnail: job.thumbnail ?? null,
   meta: job.meta,
-  status: job.status === "done" ? "done" : job.status === "error" ? "error" : "queued",
-  progress: job.status === "done" ? 100 : 0,
+  // Mantém o status real para identificar jobs que estavam ativos no refresh.
+  status:
+    job.status === "done"
+      ? "done"
+      : job.status === "error"
+        ? "error"
+        : "uploading",
+  // Persiste o progresso REAL — assim ao recarregar o app a barra continua
+  // do mesmo ponto enquanto o TUS retoma a transferência.
+  progress: job.status === "done" ? 100 : Math.round(job.progress || 0),
   speedMBs: 0,
   etaSec: 0,
   errorMsg: job.errorMsg,
