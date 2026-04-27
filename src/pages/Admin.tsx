@@ -21,6 +21,7 @@ import AdminPlans from "@/components/admin/AdminPlans";
 import AdminReports from "@/components/admin/AdminReports";
 import AdminBranding from "@/components/admin/AdminBranding";
 import AdminNotifications from "@/components/admin/AdminNotifications";
+import AdminUploadsRail from "@/components/AdminUploadsRail";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
