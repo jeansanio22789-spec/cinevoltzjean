@@ -464,7 +464,7 @@ const AdminVideos = () => {
 
   const totalSize = videos.length;
   const published = videos.filter((v) => v.status === "published").length;
-  const drafts = videos.filter((v) => v.status === "draft").length;
+  const draftCount = videos.filter((v) => v.status === "draft").length;
   const doneCount = jobs.filter((j) => j.status === "done").length;
 
   return (
