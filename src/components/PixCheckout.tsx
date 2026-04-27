@@ -8,13 +8,18 @@ import { useNavigate } from "react-router-dom";
 
 interface Plan {
   name: string;
-  priceValue: string;
+  priceValue?: string;
   price: string;
   period: string;
 }
 
 interface Props {
-  plan: Plan;
+  /** Modo plano: passa um Plan completo */
+  plan?: Plan;
+  /** Modo título individual: passa o id e o título */
+  movieId?: string;
+  movieTitle?: string;
+  moviePrice?: number;
   onClose: () => void;
 }
 
@@ -26,7 +31,7 @@ interface PixData {
   amount: number;
 }
 
-const PixCheckout = ({ plan, onClose }: Props) => {
+const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) => {
   const [pix, setPix] = useState<PixData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +39,13 @@ const PixCheckout = ({ plan, onClose }: Props) => {
   const [paid, setPaid] = useState(false);
   const pollRef = useRef<number | null>(null);
   const navigate = useNavigate();
+
+  const isMovie = !!movieId;
+  const headerName = isMovie ? movieTitle ?? "Título" : plan?.name ?? "Plano";
+  const headerPrice = isMovie
+    ? `R$ ${(moviePrice ?? 10).toFixed(2).replace(".", ",")}`
+    : plan?.price ?? "";
+  const headerPeriod = isMovie ? " (acesso vitalício)" : plan?.period ?? "";
 
   const getFunctionErrorMessage = async (err: unknown) => {
     if (err instanceof FunctionsHttpError) {
@@ -51,8 +63,11 @@ const PixCheckout = ({ plan, onClose }: Props) => {
   useEffect(() => {
     const create = async () => {
       try {
+        const body = isMovie
+          ? { movie_id: movieId }
+          : { plan: plan!.name };
         const { data, error } = await supabase.functions.invoke("mp-create-pix", {
-          body: { plan: plan.name },
+          body,
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
@@ -65,7 +80,7 @@ const PixCheckout = ({ plan, onClose }: Props) => {
       }
     };
     create();
-  }, [plan.name]);
+  }, [plan?.name, movieId, isMovie]);
 
   // Polling de pagamento a cada 4s
   useEffect(() => {
@@ -79,13 +94,17 @@ const PixCheckout = ({ plan, onClose }: Props) => {
         toast.success("Pagamento confirmado! Liberando acesso…");
         setTimeout(() => {
           onClose();
-          navigate("/minha-conta");
+          if (isMovie && movieId) {
+            navigate(`/assistir/${movieId}`);
+          } else {
+            navigate("/minha-conta");
+          }
         }, 1800);
       }
     };
     pollRef.current = window.setInterval(tick, 4000) as unknown as number;
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [pix?.purchase_id, paid, navigate, onClose]);
+  }, [pix?.purchase_id, paid, navigate, onClose, isMovie, movieId]);
 
   const handleCopy = () => {
     if (!pix?.qr_code) return;
