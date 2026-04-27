@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { toast } from "sonner";
 
+const normalizeUid = (uid: string) => uid.replace(/[^0-9A-Fa-f]/g, "").toUpperCase();
+const prettyUid = (uid: string) => normalizeUid(uid).match(/.{1,2}/g)?.join(":") ?? normalizeUid(uid);
+
 const Login = () => {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
@@ -30,6 +33,8 @@ const Login = () => {
   const [cancelFn, setCancelFn] = useState<null | (() => void | Promise<void>)>(null);
   // Token NFC validado, será consumido após o login com senha
   const [nfcToken, setNfcToken] = useState<string | null>(null);
+  // UID lido de um crachá novo: salva automaticamente depois do login admin.
+  const [pendingEnrollUid, setPendingEnrollUid] = useState<string | null>(null);
 
   useEffect(() => {
     isNfcSupported().then((ok) => {
@@ -73,15 +78,23 @@ const Login = () => {
       }
       const result = data as { ok: boolean; email?: string; token?: string; reason?: string };
       if (!result.ok) {
+        if (result.reason === "unknown_tag") {
+          const normalized = normalizeUid(uid);
+          setPendingEnrollUid(normalized);
+          setNfcToken(null);
+          setMode("client");
+          setError(`Crachá novo lido (${prettyUid(normalized)}). Entre com email e senha admin para salvar.`);
+          toast.warning("Crachá novo lido. Faça login admin para cadastrar automaticamente.");
+          return;
+        }
         toast.error(
-          result.reason === "unknown_tag"
-            ? "Crachá não reconhecido."
-            : result.reason === "not_admin"
-              ? "Este crachá não pertence a um administrador."
-              : "Falha ao validar crachá.",
+          result.reason === "not_admin"
+            ? "Este crachá não pertence a um administrador."
+            : "Falha ao validar crachá.",
         );
         return;
       }
+      setPendingEnrollUid(null);
       setEmail(result.email!);
       setNfcToken(result.token!);
       toast.success("Crachá validado. Agora informe a senha.");
@@ -132,6 +145,36 @@ const Login = () => {
       return;
     }
 
+    const { data: { user: signedUser } } = await supabase.auth.getUser();
+    const { data: signedUserIsAdmin } = signedUser ? await supabase.rpc("is_admin") : { data: false };
+
+    if (pendingEnrollUid) {
+      if (!signedUser || !signedUserIsAdmin) {
+        setError("Só administrador pode cadastrar crachá NFC.");
+        setLoading(false);
+        return;
+      }
+
+      const { error: enrollError } = await supabase.from("admin_nfc_tags").insert({
+        user_id: signedUser.id,
+        tag_uid: pendingEnrollUid,
+        label: "Crachá principal",
+      });
+
+      if (enrollError) {
+        if (enrollError.code === "23505") {
+          toast.warning("Este crachá já estava cadastrado.");
+        } else {
+          setError("Não foi possível salvar o crachá: " + enrollError.message);
+          setLoading(false);
+          return;
+        }
+      } else {
+        toast.success("Crachá cadastrado. Próximas entradas serão por NFC + senha.");
+      }
+      setPendingEnrollUid(null);
+    }
+
     // Se modo admin, valida o crachá NO SERVIDOR depois do login
     if (mode === "admin") {
       const { data, error: rpcError } = await supabase.rpc("consume_admin_nfc_challenge", {
@@ -156,13 +199,7 @@ const Login = () => {
 
     let destination = redirectParam;
     if (!destination) {
-      const { data: { user: u } } = await supabase.auth.getUser();
-      if (u) {
-        const { data: isAdmin } = await supabase.rpc("is_admin");
-        destination = isAdmin ? "/admin" : "/minha-conta";
-      } else {
-        destination = "/";
-      }
+      destination = signedUser ? (signedUserIsAdmin ? "/admin" : "/minha-conta") : "/";
     }
     navigate(destination);
     setLoading(false);
@@ -172,6 +209,7 @@ const Login = () => {
     setMode(m);
     setError("");
     setNfcToken(null);
+    setPendingEnrollUid(null);
     if (m === "client") setEmail("");
   };
 
@@ -242,6 +280,20 @@ const Login = () => {
             </div>
           )}
 
+          {pendingEnrollUid && !isSignUp && (
+            <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-1">
+              <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5" /> Crachá novo detectado
+              </p>
+              <p className="text-[11px] text-muted-foreground font-mono break-all">
+                UID {prettyUid(pendingEnrollUid)}
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Entre com email e senha de admin para cadastrar esse crachá automaticamente.
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-medium mb-1.5 block">
               {mode === "admin" && !isSignUp ? "Passo 2 — Email" : "Email"}
@@ -297,7 +349,7 @@ const Login = () => {
 
           <button
             type="button"
-            onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccess(""); setNfcToken(null); }}
+            onClick={() => { setIsSignUp(!isSignUp); setError(""); setSuccess(""); setNfcToken(null); setPendingEnrollUid(null); }}
             className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             {isSignUp ? "Já tem conta? Faça login" : "Não tem conta? Cadastre-se"}
