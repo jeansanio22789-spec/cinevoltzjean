@@ -481,25 +481,52 @@ interface EnqueueInput {
 // que jobs persistidos sejam retomados mesmo se nenhum componente que usa o
 // hook estiver montado ainda.
 // ---------------------------------------------------------------------------
+// Verifica se o blob do File ainda é legível. No mobile, depois que o
+// SO mata o app em background, o handle do arquivo pode ficar inválido —
+// nesse caso o TUS falharia silenciosamente. Detectamos antes de tentar.
+const isFileReadable = async (file: File): Promise<boolean> => {
+  try {
+    if (!file || typeof file.slice !== "function" || !file.size) return false;
+    const slice = file.slice(0, 1);
+    await slice.arrayBuffer();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const initUploadQueue = () => {
   if (store.initialized) return;
   store.initialized = true;
-  void loadPersistedUploadJobs().then((saved) => {
+  void loadPersistedUploadJobs().then(async (saved) => {
     if (!saved.length || store.jobs.length > 0) return;
-    const restoredJobs: UploadJob[] = saved
-      .filter((j) => j.status !== "done")
-      .map((j) => ({
-        ...j,
-        status: j.status === "error" ? "error" : "queued",
-        // Preserva o progresso anterior — assim o usuário vê o upload
-        // retomar de onde parou (TUS continua do mesmo offset no Storage).
-        progress: j.status === "error" ? j.progress : (j.progress ?? 0),
-        speedMBs: 0,
-        etaSec: 0,
-        timedOut: false,
-        thumbPreviewUrl: j.thumbnail ? URL.createObjectURL(j.thumbnail) : null,
-        uploadPath: j.uploadPath,
-      }));
+
+    const candidates = saved.filter((j) => j.status !== "done");
+
+    // Valida cada arquivo ANTES de hidratar — assim quem perdeu o blob
+    // aparece imediatamente como "precisa selecionar de novo" em vez de
+    // ficar travado em 0% pra sempre.
+    const restoredJobs: UploadJob[] = await Promise.all(
+      candidates.map(async (j) => {
+        const fileOk = await isFileReadable(j.file);
+        const thumbOk = j.thumbnail ? await isFileReadable(j.thumbnail) : true;
+        const dead = !fileOk;
+        return {
+          ...j,
+          status: dead ? "error" : j.status === "error" ? "error" : "queued",
+          progress: j.status === "error" ? j.progress : (j.progress ?? 0),
+          speedMBs: 0,
+          etaSec: 0,
+          timedOut: false,
+          thumbPreviewUrl:
+            j.thumbnail && thumbOk ? URL.createObjectURL(j.thumbnail) : null,
+          uploadPath: j.uploadPath,
+          errorMsg: dead
+            ? "O app foi fechado e o arquivo precisa ser selecionado novamente. Toque em remover e reenvie o vídeo."
+            : j.errorMsg,
+        } satisfies UploadJob;
+      }),
+    );
 
     store.hydrate(restoredJobs);
     restoredJobs
