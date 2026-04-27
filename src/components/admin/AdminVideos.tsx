@@ -173,6 +173,17 @@ const AdminVideos = () => {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [recognizingTitle, setRecognizingTitle] = useState(false);
+  const [drafts, setDrafts] = useState<VideoDraft[]>([]);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+
+  const refreshDrafts = async () => {
+    const list = await loadDrafts();
+    setDrafts(list);
+  };
+
+  useEffect(() => {
+    void refreshDrafts();
+  }, []);
 
   // Lê o título escrito na capa via IA com visão (OCR semântico).
   // O título final fica TUDO MAIÚSCULO e, se a capa indicar áudio
