@@ -167,10 +167,10 @@ const AdminNfcTagsPage = () => {
       return;
     }
     await logAudit({
-      action: "nfc_tag_create",
-      resource_type: "admin_nfc_tag",
+      action: "create",
+      resource_type: "settings",
       description: `Crachá NFC "${cleanLabel}" cadastrado`,
-      metadata: { tag_uid: normalizedUid, label: cleanLabel },
+      metadata: { type: "admin_nfc_tag", tag_uid: normalizedUid, label: cleanLabel },
     });
     toast.success("Crachá cadastrado!");
     resetPreview();
