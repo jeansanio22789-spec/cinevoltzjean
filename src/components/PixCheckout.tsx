@@ -251,7 +251,9 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix
 
               <div className="flex justify-between items-start gap-3">
                 <span className="text-xs text-muted-foreground">Método</span>
-                <span className="text-xs font-semibold text-foreground">PIX</span>
+                <span className="text-xs font-semibold text-foreground">
+                  {paymentMode === "card" ? "Cartão" : "PIX"}
+                </span>
               </div>
 
               <div className="flex justify-between items-start gap-3">
