@@ -43,6 +43,8 @@ export interface UploadJob {
   /** Caminho fixo do arquivo no Storage. Persistido para que o TUS consiga
    *  retomar exatamente o mesmo upload após o app ser recarregado. */
   uploadPath?: string;
+  /** Timestamp do último progresso recebido — usado para detectar travamento. */
+  lastProgressAt?: number;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
@@ -412,6 +414,7 @@ const runJob = async (job: UploadJob) => {
           lockedEtaSec,
           lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
+          lastProgressAt: Date.now(),
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
@@ -559,7 +562,9 @@ export const useUploadQueue = (onJobDone?: () => void) => {
     runningJobIds.delete(id);
     store.update(id, {
       status: "queued",
-      progress: 0,
+      // Mantém o progresso atual — o TUS vai retomar de onde parou,
+      // não faz sentido voltar a barra para 0.
+      progress: target.uploadPath ? target.progress : 0,
       speedMBs: 0,
       etaSec: 0,
       lockedEtaSec: undefined,
@@ -567,6 +572,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
       errorMsg: undefined,
       timedOut: false,
       abort: undefined,
+      lastProgressAt: Date.now(),
     });
     // Pequeno delay pra garantir que o abort propagou antes de redisparar
     setTimeout(() => {

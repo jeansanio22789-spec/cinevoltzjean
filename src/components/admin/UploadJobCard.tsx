@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -11,6 +12,8 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { UploadJob } from "@/hooks/useUploadQueue";
+
+const STUCK_THRESHOLD_MS = 30_000; // 30s sem progresso = travado
 
 const fmtEta = (sec: number) =>
   sec > 60 ? `${Math.ceil(sec / 60)}min` : `${Math.ceil(sec)}s`;
@@ -56,6 +59,20 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
   const Icon = badge.icon;
   const showProgress =
     j.status === "uploading" || j.status === "saving" || j.status === "warning";
+
+  // 🔁 Tick periódico para reavaliar "travado" mesmo sem update do hook.
+  const [, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!showProgress) return;
+    const id = window.setInterval(() => setNow(Date.now()), 5000);
+    return () => window.clearInterval(id);
+  }, [showProgress]);
+
+  // Considera travado se status ativo mas o último progresso foi há mais de 30s.
+  const isStuck =
+    showProgress &&
+    !!j.lastProgressAt &&
+    Date.now() - j.lastProgressAt > STUCK_THRESHOLD_MS;
 
   // Estimativas FIXAS vindas do hook (não oscilam).
   // Se ainda não foi travada (uploads muito rápidos ou início), usa o ETA atual.
@@ -119,16 +136,24 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
         )}
       </div>
 
-      {/* Botão de Retomar envio — aparece em erro ou travado/lento */}
-      {(j.status === "error" || j.status === "warning") && (
+      {/* Botão de Continuar/Retomar envio — aparece em erro, lento ou travado */}
+      {(j.status === "error" || j.status === "warning" || isStuck) && (
         <button
           onClick={onRetry}
           className="w-full inline-flex items-center justify-center gap-2 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors py-2 rounded"
-          title="Reiniciar este envio do zero"
+          title="Continuar este envio de onde parou"
         >
           <RotateCw className="w-3.5 h-3.5" />
-          Retomar envio
+          {isStuck && j.status !== "error"
+            ? "Continuar envio (travado)"
+            : "Retomar envio"}
         </button>
+      )}
+
+      {isStuck && j.status !== "error" && (
+        <p className="text-[11px] text-amber-500">
+          ⚠️ Sem progresso há mais de 30s — toque em "Continuar envio" para destravar.
+        </p>
       )}
 
       {showProgress && (
