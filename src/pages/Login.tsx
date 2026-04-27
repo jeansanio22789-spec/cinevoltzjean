@@ -257,7 +257,23 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <p className="text-primary font-black text-3xl tracking-tight mb-2">STREAMFLIX</p>
+          <p
+            className="text-primary font-black text-3xl tracking-tight mb-2 select-none cursor-default"
+            onClick={() => {
+              // 5 toques rápidos no logo revelam o modo admin manual
+              const now = Date.now();
+              const taps = (window as any).__adminTaps || [];
+              const recent = [...taps, now].filter((t: number) => now - t < 2500);
+              (window as any).__adminTaps = recent;
+              if (recent.length >= 5) {
+                (window as any).__adminTaps = [];
+                switchMode("admin");
+                toast.info("Modo admin ativado");
+              }
+            }}
+          >
+            STREAMFLIX
+          </p>
           <p className="text-muted-foreground text-sm">
             {isSignUp ? "Crie sua conta gratuita" : "Acesse sua conta"}
           </p>
