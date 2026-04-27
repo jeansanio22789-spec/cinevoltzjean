@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
   ShoppingBag, Link2, Radio, Megaphone, Send, Library, Crown, BarChart3, Bell, Palette,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
