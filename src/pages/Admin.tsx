@@ -128,6 +128,7 @@ const Admin = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
+            {activeTab !== "videos" && <AdminUploadsRail />}
             {activeTab === "dashboard" && <AdminDashboard />}
             {activeTab === "reports" && <AdminReports />}
             {activeTab === "movies" && <AdminMovies />}
