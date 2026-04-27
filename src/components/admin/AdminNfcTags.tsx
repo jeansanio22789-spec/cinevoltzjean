@@ -40,20 +40,19 @@ const AdminNfcTags = () => {
 
   const startEnroll = async () => {
     if (!supported) {
-      toast.error("Este aparelho/navegador não suporta NFC. Use o app Android.");
+      toast.error("NFC indisponível. Use o app Android ou abra fora do preview.");
       return;
     }
+    // Pede o nome ANTES, pra UX ficar igual a uma maquininha:
+    // confirma → mostra "aproxime" → lê → grava.
+    const label = window.prompt("Nome para este crachá (ex: Crachá da carteira)", "Crachá");
+    if (!label) return;
+
     setScanning(true);
     const session = readNfcOnce();
     setCancelFn(() => session.cancel);
     try {
       const uid = await session.uid;
-      const label = window.prompt("Nome para este crachá (ex: Crachá da carteira)", "Crachá");
-      if (!label) {
-        setScanning(false);
-        setCancelFn(null);
-        return;
-      }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error("Sessão expirada");
