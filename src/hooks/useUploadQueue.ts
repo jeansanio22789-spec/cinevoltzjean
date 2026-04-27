@@ -286,24 +286,21 @@ const uploadFileTus = (
     const downlinkMbps = conn?.downlink ?? 10;
     const isFast = effType === "4g" || downlinkMbps >= 5;
 
-    // ⚡ MUITO paralelismo + chunks médios = throughput máximo.
-    // Cada conexão TCP tem um teto de banda, então abrir 8 em paralelo
-    // multiplica a velocidade total (especialmente em 4G/5G/Wi-Fi).
-    // Chunks menores (5MB) deixam cada parte terminar rápido e liberar
-    // espaço pra próxima — fluxo contínuo em vez de "ondas".
-    const chunkSize = isFast ? 5 * 1024 * 1024 : 2 * 1024 * 1024;
-    const parallelUploads = isFast ? 8 : 3;
+    // ⚡ Equilíbrio entre paralelismo e tamanho de chunk.
+    // Muito paralelismo (>4) em mobile faz as conexões competirem banda
+    // e cada uma fica lenta — pior que serial. 3 paralelos é o sweet spot.
+    // Chunk de 8MB = poucas requisições, baixo overhead, retry barato.
+    const chunkSize = isFast ? 8 * 1024 * 1024 : 4 * 1024 * 1024;
+    const parallelUploads = isFast ? 3 : 1;
 
     const upload = new tus.Upload(file, {
       endpoint,
-      // Retries rápidos no começo, vão crescendo pra não martelar a rede
       retryDelays: [0, 300, 1000, 2500, 5000, 10000, 20000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
       },
-      // ⚠️ CRÍTICO: precisa ser false pra parallelUploads funcionar.
-      // Com true, o tus-js-client manda tudo serial, ignorando paralelismo.
+      // false é necessário pra parallelUploads funcionar (>1)
       uploadDataDuringCreation: false,
       removeFingerprintOnSuccess: true,
       metadata: {
