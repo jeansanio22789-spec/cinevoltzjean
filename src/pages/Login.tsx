@@ -302,6 +302,26 @@ const Login = () => {
           >
             {isSignUp ? "Já tem conta? Faça login" : "Não tem conta? Cadastre-se"}
           </button>
+
+          {mode === "admin" && !isSignUp && (
+            <div className="pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={async () => {
+                  await cancelScan();
+                  toast.info("Entre com email e senha. Depois vá em Sistema → Crachás NFC.");
+                  switchMode("client");
+                }}
+                className="w-full flex items-center justify-center gap-2 text-xs text-primary hover:text-primary/80 font-semibold transition-colors"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                Cadastrar novo crachá
+              </button>
+              <p className="text-[10px] text-muted-foreground text-center mt-1.5 leading-snug">
+                Requer login admin com email e senha primeiro
+              </p>
+            </div>
+          )}
         </form>
       </div>
 
