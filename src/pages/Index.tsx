@@ -4,50 +4,23 @@ import HeroSection from "@/components/HeroSection";
 import Footer from "@/components/Footer";
 import ContentRail from "@/components/ContentRail";
 import AdminUploadsRail from "@/components/AdminUploadsRail";
-import { useMovies, type DbMovie } from "@/hooks/useMovies";
-import { useUploadQueue } from "@/hooks/useUploadQueue";
+import { useMovies } from "@/hooks/useMovies";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
 import type { RailMovie } from "@/components/MovieCard";
 
 const Index = () => {
   const { movies, loading } = useMovies();
-  const { jobs } = useUploadQueue();
   const [query, setQuery] = useState("");
-
-  // Transforma uploads ativos em "pseudo-filmes" para misturar no catálogo
-  const pendingMovies: RailMovie[] = useMemo(() => {
-    return jobs
-      .filter((j) =>
-        ["uploading", "warning", "queued", "saving"].includes(j.status),
-      )
-      .map((j) => {
-        const fake: RailMovie = {
-          id: `pending-${j.id}`,
-          title: j.meta.title,
-          description: j.meta.description || null,
-          thumbnail_url: j.thumbPreviewUrl || null,
-          year: new Date().getFullYear(),
-          duration: null,
-          genre: j.meta.genre || "Outros",
-          rating: null,
-          status: "pending",
-          video_url: null,
-          telegram_url: null,
-          _pending: j,
-        };
-        return fake;
-      });
-  }, [jobs]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const all: RailMovie[] = [...pendingMovies, ...(movies as DbMovie[])];
+    const all: RailMovie[] = movies;
     if (!q) return all;
     return all.filter((m) => m.title.toLowerCase().includes(q));
-  }, [movies, pendingMovies, query]);
+  }, [movies, query]);
 
-  // Fileira "Adicionados recentemente" — pendentes vêm primeiro, depois recentes
+  // Fileira "Adicionados recentemente"
   const recent = useMemo(() => filtered.slice(0, 20), [filtered]);
 
   // Agrupa por gênero pra criar uma fileira por categoria (estilo Netflix)
