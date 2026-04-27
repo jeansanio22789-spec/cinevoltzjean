@@ -417,8 +417,9 @@ const Login = () => {
         </form>
       </div>
 
-      {/* Modal "maquininha" pedindo o crachá */}
-      <Dialog open={scanning} onOpenChange={(o) => { if (!o) cancelScan(); }}>
+      {/* Modal "maquininha" SÓ aparece quando o usuário toca no botão manual.
+          No modo silencioso (automático ao abrir o login) o NFC escuta sem UI. */}
+      <Dialog open={scanning && !silentScan} onOpenChange={(o) => { if (!o) cancelScan(); }}>
         <DialogContent
           className="max-w-sm border-primary/40 bg-gradient-to-b from-card to-background"
           onPointerDownOutside={(e) => e.preventDefault()}
