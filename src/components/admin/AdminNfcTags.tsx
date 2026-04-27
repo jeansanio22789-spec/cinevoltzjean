@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { isNfcSupported, readNfcOnce, isInIframe } from "@/lib/nfcReader";
 import { Capacitor } from "@capacitor/core";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+// sr-only wrapper replaces VisuallyHidden
 
 interface NfcTag {
   id: string;
@@ -188,12 +188,12 @@ const AdminNfcTags = () => {
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
-          <VisuallyHidden>
+          <span className="sr-only">
             <DialogTitle>Leitura de crachá NFC</DialogTitle>
             <DialogDescription>
               Aproxime o crachá NFC da parte de trás do celular para cadastrá-lo.
             </DialogDescription>
-          </VisuallyHidden>
+          </span>
           <div className="flex flex-col items-center text-center py-4 space-y-5">
             <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold">
               Aguardando crachá
