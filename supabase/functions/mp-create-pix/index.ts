@@ -13,6 +13,7 @@ const PLANS: Record<string, { amount: number; days: number }> = {
   "Básico":   { amount: 18.90, days: 30 },
   "Padrão":   { amount: 39.90, days: 30 },
   "Premium":  { amount: 55.90, days: 30 },
+  "Teste":    { amount: 0.10,  days: 1 },
 };
 
 Deno.serve(async (req) => {
