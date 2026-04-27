@@ -8,6 +8,7 @@ import { useLocalVideoSrc } from "@/hooks/useLocalVideoSrc";
 import TelegramPlayer from "@/components/TelegramPlayer";
 import VideoPlayer from "@/components/VideoPlayer";
 import IntroVignette from "@/components/IntroVignette";
+import PixCheckout from "@/components/PixCheckout";
 
 interface WatchMovie {
   id: string;
@@ -21,6 +22,7 @@ interface WatchMovie {
   genre: string | null;
   rating: string | null;
   status: string | null;
+  price: number | null;
 }
 
 const Watch = () => {
