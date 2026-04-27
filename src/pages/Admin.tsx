@@ -161,6 +161,7 @@ const Admin = () => {
             {activeTab === "users" && <AdminUsers />}
             {activeTab === "notifications" && <AdminNotifications />}
             {activeTab === "branding" && <AdminBranding />}
+            {activeTab === "nfc" && <AdminNfcTagsPage />}
             {activeTab === "audit" && <AdminAuditLog />}
             {activeTab === "settings" && <AdminSettings />}
           </main>
