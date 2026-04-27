@@ -748,8 +748,17 @@ const AdminVideos = () => {
               Salvar no Aparelho
               {selectedFiles.length > 1 && ` (${selectedFiles.length})`}
             </button>
+            <button
+              onClick={handleSaveDraft}
+              disabled={selectedFiles.length === 0}
+              className="px-6 py-2 bg-muted text-foreground rounded text-sm font-semibold hover:bg-muted/80 transition-colors disabled:opacity-50 flex items-center gap-2 border border-border"
+              title="Salva o vídeo + capa + título no aparelho para enviar depois — sem usar internet agora."
+            >
+              <Save className="w-4 h-4" />
+              {editingDraftId ? "Atualizar Rascunho" : "Salvar Rascunho"}
+            </button>
             <p className="text-xs text-muted-foreground self-center w-full">
-              💡 <strong>Enviar</strong>: nuvem, todos veem. <strong>Salvar Link</strong>: instantâneo p/ todos. <strong>Salvar no Aparelho</strong>: instantâneo, só neste celular.
+              💡 <strong>Enviar</strong>: nuvem, todos veem. <strong>Salvar Link</strong>: instantâneo p/ todos. <strong>Salvar no Aparelho</strong>: instantâneo, só neste celular. <strong>Salvar Rascunho</strong>: guarda local pra enviar depois.
             </p>
           </div>
 
