@@ -60,6 +60,20 @@ const UploadJobCard = ({ job: j, onRetry, onRemove }: Props) => {
   const showProgress =
     j.status === "uploading" || j.status === "saving" || j.status === "warning";
 
+  // 🔁 Tick periódico para reavaliar "travado" mesmo sem update do hook.
+  const [, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!showProgress) return;
+    const id = window.setInterval(() => setNow(Date.now()), 5000);
+    return () => window.clearInterval(id);
+  }, [showProgress]);
+
+  // Considera travado se status ativo mas o último progresso foi há mais de 30s.
+  const isStuck =
+    showProgress &&
+    !!j.lastProgressAt &&
+    Date.now() - j.lastProgressAt > STUCK_THRESHOLD_MS;
+
   // Estimativas FIXAS vindas do hook (não oscilam).
   // Se ainda não foi travada (uploads muito rápidos ou início), usa o ETA atual.
   const displayEta = j.lockedEtaSec ?? j.etaSec;
