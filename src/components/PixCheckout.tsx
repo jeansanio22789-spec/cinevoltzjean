@@ -95,11 +95,12 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) 
         setTimeout(() => {
           onClose();
           if (isMovie && movieId) {
-            navigate(`/assistir/${movieId}`);
+            // hard reload pra recarregar checagem de acesso
+            window.location.href = `/assistir/${movieId}`;
           } else {
-            navigate("/minha-conta");
+            window.location.href = "/minha-conta";
           }
-        }, 1800);
+        }, 800);
       }
     };
     pollRef.current = window.setInterval(tick, 4000) as unknown as number;
