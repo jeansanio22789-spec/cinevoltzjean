@@ -2,11 +2,17 @@ import { useEffect, useState, useRef } from "react";
 import {
   Upload, Film, Clock, CheckCircle, XCircle, Play,
   FileVideo, Image, Type, Tag, Trash2, Loader2, Zap, AlertTriangle, Plus, X, RotateCw, Link2,
-  Save, FolderOpen,
+  Save, FolderOpen, Rocket,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useUploadQueue, type UploadJob } from "@/hooks/useUploadQueue";
+import {
+  useUploadQueue,
+  type UploadJob,
+  getTurboMode,
+  setTurboMode,
+  subscribeTurboMode,
+} from "@/hooks/useUploadQueue";
 import UploadJobCard from "@/components/admin/UploadJobCard";
 import RemoteUploadsPanel from "@/components/admin/RemoteUploadsPanel";
 import { isLocalVideoUrl, parseLocalVideoId, deleteLocalVideo, saveLocalVideo } from "@/lib/localVideoStore";
@@ -246,6 +252,15 @@ const AdminVideos = () => {
   const { jobs, enqueue, removeJob, clearDone, retry, activeCount } = useUploadQueue(
     () => fetchVideos(),
   );
+
+  // ⚡ Modo Turbo Forçado — sequencial estrito (1 upload por vez)
+  const [turboOn, setTurboOn] = useState(getTurboMode());
+  useEffect(() => {
+    const unsub = subscribeTurboMode(setTurboOn);
+    return () => {
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     fetchVideos();

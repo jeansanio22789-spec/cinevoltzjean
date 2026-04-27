@@ -440,7 +440,56 @@ const runningJobIds = new Set<string>();
 const SLOW_THRESHOLD_MBS = 2;
 const pendingJobIds: string[] = [];
 
+// ⚡ Modo Turbo Forçado — usuário pediu pra acelerar manualmente.
+// Quando ligado: SEMPRE 1 upload por vez (mesmo em conexão rápida) e
+// renegocia a fila imediatamente, jogando os ativos extras de volta pro
+// "queued" para liberar 100% da banda pro primeiro.
+let turboForced = false;
+const turboListeners = new Set<(on: boolean) => void>();
+
+export const getTurboMode = () => turboForced;
+export const subscribeTurboMode = (cb: (on: boolean) => void) => {
+  turboListeners.add(cb);
+  return () => turboListeners.delete(cb);
+};
+
+export const setTurboMode = (on: boolean) => {
+  if (turboForced === on) return;
+  turboForced = on;
+  turboListeners.forEach((l) => l(on));
+
+  if (on) {
+    // Renegocia: mantém só 1 ativo, devolve os outros pra fila
+    const active = store.jobs.filter(
+      (j) =>
+        runningJobIds.has(j.id) &&
+        (j.status === "uploading" || j.status === "warning"),
+    );
+    // Ordena pelo mais avançado primeiro — esse continua, os outros pausam
+    active.sort((a, b) => b.progress - a.progress);
+    active.slice(1).forEach((j) => {
+      try {
+        j.abort?.();
+      } catch {
+        /* noop */
+      }
+      runningJobIds.delete(j.id);
+      if (!pendingJobIds.includes(j.id)) pendingJobIds.unshift(j.id);
+      store.update(j.id, {
+        status: "queued",
+        speedMBs: 0,
+        etaSec: 0,
+        abort: undefined,
+      });
+    });
+  } else {
+    // Saiu do turbo — tenta dar vazão à fila normalmente
+    drainPending();
+  }
+};
+
 const isConnectionSlow = (): boolean => {
+  if (turboForced) return true; // turbo = sempre sequencial
   // Olha pro job ativo mais recente. Se ele tá indo < 2 MB/s, é lenta.
   const active = store.jobs.find(
     (j) =>
@@ -453,7 +502,12 @@ const isConnectionSlow = (): boolean => {
 };
 
 const drainPending = () => {
-  while (pendingJobIds.length > 0 && !isConnectionSlow()) {
+  const maxConcurrent = turboForced ? 1 : Infinity;
+  while (
+    pendingJobIds.length > 0 &&
+    runningJobIds.size < maxConcurrent &&
+    !isConnectionSlow()
+  ) {
     const nextId = pendingJobIds.shift()!;
     const next = store.jobs.find((j) => j.id === nextId);
     if (next && !runningJobIds.has(next.id)) {
@@ -465,8 +519,8 @@ const drainPending = () => {
 const runJob = async (job: UploadJob) => {
   if (runningJobIds.has(job.id)) return;
 
-  // Se já tem upload rodando E a conexão tá lenta, espera na fila.
-  if (runningJobIds.size > 0 && isConnectionSlow()) {
+  // Se já tem upload rodando E (a conexão tá lenta OU turbo forçado), espera.
+  if (runningJobIds.size > 0 && (isConnectionSlow() || turboForced)) {
     if (!pendingJobIds.includes(job.id)) pendingJobIds.push(job.id);
     store.update(job.id, { status: "queued" });
     return;
