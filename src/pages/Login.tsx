@@ -32,8 +32,27 @@ const Login = () => {
   const [nfcToken, setNfcToken] = useState<string | null>(null);
 
   useEffect(() => {
-    isNfcSupported().then(setNfcSupported);
+    isNfcSupported().then((ok) => {
+      setNfcSupported(ok);
+      // Já entra em modo admin se tiver NFC — assim a "primeira batida" do
+      // crachá é o que abre o app, sem precisar tocar em nada.
+      if (ok) setMode("admin");
+    });
   }, []);
+
+  // Auto-inicia a leitura sempre que estiver em modo admin, com NFC disponível,
+  // sem token validado, sem scan rodando e sem estar no cadastro.
+  useEffect(() => {
+    if (mode !== "admin") return;
+    if (!nfcSupported) return;
+    if (nfcToken) return;
+    if (scanning) return;
+    if (isSignUp) return;
+    // pequeno delay pra UI montar antes de abrir o modal
+    const t = setTimeout(() => { void startNfcScan(); }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, nfcSupported, nfcToken, scanning, isSignUp]);
 
   const startNfcScan = async () => {
     if (!nfcSupported) {
