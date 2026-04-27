@@ -19,6 +19,7 @@ import TestChannels from "./pages/TestChannels.tsx";
 import ChannelView from "./pages/ChannelView.tsx";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import InstallAppPrompt from "@/components/InstallAppPrompt";
+import UploadFloatingIndicator from "@/components/UploadFloatingIndicator";
 import { useEffect } from "react";
 import { installAudioUnlock } from "@/lib/audioUnlock";
 import { initUploadQueue } from "@/hooks/useUploadQueue";
