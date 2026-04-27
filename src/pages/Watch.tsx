@@ -36,6 +36,7 @@ const Watch = () => {
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [tokenAccess, setTokenAccess] = useState(false);
   const [introDone, setIntroDone] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const token = params.get("token");
 
