@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.mp-create-pix]
 verify_jwt = false
 
+[functions.mp-create-checkout]
+verify_jwt = false
+
 [functions.mp-check-payment]
 verify_jwt = false
 
