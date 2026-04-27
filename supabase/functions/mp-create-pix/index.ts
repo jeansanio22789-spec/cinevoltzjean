@@ -123,12 +123,22 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         transaction_amount: amount,
-        description: `${label} - JS Produtos Digitais LTDA`,
+        description: `JS PRODUTOS DIGITAIS LTDA - ${label}`,
+        statement_descriptor: "JS PRODUTOS DIGITAIS",
         payment_method_id: "pix",
         notification_url: notifUrl,
         external_reference: purchase.id,
         payer: {
           email: user?.email || "cliente@cinevolt.app",
+        },
+        additional_info: {
+          items: [{
+            id: movie_id ?? purchasePlan,
+            title: label,
+            description: `Cobrança JS PRODUTOS DIGITAIS LTDA`,
+            quantity: 1,
+            unit_price: amount,
+          }],
         },
       }),
     });
