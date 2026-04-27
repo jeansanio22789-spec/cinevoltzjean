@@ -59,6 +59,7 @@ const App = () => {
               <Route path="*" element={<NotFound />} />
             </Routes>
             <InstallAppPrompt />
+            <UploadFloatingIndicator />
           </MaintenanceGate>
         </AuthProvider>
       </BrowserRouter>
