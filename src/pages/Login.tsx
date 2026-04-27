@@ -257,32 +257,42 @@ const Login = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <p className="text-primary font-black text-3xl tracking-tight mb-2">STREAMFLIX</p>
+          <p
+            className="text-primary font-black text-3xl tracking-tight mb-2 select-none cursor-default"
+            onClick={() => {
+              // 5 toques rápidos no logo revelam o modo admin manual
+              const now = Date.now();
+              const taps = (window as any).__adminTaps || [];
+              const recent = [...taps, now].filter((t: number) => now - t < 2500);
+              (window as any).__adminTaps = recent;
+              if (recent.length >= 5) {
+                (window as any).__adminTaps = [];
+                switchMode("admin");
+                toast.info("Modo admin ativado");
+              }
+            }}
+          >
+            STREAMFLIX
+          </p>
           <p className="text-muted-foreground text-sm">
             {isSignUp ? "Crie sua conta gratuita" : "Acesse sua conta"}
           </p>
         </div>
 
-        {/* Seletor de modo */}
-        {!isSignUp && (
-          <div className="grid grid-cols-2 gap-1 p-1 bg-muted/40 rounded-lg mb-4">
+        {/* Aba Admin oculta. O acesso admin acontece automaticamente quando
+            o crachá NFC é aproximado (scan silencioso roda em background).
+            Indicador discreto aparece só quando o modo admin está ativo. */}
+        {!isSignUp && mode === "admin" && (
+          <div className="mb-3 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="w-3 h-3 text-primary" /> Modo admin ativo
+            </span>
             <button
               type="button"
               onClick={() => switchMode("client")}
-              className={`py-2 rounded-md text-xs font-semibold transition-colors ${
-                mode === "client" ? "bg-card text-foreground shadow" : "text-muted-foreground"
-              }`}
+              className="hover:text-foreground"
             >
-              Cliente
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode("admin")}
-              className={`py-2 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1 ${
-                mode === "admin" ? "bg-card text-foreground shadow" : "text-muted-foreground"
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" /> Admin
+              Sair
             </button>
           </div>
         )}
@@ -345,7 +355,7 @@ const Login = () => {
               required
               disabled={mode === "admin" && !isSignUp && !!nfcToken}
               className="w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-70"
-              placeholder="admin@streamflix.com"
+              placeholder="seuemail@exemplo.com"
             />
           </div>
 
@@ -394,26 +404,6 @@ const Login = () => {
           >
             {isSignUp ? "Já tem conta? Faça login" : "Não tem conta? Cadastre-se"}
           </button>
-
-          {mode === "admin" && !isSignUp && (
-            <div className="pt-3 border-t border-border">
-              <button
-                type="button"
-                onClick={async () => {
-                  await cancelScan();
-                  toast.info("Entre com email e senha. Depois vá em Sistema → Crachás NFC.");
-                  switchMode("client");
-                }}
-                className="w-full flex items-center justify-center gap-2 text-xs text-primary hover:text-primary/80 font-semibold transition-colors"
-              >
-                <CreditCard className="w-3.5 h-3.5" />
-                Cadastrar novo crachá
-              </button>
-              <p className="text-[10px] text-muted-foreground text-center mt-1.5 leading-snug">
-                Requer login admin com email e senha primeiro
-              </p>
-            </div>
-          )}
         </form>
       </div>
 
