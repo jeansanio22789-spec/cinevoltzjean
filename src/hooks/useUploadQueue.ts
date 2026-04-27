@@ -157,11 +157,22 @@ const store = {
     this.jobs = this.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j));
     const updated = this.jobs.find((j) => j.id === id);
     if (updated && updated.status !== "done") void persistUploadJob(toPersistedJob(updated));
+    if (updated) {
+      // Status crítico vai imediato; progresso vai com debounce.
+      const immediate =
+        patch.status !== undefined ||
+        patch.errorMsg !== undefined ||
+        patch.uploadPath !== undefined;
+      syncJobToRemote(updated, immediate);
+    }
     this.emit();
   },
   add(jobs: UploadJob[]) {
     this.jobs = [...this.jobs, ...jobs];
-    jobs.forEach((j) => void persistUploadJob(toPersistedJob(j)));
+    jobs.forEach((j) => {
+      void persistUploadJob(toPersistedJob(j));
+      syncJobToRemote(j, true);
+    });
     this.emit();
   },
   hydrate(jobs: UploadJob[]) {
@@ -175,6 +186,7 @@ const store = {
     if (target?.thumbPreviewUrl) URL.revokeObjectURL(target.thumbPreviewUrl);
     this.jobs = this.jobs.filter((j) => j.id !== id);
     void deletePersistedUploadJob(id);
+    void deleteRemoteJob(id);
     this.emit();
   },
   clearDone() {
@@ -184,6 +196,7 @@ const store = {
       .forEach((j) => URL.revokeObjectURL(j.thumbPreviewUrl!));
     this.jobs = this.jobs.filter((j) => j.status !== "done");
     void deletePersistedUploadJobs(doneIds);
+    doneIds.forEach((id) => void deleteRemoteJob(id));
     this.emit();
   },
   subscribe(l: Listener) {
