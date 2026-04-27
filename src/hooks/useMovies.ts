@@ -13,6 +13,7 @@ export interface DbMovie {
   status: string | null;
   video_url: string | null;
   telegram_url: string | null;
+  price?: number | null;
 }
 
 export const useMovies = () => {
