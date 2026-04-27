@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
           excluded_payment_methods,
           installments: 12,
         },
-        statement_descriptor: "CINEVOLT",
+        statement_descriptor: "JS PRODUTOS DIGITAIS",
       }),
     });
 
