@@ -129,7 +129,10 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) 
             <h3 className="text-lg font-bold">Pagamento PIX</h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            Plano <span className="font-semibold text-foreground">{plan.name}</span> — <span className="font-semibold text-foreground">{plan.price}</span>{plan.period}
+            {isMovie ? "Título" : "Plano"}{" "}
+            <span className="font-semibold text-foreground">{headerName}</span> —{" "}
+            <span className="font-semibold text-foreground">{headerPrice}</span>
+            {headerPeriod}
           </p>
         </div>
 
