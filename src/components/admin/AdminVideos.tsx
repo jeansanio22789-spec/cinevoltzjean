@@ -765,6 +765,82 @@ const AdminVideos = () => {
         </div>
       )}
 
+      {/* Rascunhos salvos */}
+      {drafts.length > 0 && (
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-primary" />
+              Rascunhos salvos
+              <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                {drafts.length}
+              </span>
+            </h3>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Vídeos prontos para enviar quando você quiser — capa, título e tudo já preenchidos.
+          </p>
+          <div className="space-y-2">
+            {drafts.map((d) => {
+              const totalMB = d.files.reduce((s, f) => s + f.size, 0) / 1024 / 1024;
+              const thumbUrl = d.thumbnail ? URL.createObjectURL(d.thumbnail) : null;
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center gap-3 bg-background rounded-lg p-3 border border-border"
+                >
+                  {thumbUrl ? (
+                    <img
+                      src={thumbUrl}
+                      alt={d.meta.title}
+                      className="w-14 h-20 object-cover rounded shrink-0"
+                      onLoad={() => URL.revokeObjectURL(thumbUrl)}
+                    />
+                  ) : (
+                    <div className="w-14 h-20 bg-muted rounded shrink-0 flex items-center justify-center">
+                      <FileVideo className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{d.meta.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {d.files.length} {d.files.length === 1 ? "arquivo" : "arquivos"} •{" "}
+                      {totalMB.toFixed(1)} MB • {d.meta.genre}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Salvo em {new Date(d.updatedAt).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button
+                      onClick={() => handleSendDraft(d)}
+                      className="px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-semibold hover:bg-primary/90 flex items-center gap-1"
+                      title="Enviar agora"
+                    >
+                      <Upload className="w-3 h-3" /> Enviar
+                    </button>
+                    <button
+                      onClick={() => handleLoadDraft(d)}
+                      className="px-3 py-1.5 bg-muted text-foreground rounded text-xs font-medium hover:bg-muted/80 flex items-center gap-1"
+                      title="Carregar no formulário pra editar"
+                    >
+                      <FolderOpen className="w-3 h-3" /> Editar
+                    </button>
+                    <button
+                      onClick={() => handleDeleteDraft(d.id)}
+                      className="px-3 py-1.5 bg-destructive/10 text-destructive rounded text-xs font-medium hover:bg-destructive/20 flex items-center gap-1"
+                      title="Excluir rascunho"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Fila de uploads */}
       {jobs.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-4 space-y-3">
