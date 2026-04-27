@@ -21,7 +21,7 @@ const AdminUploadsRail = () => {
   const hasActive = active > 0;
 
   return (
-    <section className="px-4 md:px-12 mb-6">
+    <section className="mb-6">
       <Link
         to="/admin?tab=videos"
         className={`group flex items-center justify-between gap-3 w-full rounded-xl border px-4 py-3 transition-all hover:scale-[1.01] ${
