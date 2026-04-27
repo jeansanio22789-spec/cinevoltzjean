@@ -253,6 +253,15 @@ const AdminVideos = () => {
     () => fetchVideos(),
   );
 
+  // ⚡ Modo Turbo Forçado — sequencial estrito (1 upload por vez)
+  const [turboOn, setTurboOn] = useState(getTurboMode());
+  useEffect(() => {
+    const unsub = subscribeTurboMode(setTurboOn);
+    return () => {
+      unsub();
+    };
+  }, []);
+
   useEffect(() => {
     fetchVideos();
   }, []);
