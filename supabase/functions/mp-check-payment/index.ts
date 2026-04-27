@@ -1,6 +1,6 @@
 // Polling: cliente verifica se o PIX foi pago.
 // Se aprovado, libera acesso IMEDIATAMENTE (sem depender do webhook do MP).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,7 +27,7 @@ type Purchase = {
 };
 
 const grantAccess = async (
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   purchase: Purchase,
   paymentId: string,
 ) => {
@@ -68,7 +68,7 @@ const grantAccess = async (
       .from("subscriptions")
       .select("id, expires_at")
       .eq("user_id", purchase.user_id)
-      .maybeSingle();
+      .maybeSingle<{ id: string; expires_at: string | null }>();
 
     if (existing) {
       const base =
