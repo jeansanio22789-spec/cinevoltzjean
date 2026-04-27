@@ -230,7 +230,7 @@ const Login = () => {
 
     let destination = redirectParam;
     if (!destination) {
-      destination = signedUser ? (signedUserIsAdmin ? "/admin" : "/minha-conta") : "/";
+      destination = signedUser && signedUserIsAdmin ? "/admin" : "/";
     }
     navigate(destination);
     setLoading(false);
