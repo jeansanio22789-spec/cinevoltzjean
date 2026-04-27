@@ -53,9 +53,7 @@ const Login = () => {
     if (nfcToken) return;
     if (scanning) return;
     if (isSignUp) return;
-    // pequeno delay pra UI montar antes de abrir o modal
-    const t = setTimeout(() => { void startNfcScan(); }, 250);
-    return () => clearTimeout(t);
+    void startNfcScan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, nfcSupported, nfcToken, scanning, isSignUp]);
 
