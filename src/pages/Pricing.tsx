@@ -61,6 +61,18 @@ const plans = [
     ],
     highlight: false,
   },
+  {
+    name: "Teste",
+    price: "R$ 0,10",
+    priceValue: "0.10",
+    period: "/teste",
+    features: [
+      "Modo de teste R$ 0,10",
+      "Valida fluxo completo PIX/Cartão",
+      "Acesso de 1 dia",
+    ],
+    highlight: false,
+  },
 ];
 
 type PaymentMode = "pix" | "card" | "wallet";
