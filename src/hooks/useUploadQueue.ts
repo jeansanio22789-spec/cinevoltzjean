@@ -26,7 +26,7 @@ const getDeviceLabel = (): string => {
 };
 
 const remoteSyncQueue = new Map<string, ReturnType<typeof setTimeout>>();
-const REMOTE_DEBOUNCE_MS = 2500; // não martela a API a cada onProgress
+const REMOTE_DEBOUNCE_MS = 4000; // não martela a API a cada onProgress
 
 const syncJobToRemote = (job: UploadJob, immediate = false) => {
   const existing = remoteSyncQueue.get(job.id);
@@ -312,9 +312,13 @@ const uploadFileDirect = async (
 ): Promise<string> => {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  // ⚡ Hostname direto do storage (mesma otimização do TUS).
+  // Pula o gateway principal e vai direto pros servidores de upload.
+  const url = `https://${projectId}.storage.supabase.co/storage/v1/object/${bucket}/${path}`;
   const startTime = Date.now();
   const samples: { t: number; bytes: number }[] = [];
+  let lastProgressAt = 0;
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -328,6 +332,11 @@ const uploadFileDirect = async (
 
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return;
+      // Throttle: só atualiza UI a cada 250ms (evita re-renders excessivos
+      // durante uploads rápidos que disparam dezenas de eventos por segundo)
+      const now = Date.now();
+      if (now - lastProgressAt < 250 && e.loaded < e.total) return;
+      lastProgressAt = now;
       updateProgress(startTime, samples, e.loaded, e.total, onProgress);
     };
 
@@ -361,6 +370,7 @@ const uploadFileTus = (
     const endpoint = `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`;
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
+    let lastProgressAt = 0;
 
     const upload = new tus.Upload(file, {
       endpoint,
@@ -384,6 +394,11 @@ const uploadFileTus = (
       chunkSize: 6 * 1024 * 1024,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
+        // Throttle: só notifica a UI a cada 250ms para evitar re-renders
+        // excessivos durante chunks grandes (que disparam progresso byte-a-byte)
+        const now = Date.now();
+        if (now - lastProgressAt < 250 && bytesUploaded < bytesTotal) return;
+        lastProgressAt = now;
         updateProgress(startTime, samples, bytesUploaded, bytesTotal, onProgress);
       },
       onSuccess: () => {
@@ -399,10 +414,11 @@ const uploadFileTus = (
   });
 
 // Limite acima do qual usamos TUS desde o início (paralelismo + retomada).
-// Abaixo disso, POST direto é mais rápido (sem overhead de criação de sessão).
-// Reduzido para 20 MB porque até esse tamanho o paralelismo do TUS já compensa
-// o overhead de criar a sessão — fica MUITO mais rápido em 4G/5G.
-const TUS_THRESHOLD_BYTES = 20 * 1024 * 1024; // 20 MB
+// Abaixo disso, POST direto é MUITO mais rápido (1 única requisição HTTP,
+// sem overhead de criar sessão + chunks de 6MB com round-trip a cada um).
+// Subimos pra 200MB porque até esse tamanho o POST direto ganha disparado
+// — TUS só vale a pena pra arquivos onde retomar é critico.
+const TUS_THRESHOLD_BYTES = 200 * 1024 * 1024; // 200 MB
 
 const uploadFileFast = async (
   bucket: string,
