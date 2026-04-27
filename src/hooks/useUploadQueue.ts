@@ -502,12 +502,9 @@ const isConnectionSlow = (): boolean => {
 };
 
 const drainPending = () => {
+  // Sem turbo = paralelo total. Com turbo = 1 por vez.
   const maxConcurrent = turboForced ? 1 : Infinity;
-  while (
-    pendingJobIds.length > 0 &&
-    runningJobIds.size < maxConcurrent &&
-    !isConnectionSlow()
-  ) {
+  while (pendingJobIds.length > 0 && runningJobIds.size < maxConcurrent) {
     const nextId = pendingJobIds.shift()!;
     const next = store.jobs.find((j) => j.id === nextId);
     if (next && !runningJobIds.has(next.id)) {
@@ -519,8 +516,9 @@ const drainPending = () => {
 const runJob = async (job: UploadJob) => {
   if (runningJobIds.has(job.id)) return;
 
-  // Se já tem upload rodando E (a conexão tá lenta OU turbo forçado), espera.
-  if (runningJobIds.size > 0 && (isConnectionSlow() || turboForced)) {
+  // Só segura na fila se o usuário ligou o Turbo manualmente.
+  // No modo normal todos rodam em paralelo, mesmo em conexão lenta.
+  if (runningJobIds.size > 0 && turboForced) {
     if (!pendingJobIds.includes(job.id)) pendingJobIds.push(job.id);
     store.update(job.id, { status: "queued" });
     return;
