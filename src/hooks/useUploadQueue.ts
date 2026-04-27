@@ -40,6 +40,9 @@ export interface UploadJob {
   startedAt?: number;
   timedOut: boolean;
   abort?: () => void;
+  /** Caminho fixo do arquivo no Storage. Persistido para que o TUS consiga
+   *  retomar exatamente o mesmo upload após o app ser recarregado. */
+  uploadPath?: string;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
@@ -54,13 +57,22 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   file: job.file,
   thumbnail: job.thumbnail ?? null,
   meta: job.meta,
-  status: job.status === "done" ? "done" : job.status === "error" ? "error" : "queued",
-  progress: job.status === "done" ? 100 : 0,
+  // Mantém o status real para identificar jobs que estavam ativos no refresh.
+  status:
+    job.status === "done"
+      ? "done"
+      : job.status === "error"
+        ? "error"
+        : "uploading",
+  // Persiste o progresso REAL — assim ao recarregar o app a barra continua
+  // do mesmo ponto enquanto o TUS retoma a transferência.
+  progress: job.status === "done" ? 100 : Math.round(job.progress || 0),
   speedMBs: 0,
   etaSec: 0,
   errorMsg: job.errorMsg,
   startedAt: job.startedAt,
   timedOut: false,
+  uploadPath: job.uploadPath,
 });
 
 const store = {
@@ -311,9 +323,11 @@ const uploadFileFast = async (
   file: File,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
+  forceTus = false,
 ): Promise<string> => {
-  // Arquivos grandes vão direto pro TUS com paralelismo de chunks → muito mais rápido.
-  if (file.size >= TUS_THRESHOLD_BYTES) {
+  // Retomada (após refresh) ou arquivos grandes vão direto pro TUS — só assim
+  // dá pra continuar de onde parou em vez de recomeçar do zero.
+  if (forceTus || file.size >= TUS_THRESHOLD_BYTES) {
     return uploadFileTus(bucket, path, file, onProgress, registerAbort);
   }
   try {
@@ -345,14 +359,24 @@ const runJob = async (job: UploadJob) => {
   }, TIMEOUT_MS);
 
   try {
+    // Quando retomando após refresh, mantém o progresso já carregado (não zera)
+    const existing = store.jobs.find((j) => j.id === job.id);
+    const isResuming = !!existing?.uploadPath;
     store.update(job.id, {
       status: "uploading",
-      progress: 0,
-      startedAt: Date.now(),
+      progress: isResuming ? existing!.progress : 0,
+      startedAt: existing?.startedAt ?? Date.now(),
     });
 
     const ext = job.file.name.split(".").pop() || "mp4";
-    const path = `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    // Reusa o caminho persistido para que o TUS consiga retomar exatamente
+    // o mesmo objeto no Storage. Se for primeiro envio, gera novo.
+    const path =
+      existing?.uploadPath ??
+      `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    if (!existing?.uploadPath) {
+      store.update(job.id, { uploadPath: path });
+    }
 
     const videoUrl = await uploadFileFast(
       "videos",
@@ -391,6 +415,7 @@ const runJob = async (job: UploadJob) => {
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
+      isResuming, // forceTus quando estamos retomando após refresh
     );
 
     let thumbnailUrl: string | null = null;
@@ -460,11 +485,14 @@ export const initUploadQueue = () => {
       .map((j) => ({
         ...j,
         status: j.status === "error" ? "error" : "queued",
-        progress: j.status === "error" ? j.progress : 0,
+        // Preserva o progresso anterior — assim o usuário vê o upload
+        // retomar de onde parou (TUS continua do mesmo offset no Storage).
+        progress: j.status === "error" ? j.progress : (j.progress ?? 0),
         speedMBs: 0,
         etaSec: 0,
         timedOut: false,
         thumbPreviewUrl: j.thumbnail ? URL.createObjectURL(j.thumbnail) : null,
+        uploadPath: j.uploadPath,
       }));
 
     store.hydrate(restoredJobs);
