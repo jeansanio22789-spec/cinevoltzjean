@@ -69,6 +69,52 @@ const Login = () => {
     setCancelFn(() => session.cancel);
     try {
       const uid = await session.uid;
+
+      // 1) Tenta login direto via edge function (tap-to-login, sem senha)
+      const { data: loginData, error: loginErr } = await supabase.functions.invoke("nfc-login", {
+        body: { tag_uid: uid },
+      });
+
+      if (!loginErr && loginData?.ok && loginData?.session) {
+        const { error: setErr } = await supabase.auth.setSession({
+          access_token: loginData.session.access_token,
+          refresh_token: loginData.session.refresh_token,
+        });
+        if (!setErr) {
+          await logAudit({
+            action: "login",
+            resource_type: "auth",
+            description: `Admin ${loginData.email} entrou via crachá NFC (tap-to-login)`,
+            metadata: { email: loginData.email, nfc: true, auto: true },
+          });
+          toast.success("Bem-vindo! Entrando no painel...");
+          navigate(redirectParam || "/admin");
+          return;
+        }
+      }
+
+      // 2) Crachá desconhecido → fluxo de cadastro (login com senha + insert)
+      const reason = loginData?.reason as string | undefined;
+      if (reason === "unknown_tag") {
+        const normalized = normalizeUid(uid);
+        setPendingEnrollUid(normalized);
+        setNfcToken(null);
+        setMode("client");
+        setError(`Crachá novo lido (${prettyUid(normalized)}). Entre com email e senha admin para salvar.`);
+        toast.warning("Crachá novo lido. Faça login admin para cadastrar automaticamente.");
+
+        // Notifica admins sobre o aparelho desconhecido tentando entrar
+        await supabase.functions.invoke("notify-unknown-device", {
+          body: { tag_uid: normalized, user_agent: navigator.userAgent },
+        }).catch(() => {});
+        return;
+      }
+      if (reason === "not_admin") {
+        toast.error("Este crachá não pertence a um administrador.");
+        return;
+      }
+
+      // 3) Fallback: fluxo antigo (NFC + senha) caso edge function caia
       const { data, error: rpcError } = await supabase.rpc("issue_admin_nfc_challenge", {
         _tag_uid: uid,
       });
@@ -78,20 +124,7 @@ const Login = () => {
       }
       const result = data as { ok: boolean; email?: string; token?: string; reason?: string };
       if (!result.ok) {
-        if (result.reason === "unknown_tag") {
-          const normalized = normalizeUid(uid);
-          setPendingEnrollUid(normalized);
-          setNfcToken(null);
-          setMode("client");
-          setError(`Crachá novo lido (${prettyUid(normalized)}). Entre com email e senha admin para salvar.`);
-          toast.warning("Crachá novo lido. Faça login admin para cadastrar automaticamente.");
-          return;
-        }
-        toast.error(
-          result.reason === "not_admin"
-            ? "Este crachá não pertence a um administrador."
-            : "Falha ao validar crachá.",
-        );
+        toast.error("Falha ao validar crachá.");
         return;
       }
       setPendingEnrollUid(null);
