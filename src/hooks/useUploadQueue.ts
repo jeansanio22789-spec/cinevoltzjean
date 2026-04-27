@@ -274,34 +274,24 @@ const uploadFileTus = (
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const endpoint = `https://${projectId}.supabase.co/storage/v1/upload/resumable`;
+    // ⚡ Hostname direto do storage = MUITO mais rápido (otimização oficial Supabase).
+    // Pula o gateway principal e vai direto pros servidores de upload.
+    const endpoint = `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`;
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
 
-    // 🚀 Detecta conexão pra ajustar agressividade.
-    const conn = (navigator as Navigator & {
-      connection?: { effectiveType?: string; downlink?: number };
-    }).connection;
-    const effType = conn?.effectiveType ?? "4g";
-    const downlinkMbps = conn?.downlink ?? 10;
-    const isFast = effType === "4g" || downlinkMbps >= 5;
-
-    // ⚡ Equilíbrio entre paralelismo e tamanho de chunk.
-    // Muito paralelismo (>4) em mobile faz as conexões competirem banda
-    // e cada uma fica lenta — pior que serial. 3 paralelos é o sweet spot.
-    // Chunk de 8MB = poucas requisições, baixo overhead, retry barato.
-    const chunkSize = isFast ? 8 * 1024 * 1024 : 4 * 1024 * 1024;
-    const parallelUploads = isFast ? 3 : 1;
-
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 300, 1000, 2500, 5000, 10000, 20000],
+      retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
       },
-      // false é necessário pra parallelUploads funcionar (>1)
-      uploadDataDuringCreation: false,
+      // ⚠️ Config oficial do Supabase — NÃO mudar:
+      // - uploadDataDuringCreation: true (obrigatório)
+      // - chunkSize: 6MB exato (obrigatório, único valor aceito)
+      // - parallelUploads NÃO é suportado pelo Supabase
+      uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
       metadata: {
         bucketName: bucket,
@@ -309,8 +299,7 @@ const uploadFileTus = (
         contentType: file.type || "application/octet-stream",
         cacheControl: "3600",
       },
-      chunkSize,
-      parallelUploads,
+      chunkSize: 6 * 1024 * 1024,
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
         updateProgress(startTime, samples, bytesUploaded, bytesTotal, onProgress);
