@@ -414,6 +414,7 @@ const runJob = async (job: UploadJob) => {
           lockedEtaSec,
           lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
+          lastProgressAt: Date.now(),
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
