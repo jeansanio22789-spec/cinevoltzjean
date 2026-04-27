@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Loader2, ShoppingBag, CheckCircle2, Clock, XCircle, Search, RefreshCw } from "lucide-react";
+import { Loader2, ShoppingBag, CheckCircle2, Clock, XCircle, Search, RefreshCw, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Purchase {
   id: string;
@@ -28,6 +29,29 @@ const AdminPurchases = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+
+  const handleRefund = async (p: Purchase) => {
+    const ok = window.confirm(
+      `Reembolsar R$ ${Number(p.amount).toFixed(2)} para ${p.user_email || "usuário"}?\n\n` +
+      `O dinheiro volta para o cliente e o acesso é cancelado. Esta ação não pode ser desfeita.`
+    );
+    if (!ok) return;
+    setRefundingId(p.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("mp-refund", {
+        body: { purchase_id: p.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Reembolso processado com sucesso");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao processar reembolso");
+    } finally {
+      setRefundingId(null);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -128,12 +152,14 @@ const AdminPurchases = () => {
                   <th className="text-left p-3 font-semibold">Valor</th>
                   <th className="text-left p-3 font-semibold hidden md:table-cell">Data</th>
                   <th className="text-right p-3 font-semibold">Status</th>
+                  <th className="text-right p-3 font-semibold">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) => {
                   const st = STATUS_MAP[p.status] || STATUS_MAP.pending;
                   const Icon = st.icon;
+                  const canRefund = p.status === "approved" && !!p.mp_payment_id;
                   return (
                     <tr key={p.id} className="border-b border-[hsl(var(--admin-border))]/50 last:border-0">
                       <td className="p-3">
@@ -149,6 +175,25 @@ const AdminPurchases = () => {
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full inline-flex items-center gap-1 ${st.cls}`}>
                           <Icon className="w-3 h-3" /> {st.label}
                         </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        {canRefund ? (
+                          <button
+                            onClick={() => handleRefund(p)}
+                            disabled={refundingId === p.id}
+                            className="text-xs px-2.5 py-1 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 disabled:opacity-50 inline-flex items-center gap-1"
+                            title="Reembolsar este pagamento"
+                          >
+                            {refundingId === p.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Undo2 className="w-3 h-3" />
+                            )}
+                            Reembolsar
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   );
