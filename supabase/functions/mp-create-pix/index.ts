@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         transaction_amount: amount,
-        description: `${label} - Cinevolt`,
+        description: `${label} - JS Produtos Digitais LTDA`,
         payment_method_id: "pix",
         notification_url: notifUrl,
         external_reference: purchase.id,

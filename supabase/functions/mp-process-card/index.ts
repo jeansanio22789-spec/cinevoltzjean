@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         transaction_amount: amount,
         token,
-        description: label,
+        description: `${label} - JS Produtos Digitais LTDA`,
         installments: Number(installments) || 1,
         payment_method_id,
         issuer_id,
@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
         },
         external_reference: purchase.id,
         notification_url: `${SUPABASE_URL}/functions/v1/mp-webhook?internal_id=${purchase.id}`,
-        statement_descriptor: "CINEVOLT",
+        statement_descriptor: "JS PRODUTOS DIGITAIS",
       }),
     });
 
