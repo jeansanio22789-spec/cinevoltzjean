@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
     // Gera magic link (precisa hashed_token + email_otp pra verifyOtp)
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "magiclink",
-      email: prof.email,
+      email,
     });
     console.log("[nfc-login] generateLink", {
       hasData: !!linkData,
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     if (otp) {
       const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
         type: "magiclink",
-        email: prof.email,
+        email,
         token: otp,
       });
       console.log("[nfc-login] verifyOtp(email_otp)", {
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
       .update({ last_used_at: new Date().toISOString() })
       .eq("user_id", match.user_id);
 
-    return json({ ok: true, session, email: prof.email });
+    return json({ ok: true, session, email });
   } catch (e) {
     console.error("[nfc-login] exception", e);
     return json({ ok: false, reason: "exception", details: String(e) }, 200);
