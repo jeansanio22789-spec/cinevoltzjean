@@ -1,11 +1,10 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRef } from "react";
-import MovieCard from "./MovieCard";
-import type { DbMovie } from "@/hooks/useMovies";
+import MovieCard, { type RailMovie } from "./MovieCard";
 
 interface ContentRailProps {
   title: string;
-  movies: DbMovie[];
+  movies: RailMovie[];
 }
 
 const ContentRail = ({ title, movies }: ContentRailProps) => {
