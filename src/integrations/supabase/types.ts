@@ -270,6 +270,7 @@ export type Database = {
           duration: string | null
           genre: string | null
           id: string
+          price: number
           rating: string | null
           status: string | null
           telegram_url: string | null
@@ -286,6 +287,7 @@ export type Database = {
           duration?: string | null
           genre?: string | null
           id?: string
+          price?: number
           rating?: string | null
           status?: string | null
           telegram_url?: string | null
@@ -302,6 +304,7 @@ export type Database = {
           duration?: string | null
           genre?: string | null
           id?: string
+          price?: number
           rating?: string | null
           status?: string | null
           telegram_url?: string | null
@@ -476,6 +479,7 @@ export type Database = {
           id: string
           metadata: Json | null
           method: string
+          movie_id: string | null
           mp_payment_id: string | null
           mp_qr_code: string | null
           mp_qr_code_base64: string | null
@@ -494,6 +498,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           method?: string
+          movie_id?: string | null
           mp_payment_id?: string | null
           mp_qr_code?: string | null
           mp_qr_code_base64?: string | null
@@ -512,6 +517,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           method?: string
+          movie_id?: string | null
           mp_payment_id?: string | null
           mp_qr_code?: string | null
           mp_qr_code_base64?: string | null
@@ -524,7 +530,15 @@ export type Database = {
           user_id?: string | null
           user_name?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchases_movie_id_fkey"
+            columns: ["movie_id"]
+            isOneToOne: false
+            referencedRelation: "movies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sponsors: {
         Row: {
