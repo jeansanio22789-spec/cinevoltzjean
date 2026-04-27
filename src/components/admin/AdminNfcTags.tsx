@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { CreditCard, Plus, Loader2, Trash2, Radio } from "lucide-react";
+import { CreditCard, Plus, Loader2, Trash2, Radio, ExternalLink, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { isNfcSupported, readNfcOnce } from "@/lib/nfcReader";
+import { isNfcSupported, readNfcOnce, isInIframe } from "@/lib/nfcReader";
+import { Capacitor } from "@capacitor/core";
 
 interface NfcTag {
   id: string;
@@ -18,6 +19,7 @@ const AdminNfcTags = () => {
   const [supported, setSupported] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [cancelFn, setCancelFn] = useState<null | (() => void | Promise<void>)>(null);
+  const [blockedByIframe, setBlockedByIframe] = useState(false);
 
   const load = async () => {
     const { data } = await supabase
@@ -30,6 +32,8 @@ const AdminNfcTags = () => {
 
   useEffect(() => {
     isNfcSupported().then(setSupported);
+    // Web NFC bloqueado quando estamos no preview (iframe) e não é o app nativo
+    setBlockedByIframe(!Capacitor.isNativePlatform() && isInIframe());
     load();
   }, []);
 
