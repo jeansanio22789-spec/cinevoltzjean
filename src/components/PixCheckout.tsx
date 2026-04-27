@@ -20,6 +20,8 @@ interface Props {
   movieId?: string;
   movieTitle?: string;
   moviePrice?: number;
+  /** Método de pagamento: pix (QR direto) ou card/wallet (Checkout Pro) */
+  paymentMode?: "pix" | "card" | "wallet";
   onClose: () => void;
 }
 
@@ -31,7 +33,7 @@ interface PixData {
   amount: number;
 }
 
-const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) => {
+const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix", onClose }: Props) => {
   const [pix, setPix] = useState<PixData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,9 +65,28 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) 
   useEffect(() => {
     const create = async () => {
       try {
-        const body = isMovie
-          ? { movie_id: movieId }
-          : { plan: plan!.name };
+        // Cartão / Carteira → Checkout Pro do Mercado Pago (redirect)
+        if (paymentMode === "card" || paymentMode === "wallet") {
+          const body: Record<string, unknown> = {
+            methods: paymentMode,
+            origin: window.location.origin,
+          };
+          if (isMovie) body.movie_id = movieId;
+          else body.plan = plan!.name;
+
+          const { data, error } = await supabase.functions.invoke("mp-create-checkout", {
+            body,
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          const url = data?.init_point || data?.sandbox_init_point;
+          if (!url) throw new Error("Link de pagamento não retornado");
+          window.location.href = url;
+          return;
+        }
+
+        // PIX → gera QR direto na hora
+        const body = isMovie ? { movie_id: movieId } : { plan: plan!.name };
         const { data, error } = await supabase.functions.invoke("mp-create-pix", {
           body,
         });
@@ -80,7 +101,7 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, onClose }: Props) 
       }
     };
     create();
-  }, [plan?.name, movieId, isMovie]);
+  }, [plan?.name, movieId, isMovie, paymentMode]);
 
   // Polling de pagamento a cada 4s
   useEffect(() => {
