@@ -473,23 +473,31 @@ const runJob = async (job: UploadJob) => {
         const cur = store.jobs.find((j) => j.id === job.id);
         const keepWarn = cur?.status === "warning";
 
-        // 🔒 Trava a estimativa UMA VEZ, quando temos velocidade estável
-        // (entre 3% e 15% de progresso). Depois disso, NÃO oscila mais.
-        // Só recalcula se a previsão estourou em mais de 50% (rede caiu de vez).
+        // 🔒 Trava a hora prevista UMA VEZ e NUNCA mais oscila.
+        // - Trava assim que tivermos velocidade real (pct >= 1%).
+        // - Só ESTENDE (nunca antecipa) se o envio atrasou MUITO
+        //   (mais de 5min da hora prevista).
+        // Resultado: o usuário sempre vê a MESMA hora, sem ficar mudando.
         let lockedEtaSec = cur?.lockedEtaSec;
         let lockedEndAt = cur?.lockedEndAt;
 
-        const shouldLockNow =
-          !lockedEndAt && pct >= 3 && pct <= 15 && etaSec > 0 && etaSec < 99999;
-        const shouldRelock =
-          lockedEndAt &&
-          Date.now() > lockedEndAt + 60_000 && // já passou mais de 1min da hora prevista
-          etaSec > 0 &&
-          etaSec < 99999;
+        const haveSignal = etaSec > 0 && etaSec < 99999;
+        const shouldLockNow = !lockedEndAt && pct >= 1 && haveSignal;
+        const shouldExtend =
+          !!lockedEndAt &&
+          haveSignal &&
+          Date.now() > (lockedEndAt as number) + 5 * 60_000; // atrasou +5min
 
-        if (shouldLockNow || shouldRelock) {
+        if (shouldLockNow) {
           lockedEtaSec = Math.round(etaSec);
           lockedEndAt = Date.now() + lockedEtaSec * 1000;
+        } else if (shouldExtend) {
+          // Só empurra pra frente, nunca pra trás
+          const candidate = Date.now() + Math.round(etaSec) * 1000;
+          if (candidate > (lockedEndAt as number)) {
+            lockedEndAt = candidate;
+            lockedEtaSec = Math.round(etaSec);
+          }
         }
 
         store.update(job.id, {
