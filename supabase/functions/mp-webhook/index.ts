@@ -64,10 +64,26 @@ Deno.serve(async (req) => {
     };
     const purchaseStatus = statusMap[status] || "pending";
 
+    // Detecta o método real usado pelo cliente (PIX, cartão, wallet, etc.)
+    const paymentTypeMap: Record<string, string> = {
+      credit_card: "Cartão de Crédito",
+      debit_card: "Cartão de Débito",
+      ticket: "Boleto",
+      atm: "Caixa Eletrônico",
+      bank_transfer: "PIX",
+      account_money: "Mercado Pago Wallet",
+      digital_wallet: "Carteira Digital",
+    };
+    const realMethod =
+      payment.payment_method_id === "pix"
+        ? "PIX"
+        : paymentTypeMap[payment.payment_type_id] || payment.payment_type_id || "PIX";
+
     // Atualizar compra
     const { data: purchase } = await admin.from("purchases")
       .update({
         status: purchaseStatus,
+        method: realMethod,
         paid_at: status === "approved" ? new Date().toISOString() : null,
         metadata: payment,
       })
@@ -93,7 +109,7 @@ Deno.serve(async (req) => {
           user_name: purchase.user_name,
           plan: purchase.plan,
           amount: purchase.amount,
-          method: "PIX",
+          method: realMethod,
           status: "Aprovado",
         });
 
@@ -152,7 +168,7 @@ Deno.serve(async (req) => {
           user_name: purchase.user_name,
           plan: purchase.plan,
           amount: purchase.amount,
-          method: "PIX",
+          method: realMethod,
           status: "Aprovado",
         });
 
