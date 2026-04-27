@@ -88,6 +88,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_nfc_tags: {
+        Row: {
+          created_at: string
+          id: string
+          label: string | null
+          last_used_at: string | null
+          tag_uid: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          last_used_at?: string | null
+          tag_uid: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string | null
+          last_used_at?: string | null
+          tag_uid?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -842,6 +869,10 @@ export type Database = {
       admin_set_user_status: {
         Args: { _status: string; _target: string }
         Returns: boolean
+      }
+      approve_admin_login_with_nfc: {
+        Args: { _request_id: string; _tag_uid: string }
+        Returns: Json
       }
       check_admin_login_status: { Args: { _request_id: string }; Returns: Json }
       consume_access_token: { Args: { _token: string }; Returns: undefined }
