@@ -42,6 +42,7 @@ const Index = () => {
       <HeroSection movie={movies[0] ?? null} />
 
       <div className="relative z-10 py-6">
+        <UpcomingPremieres />
         <div className="px-4 md:px-12 mb-6">
           <AdminUploadsRail />
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
