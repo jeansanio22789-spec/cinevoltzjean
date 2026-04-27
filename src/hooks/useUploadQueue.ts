@@ -357,14 +357,24 @@ const runJob = async (job: UploadJob) => {
   }, TIMEOUT_MS);
 
   try {
+    // Quando retomando após refresh, mantém o progresso já carregado (não zera)
+    const existing = store.jobs.find((j) => j.id === job.id);
+    const isResuming = !!existing?.uploadPath;
     store.update(job.id, {
       status: "uploading",
-      progress: 0,
-      startedAt: Date.now(),
+      progress: isResuming ? existing!.progress : 0,
+      startedAt: existing?.startedAt ?? Date.now(),
     });
 
     const ext = job.file.name.split(".").pop() || "mp4";
-    const path = `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    // Reusa o caminho persistido para que o TUS consiga retomar exatamente
+    // o mesmo objeto no Storage. Se for primeiro envio, gera novo.
+    const path =
+      existing?.uploadPath ??
+      `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    if (!existing?.uploadPath) {
+      store.update(job.id, { uploadPath: path });
+    }
 
     const videoUrl = await uploadFileFast(
       "videos",
