@@ -21,6 +21,7 @@ import AdminPlans from "@/components/admin/AdminPlans";
 import AdminReports from "@/components/admin/AdminReports";
 import AdminBranding from "@/components/admin/AdminBranding";
 import AdminNotifications from "@/components/admin/AdminNotifications";
+import AdminUploadsRail from "@/components/AdminUploadsRail";
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   dashboard: { title: "Dashboard", subtitle: "Visão geral da plataforma em tempo real" },
@@ -127,6 +128,7 @@ const Admin = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
+            {activeTab !== "videos" && <AdminUploadsRail />}
             {activeTab === "dashboard" && <AdminDashboard />}
             {activeTab === "reports" && <AdminReports />}
             {activeTab === "movies" && <AdminMovies />}
