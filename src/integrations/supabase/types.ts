@@ -896,6 +896,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _normalize_nfc_uid: { Args: { _uid: string }; Returns: string }
+      _reverse_hex_bytes: { Args: { _hex: string }; Returns: string }
       admin_set_user_status: {
         Args: { _status: string; _target: string }
         Returns: boolean
