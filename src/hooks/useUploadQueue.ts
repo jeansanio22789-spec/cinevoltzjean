@@ -9,6 +9,75 @@ import {
   type PersistedUploadJob,
 } from "@/lib/uploadQueuePersistence";
 
+// ---------------------------------------------------------------------------
+// 🌐 Sincronização com Supabase (tabela upload_jobs)
+// Permite que o admin acompanhe o progresso de uploads iniciados em OUTROS
+// dispositivos. O arquivo continua subindo do device original — apenas o
+// estado (progresso, status, erro) é replicado pra todos.
+// ---------------------------------------------------------------------------
+const getDeviceLabel = (): string => {
+  if (typeof navigator === "undefined") return "Desconhecido";
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad/i.test(ua)) return "iPhone/iPad";
+  if (/Android/i.test(ua)) return "Android";
+  if (/Mac/i.test(ua)) return "Mac";
+  if (/Windows/i.test(ua)) return "Windows";
+  return "Web";
+};
+
+const remoteSyncQueue = new Map<string, ReturnType<typeof setTimeout>>();
+const REMOTE_DEBOUNCE_MS = 2500; // não martela a API a cada onProgress
+
+const syncJobToRemote = (job: UploadJob, immediate = false) => {
+  const existing = remoteSyncQueue.get(job.id);
+  if (existing) clearTimeout(existing);
+
+  const run = async () => {
+    remoteSyncQueue.delete(job.id);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const userId = sess.session?.user.id;
+      if (!userId) return;
+      await supabase.from("upload_jobs").upsert(
+        {
+          id: job.id,
+          user_id: userId,
+          device_label: getDeviceLabel(),
+          file_name: job.file?.name ?? "arquivo.mp4",
+          file_size: job.file?.size ?? 0,
+          title: job.meta.title,
+          genre: job.meta.genre,
+          description: job.meta.description,
+          status: job.status,
+          progress: Math.round(job.progress || 0),
+          speed_mbs: Number((job.speedMBs || 0).toFixed(2)),
+          eta_sec: Math.round(job.etaSec || 0),
+          upload_path: job.uploadPath ?? null,
+          error_msg: job.errorMsg ?? null,
+          started_at: job.startedAt ? new Date(job.startedAt).toISOString() : null,
+        },
+        { onConflict: "id" },
+      );
+    } catch {
+      /* offline / sem permissão — ignora */
+    }
+  };
+
+  if (immediate) {
+    void run();
+  } else {
+    remoteSyncQueue.set(job.id, setTimeout(run, REMOTE_DEBOUNCE_MS));
+  }
+};
+
+const deleteRemoteJob = async (id: string) => {
+  try {
+    await supabase.from("upload_jobs").delete().eq("id", id);
+  } catch {
+    /* ignora */
+  }
+};
+
 export type UploadStatus =
   | "queued"
   | "uploading"
@@ -88,11 +157,22 @@ const store = {
     this.jobs = this.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j));
     const updated = this.jobs.find((j) => j.id === id);
     if (updated && updated.status !== "done") void persistUploadJob(toPersistedJob(updated));
+    if (updated) {
+      // Status crítico vai imediato; progresso vai com debounce.
+      const immediate =
+        patch.status !== undefined ||
+        patch.errorMsg !== undefined ||
+        patch.uploadPath !== undefined;
+      syncJobToRemote(updated, immediate);
+    }
     this.emit();
   },
   add(jobs: UploadJob[]) {
     this.jobs = [...this.jobs, ...jobs];
-    jobs.forEach((j) => void persistUploadJob(toPersistedJob(j)));
+    jobs.forEach((j) => {
+      void persistUploadJob(toPersistedJob(j));
+      syncJobToRemote(j, true);
+    });
     this.emit();
   },
   hydrate(jobs: UploadJob[]) {
@@ -106,6 +186,7 @@ const store = {
     if (target?.thumbPreviewUrl) URL.revokeObjectURL(target.thumbPreviewUrl);
     this.jobs = this.jobs.filter((j) => j.id !== id);
     void deletePersistedUploadJob(id);
+    void deleteRemoteJob(id);
     this.emit();
   },
   clearDone() {
@@ -115,6 +196,7 @@ const store = {
       .forEach((j) => URL.revokeObjectURL(j.thumbPreviewUrl!));
     this.jobs = this.jobs.filter((j) => j.status !== "done");
     void deletePersistedUploadJobs(doneIds);
+    doneIds.forEach((id) => void deleteRemoteJob(id));
     this.emit();
   },
   subscribe(l: Listener) {
@@ -452,6 +534,7 @@ const runJob = async (job: UploadJob) => {
 
     store.update(job.id, { status: "done", progress: 100 });
     void deletePersistedUploadJob(job.id);
+    void deleteRemoteJob(job.id);
     for (const cb of doneCallbacks) {
       try {
         cb();

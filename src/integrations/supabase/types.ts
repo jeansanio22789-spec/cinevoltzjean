@@ -689,6 +689,66 @@ export type Database = {
         }
         Relationships: []
       }
+      upload_jobs: {
+        Row: {
+          created_at: string
+          description: string | null
+          device_label: string | null
+          error_msg: string | null
+          eta_sec: number
+          file_name: string
+          file_size: number
+          genre: string | null
+          id: string
+          progress: number
+          speed_mbs: number
+          started_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          upload_path: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          device_label?: string | null
+          error_msg?: string | null
+          eta_sec?: number
+          file_name: string
+          file_size?: number
+          genre?: string | null
+          id: string
+          progress?: number
+          speed_mbs?: number
+          started_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          upload_path?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          device_label?: string | null
+          error_msg?: string | null
+          eta_sec?: number
+          file_name?: string
+          file_size?: number
+          genre?: string | null
+          id?: string
+          progress?: number
+          speed_mbs?: number
+          started_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          upload_path?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_movie_access: {
         Row: {
           expires_at: string | null
