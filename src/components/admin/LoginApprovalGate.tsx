@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ShieldAlert, Check, X, Smartphone, Clock } from "lucide-react";
+import { ShieldAlert, Check, X, Smartphone, Clock, CreditCard, Radio } from "lucide-react";
 import { toast } from "sonner";
+import { isNfcSupported, readNfcOnce } from "@/lib/nfcReader";
 
 interface LoginRequest {
   id: string;
@@ -28,6 +29,9 @@ const LoginApprovalGate = () => {
   const [pending, setPending] = useState<LoginRequest | null>(null);
   const [acting, setActing] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [nfcAvailable, setNfcAvailable] = useState(false);
+  const [scanningNfc, setScanningNfc] = useState(false);
+  const [nfcCancel, setNfcCancel] = useState<null | (() => void | Promise<void>)>(null);
 
   // Carrega solicitações pendentes existentes ao logar
   useEffect(() => {
