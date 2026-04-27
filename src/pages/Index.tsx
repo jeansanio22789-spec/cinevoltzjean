@@ -7,12 +7,14 @@ import AdminUploadsRail from "@/components/AdminUploadsRail";
 import UpcomingPremieres from "@/components/UpcomingPremieres";
 
 import { useMovies } from "@/hooks/useMovies";
+import { useContinueWatching } from "@/hooks/useContinueWatching";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
 import type { RailMovie } from "@/components/MovieCard";
 
 const Index = () => {
   const { movies, loading } = useMovies();
+  const continueWatching = useContinueWatching(movies);
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -22,10 +24,24 @@ const Index = () => {
     return all.filter((m) => m.title.toLowerCase().includes(q));
   }, [movies, query]);
 
-  // Fileira "Adicionados recentemente"
+  // "Em alta" — pega os 12 mais recentes (proxy de tendência por enquanto)
+  const trending = useMemo(() => filtered.slice(0, 12), [filtered]);
+
+  // "Para você" — embaralhamento determinístico baseado no id pra dar
+  // sensação de recomendação personalizada sem chamar IA.
+  const forYou = useMemo(() => {
+    const pool = [...filtered];
+    return pool
+      .map((m) => ({ m, k: (m.id.charCodeAt(0) + m.id.charCodeAt(m.id.length - 1)) % 97 }))
+      .sort((a, b) => a.k - b.k)
+      .map((x) => x.m)
+      .slice(0, 14);
+  }, [filtered]);
+
+  // Adicionados recentemente
   const recent = useMemo(() => filtered.slice(0, 20), [filtered]);
 
-  // Agrupa por gênero pra criar uma fileira por categoria (estilo Netflix)
+  // Agrupa por gênero
   const byGenre = useMemo(() => {
     const map = new Map<string, RailMovie[]>();
     for (const m of filtered) {
@@ -35,6 +51,8 @@ const Index = () => {
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
   }, [filtered]);
+
+  const isSearching = query.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,8 +85,17 @@ const Index = () => {
           <p className="text-center text-muted-foreground py-20">
             {query ? "Nada encontrado pra essa busca." : "Nenhum conteúdo disponível ainda."}
           </p>
+        ) : isSearching ? (
+          <div className="space-y-2">
+            <ContentRail title={`Resultados para "${query}"`} movies={filtered} />
+          </div>
         ) : (
           <div className="space-y-2">
+            {continueWatching.length > 0 && (
+              <ContentRail title="Continuar assistindo" movies={continueWatching} />
+            )}
+            {trending.length > 0 && <ContentRail title="🔥 Em alta" movies={trending} />}
+            {forYou.length > 0 && <ContentRail title="Para você" movies={forYou} />}
             {recent.length > 0 && <ContentRail title="Adicionados recentemente" movies={recent} />}
             {byGenre.map(([genre, items]) => (
               <ContentRail key={genre} title={genre} movies={items} />
