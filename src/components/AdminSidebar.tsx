@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
   ShoppingBag, Link2, Radio, Megaphone, Send, Library, Crown, BarChart3, Bell, Palette,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,6 +33,7 @@ export type AdminTab =
   | "notifications"
   | "branding"
   | "audit"
+  | "nfc"
   | "settings";
 
 const sections = [
@@ -68,6 +70,7 @@ const sections = [
     items: [
       { title: "Notificações", tab: "notifications" as AdminTab, icon: Bell },
       { title: "Identidade Visual", tab: "branding" as AdminTab, icon: Palette },
+      { title: "Crachás NFC", tab: "nfc" as AdminTab, icon: CreditCard },
       { title: "Log de Auditoria", tab: "audit" as AdminTab, icon: Shield },
       { title: "Configurações", tab: "settings" as AdminTab, icon: Settings },
     ],
