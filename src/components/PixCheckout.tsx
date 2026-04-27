@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { X, QrCode, Copy, CheckCheck, Loader2, CheckCircle2, Play, User, Receipt } from "lucide-react";
+import { X, QrCode, Copy, CheckCheck, Loader2, CheckCircle2, Play, User, Receipt, CreditCard } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import CardCheckout from "@/components/CardCheckout";
 
 interface Plan {
   name: string;
@@ -63,10 +64,16 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix
   };
 
   useEffect(() => {
+    // Cartão é tratado pelo CardCheckout embutido (não precisa criar PIX)
+    if (paymentMode === "card") {
+      setLoading(false);
+      return;
+    }
+
     const create = async () => {
       try {
-        // Cartão / Carteira → Checkout Pro do Mercado Pago (redirect)
-        if (paymentMode === "card" || paymentMode === "wallet") {
+        // Carteira → Checkout Pro do Mercado Pago (redirect — saldo MP não funciona embutido)
+        if (paymentMode === "wallet") {
           const body: Record<string, unknown> = {
             methods: paymentMode,
             origin: window.location.origin,
@@ -153,8 +160,14 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix
 
         <div className="text-center mb-5">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <QrCode className="w-6 h-6 text-primary" />
-            <h3 className="text-lg font-bold">Pagamento PIX</h3>
+            {paymentMode === "card" ? (
+              <CreditCard className="w-6 h-6 text-primary" />
+            ) : (
+              <QrCode className="w-6 h-6 text-primary" />
+            )}
+            <h3 className="text-lg font-bold">
+              {paymentMode === "card" ? "Pagamento com Cartão" : "Pagamento PIX"}
+            </h3>
           </div>
           <p className="text-sm text-muted-foreground">
             {isMovie ? "Título" : "Plano"}{" "}
@@ -164,12 +177,36 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix
           </p>
         </div>
 
-        {loading && (
+        {/* Cartão embutido — não usa PIX nem redirect */}
+        {paymentMode === "card" && !paid && (
+          <CardCheckout
+            amount={isMovie ? (moviePrice ?? 10) : Number(plan?.priceValue ?? 0)}
+            label={isMovie ? `Título: ${movieTitle}` : `Plano ${plan?.name}`}
+            plan={isMovie ? undefined : plan?.name}
+            movieId={movieId}
+            onApproved={() => {
+              setPaid(true);
+              if (!pix) {
+                setPix({
+                  purchase_id: "",
+                  qr_code: "",
+                  amount: isMovie ? (moviePrice ?? 10) : Number(plan?.priceValue ?? 0),
+                });
+              }
+            }}
+            onClose={onClose}
+          />
+        )}
+
+        {loading && paymentMode !== "card" && (
           <div className="flex flex-col items-center gap-3 py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Gerando seu PIX seguro…</p>
+            <p className="text-sm text-muted-foreground">
+              {paymentMode === "wallet" ? "Abrindo carteira Mercado Pago…" : "Gerando seu PIX seguro…"}
+            </p>
           </div>
         )}
+
 
         {error && (
           <div className="text-center py-8 space-y-3">
@@ -214,7 +251,9 @@ const PixCheckout = ({ plan, movieId, movieTitle, moviePrice, paymentMode = "pix
 
               <div className="flex justify-between items-start gap-3">
                 <span className="text-xs text-muted-foreground">Método</span>
-                <span className="text-xs font-semibold text-foreground">PIX</span>
+                <span className="text-xs font-semibold text-foreground">
+                  {paymentMode === "card" ? "Cartão" : "PIX"}
+                </span>
               </div>
 
               <div className="flex justify-between items-start gap-3">
