@@ -30,38 +30,42 @@ const Login = () => {
   const [mode, setMode] = useState<"client" | "admin">("client");
   const [nfcSupported, setNfcSupported] = useState(false);
   const [scanning, setScanning] = useState(false);
+  // Quando true, o scan está rodando "no fundo" — não abre o modal grande.
+  // Quando false e scanning=true, o usuário tocou no botão → mostra modal.
+  const [silentScan, setSilentScan] = useState(true);
   const [cancelFn, setCancelFn] = useState<null | (() => void | Promise<void>)>(null);
   // Token NFC validado, será consumido após o login com senha
   const [nfcToken, setNfcToken] = useState<string | null>(null);
   // UID lido de um crachá novo: salva automaticamente depois do login admin.
   const [pendingEnrollUid, setPendingEnrollUid] = useState<string | null>(null);
+  // Trigger pra reiniciar o scan automático após erro/falha
+  const [autoScanTick, setAutoScanTick] = useState(0);
 
   useEffect(() => {
     isNfcSupported().then((ok) => {
       setNfcSupported(ok);
-      // Já entra em modo admin se tiver NFC — assim a "primeira batida" do
-      // crachá é o que abre o app, sem precisar tocar em nada.
-      if (ok) setMode("admin");
     });
   }, []);
 
-  // Auto-inicia a leitura sempre que estiver em modo admin, com NFC disponível,
-  // sem token validado, sem scan rodando e sem estar no cadastro.
+  // Escuta NFC em background sempre que estamos na tela de login,
+  // sem token validado e sem estar no cadastro. Modo "silencioso":
+  // o admin só encosta o crachá e o app entra sozinho.
   useEffect(() => {
-    if (mode !== "admin") return;
     if (!nfcSupported) return;
     if (nfcToken) return;
     if (scanning) return;
     if (isSignUp) return;
-    void startNfcScan();
+    if (pendingEnrollUid) return;
+    void startNfcScan({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, nfcSupported, nfcToken, scanning, isSignUp]);
+  }, [nfcSupported, nfcToken, scanning, isSignUp, pendingEnrollUid, autoScanTick]);
 
-  const startNfcScan = async () => {
+  const startNfcScan = async (opts: { silent?: boolean } = {}) => {
     if (!nfcSupported) {
       toast.error("NFC indisponível. Use o app Android ou abra o site fora do preview.");
       return;
     }
+    setSilentScan(!!opts.silent);
     setScanning(true);
     const session = readNfcOnce();
     setCancelFn(() => session.cancel);
@@ -133,7 +137,12 @@ const Login = () => {
         document.querySelector<HTMLInputElement>("input[name='admin-password']")?.focus();
       }, 100);
     } catch (err: any) {
-      if (err?.message) toast.error(err.message);
+      // Em scan silencioso, não enche a tela com toasts; só reagenda
+      if (!opts.silent && err?.message) toast.error(err.message);
+      // Reagenda nova tentativa silenciosa após pequeno delay
+      if (opts.silent) {
+        setTimeout(() => setAutoScanTick((t) => t + 1), 1500);
+      }
     } finally {
       setScanning(false);
       setCancelFn(null);
@@ -294,7 +303,7 @@ const Login = () => {
                   </p>
                   <button
                     type="button"
-                    onClick={startNfcScan}
+                    onClick={() => startNfcScan({ silent: false })}
                     disabled={!nfcSupported}
                     className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-2.5 rounded font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
