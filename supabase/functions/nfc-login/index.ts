@@ -63,12 +63,20 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!roleRow) return json({ ok: false, reason: "not_admin" }, 200);
 
+    // Pega email direto de auth.users (mais confiável que profiles)
+    let email: string | null = null;
     const { data: prof } = await admin
       .from("profiles")
       .select("email")
       .eq("id", match.user_id)
       .maybeSingle();
-    if (!prof?.email) return json({ ok: false, reason: "no_email" }, 200);
+    email = prof?.email ?? null;
+    if (!email) {
+      const { data: userData, error: userErr } = await admin.auth.admin.getUserById(match.user_id);
+      email = userData?.user?.email ?? null;
+      console.log("[nfc-login] fallback getUserById", { hasEmail: !!email, err: userErr?.message });
+    }
+    if (!email) return json({ ok: false, reason: "no_email" }, 200);
 
     // Gera magic link (precisa hashed_token + email_otp pra verifyOtp)
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
