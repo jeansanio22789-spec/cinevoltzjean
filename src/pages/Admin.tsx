@@ -21,6 +21,7 @@ import AdminPlans from "@/components/admin/AdminPlans";
 import AdminReports from "@/components/admin/AdminReports";
 import AdminBranding from "@/components/admin/AdminBranding";
 import AdminNotifications from "@/components/admin/AdminNotifications";
+import AdminNfcTagsPage from "@/components/admin/AdminNfcTagsPage";
 
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
@@ -40,6 +41,7 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   users: { title: "Usuários", subtitle: "Assinantes, planos e permissões" },
   notifications: { title: "Notificações", subtitle: "Envie avisos para os usuários" },
   branding: { title: "Identidade Visual", subtitle: "Nome, logo e cores do app" },
+  nfc: { title: "Crachás NFC", subtitle: "Cadastre e gerencie crachás para login do admin" },
   audit: { title: "Log de Auditoria", subtitle: "Histórico completo de ações na plataforma" },
   settings: { title: "Configurações", subtitle: "Ajustes da plataforma e segurança" },
 };
