@@ -1,10 +1,4 @@
-// Edge function: troca um UID NFC válido por uma sessão de admin.
-// - Procura o crachá usando a mesma normalização/reverso que as RPCs.
-// - Confirma que o dono é admin.
-// - Gera um magic link (signInWithOtp) e extrai o token_hash.
-// - Verifica esse token via verifyOtp pra obter access_token + refresh_token.
-// - Devolve a sessão pro front, que chama supabase.auth.setSession().
-// Sem isso seria preciso senha — esse é o fluxo único e seguro pra "tap-to-login".
+// Edge function: troca um UID NFC válido por uma sessão de admin (tap-to-login).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const corsHeaders = {
@@ -32,7 +26,8 @@ Deno.serve(async (req) => {
 
   try {
     const { tag_uid } = (await req.json().catch(() => ({}))) as { tag_uid?: string };
-    if (!tag_uid) return json({ ok: false, reason: "missing_tag" }, 400);
+    console.log("[nfc-login] received", { tag_uid });
+    if (!tag_uid) return json({ ok: false, reason: "missing_tag" }, 200);
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -43,73 +38,114 @@ Deno.serve(async (req) => {
     const uid = normalize(tag_uid);
     const uidRev = reverseHex(uid);
 
-    // Busca todos os crachás (poucos registros) e procura match tolerante.
     const { data: tags, error: tagsErr } = await admin
       .from("admin_nfc_tags")
       .select("user_id, tag_uid");
-    if (tagsErr) return json({ ok: false, reason: "db_error", details: tagsErr.message }, 500);
+    if (tagsErr) {
+      console.error("[nfc-login] db_error", tagsErr);
+      return json({ ok: false, reason: "db_error", details: tagsErr.message }, 200);
+    }
 
     const match = (tags ?? []).find((t) => {
       const stored = normalize(t.tag_uid);
-      return (
-        stored === uid ||
-        stored === uidRev ||
-        uid.includes(stored) ||
-        stored.includes(uid)
-      );
+      return stored === uid || stored === uidRev || uid.includes(stored) || stored.includes(uid);
     });
-    if (!match) return json({ ok: false, reason: "unknown_tag" }, 404);
+    if (!match) {
+      console.log("[nfc-login] unknown_tag", { uid, total: tags?.length });
+      return json({ ok: false, reason: "unknown_tag" }, 200);
+    }
 
-    // Confirma que é admin
     const { data: roleRow } = await admin
       .from("user_roles")
       .select("user_id")
       .eq("user_id", match.user_id)
       .eq("role", "admin")
       .maybeSingle();
-    if (!roleRow) return json({ ok: false, reason: "not_admin" }, 403);
+    if (!roleRow) return json({ ok: false, reason: "not_admin" }, 200);
 
-    // Pega email pra gerar o magic link
+    // Pega email direto de auth.users (mais confiável que profiles)
+    let email: string | null = null;
     const { data: prof } = await admin
       .from("profiles")
       .select("email")
       .eq("id", match.user_id)
       .maybeSingle();
-    if (!prof?.email) return json({ ok: false, reason: "no_email" }, 500);
+    email = prof?.email ?? null;
+    if (!email) {
+      const { data: userData, error: userErr } = await admin.auth.admin.getUserById(match.user_id);
+      email = userData?.user?.email ?? null;
+      console.log("[nfc-login] fallback getUserById", { hasEmail: !!email, err: userErr?.message });
+    }
+    if (!email) return json({ ok: false, reason: "no_email" }, 200);
 
-    // Gera magic link com token_hash
+    // Gera magic link (precisa hashed_token + email_otp pra verifyOtp)
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
       type: "magiclink",
-      email: prof.email,
+      email,
     });
-    if (linkErr || !linkData?.properties?.hashed_token) {
-      return json({ ok: false, reason: "link_failed", details: linkErr?.message }, 500);
+    console.log("[nfc-login] generateLink", {
+      hasData: !!linkData,
+      hasProps: !!linkData?.properties,
+      hasHashed: !!linkData?.properties?.hashed_token,
+      hasOtp: !!linkData?.properties?.email_otp,
+      err: linkErr?.message,
+    });
+    if (linkErr || !linkData?.properties) {
+      return json({ ok: false, reason: "link_failed", details: linkErr?.message }, 200);
     }
 
-    // Verifica o token_hash pra obter access + refresh tokens
-    const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
-      type: "magiclink",
-      token_hash: linkData.properties.hashed_token,
-    });
-    if (verifyErr || !verified?.session) {
-      return json({ ok: false, reason: "verify_failed", details: verifyErr?.message }, 500);
+    // Tenta verifyOtp pelo email_otp (mais confiável que token_hash em algumas versões)
+    const otp = linkData.properties.email_otp;
+    let session: { access_token: string; refresh_token: string } | null = null;
+
+    if (otp) {
+      const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
+        type: "magiclink",
+        email,
+        token: otp,
+      });
+      console.log("[nfc-login] verifyOtp(email_otp)", {
+        ok: !!verified?.session,
+        err: verifyErr?.message,
+      });
+      if (verified?.session) {
+        session = {
+          access_token: verified.session.access_token,
+          refresh_token: verified.session.refresh_token,
+        };
+      }
     }
 
-    // Atualiza last_used_at do crachá
+    // Fallback: tenta hashed_token
+    if (!session && linkData.properties.hashed_token) {
+      const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
+        type: "magiclink",
+        token_hash: linkData.properties.hashed_token,
+      });
+      console.log("[nfc-login] verifyOtp(token_hash)", {
+        ok: !!verified?.session,
+        err: verifyErr?.message,
+      });
+      if (verified?.session) {
+        session = {
+          access_token: verified.session.access_token,
+          refresh_token: verified.session.refresh_token,
+        };
+      }
+    }
+
+    if (!session) {
+      return json({ ok: false, reason: "verify_failed" }, 200);
+    }
+
     await admin
       .from("admin_nfc_tags")
       .update({ last_used_at: new Date().toISOString() })
       .eq("user_id", match.user_id);
 
-    return json({
-      ok: true,
-      session: {
-        access_token: verified.session.access_token,
-        refresh_token: verified.session.refresh_token,
-      },
-      email: prof.email,
-    });
+    return json({ ok: true, session, email });
   } catch (e) {
-    return json({ ok: false, reason: "exception", details: String(e) }, 500);
+    console.error("[nfc-login] exception", e);
+    return json({ ok: false, reason: "exception", details: String(e) }, 200);
   }
 });
