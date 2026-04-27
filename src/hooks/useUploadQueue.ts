@@ -482,11 +482,14 @@ export const initUploadQueue = () => {
       .map((j) => ({
         ...j,
         status: j.status === "error" ? "error" : "queued",
-        progress: j.status === "error" ? j.progress : 0,
+        // Preserva o progresso anterior — assim o usuário vê o upload
+        // retomar de onde parou (TUS continua do mesmo offset no Storage).
+        progress: j.status === "error" ? j.progress : (j.progress ?? 0),
         speedMBs: 0,
         etaSec: 0,
         timedOut: false,
         thumbPreviewUrl: j.thumbnail ? URL.createObjectURL(j.thumbnail) : null,
+        uploadPath: j.uploadPath,
       }));
 
     store.hydrate(restoredJobs);
