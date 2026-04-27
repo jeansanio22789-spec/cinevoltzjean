@@ -63,6 +63,13 @@ const MovieCard = ({ movie }: MovieCardProps) => {
           </div>
         )}
 
+        {/* Selo de preço (sempre visível, em filmes publicados) */}
+        {!isPending && (
+          <div className="absolute bottom-2 left-2 z-10 bg-primary text-primary-foreground text-[11px] font-black px-2 py-0.5 rounded shadow-lg">
+            R$ {Number(movie.price ?? 10).toFixed(2).replace(".", ",")}
+          </div>
+        )}
+
         {/* Selo "CHEGANDO" + barra de progresso para itens em envio */}
         {isPending && (
           <>
