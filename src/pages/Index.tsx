@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import Footer from "@/components/Footer";
 import ContentRail from "@/components/ContentRail";
-import AdminUploadsRail from "@/components/AdminUploadsRail";
+
 import { useMovies } from "@/hooks/useMovies";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search } from "lucide-react";
