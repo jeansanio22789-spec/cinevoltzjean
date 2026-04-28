@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X, Sparkles, Radio } from "lucide-react";
 
 interface DriveFile {
   id: string;
@@ -31,6 +33,62 @@ export default function AdminGoogleDriveImport() {
   const [importing, setImporting] = useState<string | null>(null);
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
+  const [autoDetecting, setAutoDetecting] = useState(false);
+  const [autoWatch, setAutoWatch] = useState(false);
+  const watchRef = useRef<number | null>(null);
+
+  const autoDetect = async (silent = false) => {
+    if (!silent) setAutoDetecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gdrive-auto-import", {
+        body: {
+          folderId: folderId.trim() ? extractFolderId(folderId) : undefined,
+          genre: "Estreias",
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const n = data?.imported || 0;
+      if (n > 0) {
+        toast({
+          title: `🎬 ${n} estreia(s) adicionada(s)!`,
+          description: data.items.map((i: any) => i.title).slice(0, 3).join(", "),
+        });
+        // marca como importados na lista
+        setImported((s) => {
+          const ns = new Set(s);
+          data.items.forEach((i: any) => {
+            const m = String(i.video_url || "").match(/\/file\/d\/([\w-]+)/);
+            if (m) ns.add(m[1]);
+          });
+          return ns;
+        });
+      } else if (!silent) {
+        toast({ title: "Nada novo no Drive", description: `${data?.scanned || 0} vídeos verificados, todos já importados.` });
+      }
+    } catch (e) {
+      if (!silent) {
+        toast({ title: "Erro na detecção", description: (e as Error).message, variant: "destructive" });
+      }
+    } finally {
+      if (!silent) setAutoDetecting(false);
+    }
+  };
+
+  // Auto-watch: verifica a cada 60s
+  useEffect(() => {
+    if (autoWatch) {
+      autoDetect(true);
+      watchRef.current = window.setInterval(() => autoDetect(true), 60000);
+    } else if (watchRef.current) {
+      clearInterval(watchRef.current);
+      watchRef.current = null;
+    }
+    return () => {
+      if (watchRef.current) clearInterval(watchRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoWatch, folderId]);
 
   const uploadCover = async (fileId: string, file: File) => {
     setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
@@ -138,6 +196,31 @@ export default function AdminGoogleDriveImport() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             <span className="ml-2">Listar</span>
           </Button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <div>
+              <div className="text-sm font-semibold">Detecção automática de estreias</div>
+              <div className="text-xs text-muted-foreground">
+                Verifica o Drive e cria filmes publicados automaticamente (capa + nome).
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch id="auto-watch" checked={autoWatch} onCheckedChange={setAutoWatch} />
+              <Label htmlFor="auto-watch" className="text-xs flex items-center gap-1 cursor-pointer">
+                <Radio className={`h-3 w-3 ${autoWatch ? "text-primary animate-pulse" : ""}`} />
+                Monitorar
+              </Label>
+            </div>
+            <Button size="sm" onClick={() => autoDetect(false)} disabled={autoDetecting}>
+              {autoDetecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              <span className="ml-2">Detectar agora</span>
+            </Button>
+          </div>
         </div>
       </Card>
 
