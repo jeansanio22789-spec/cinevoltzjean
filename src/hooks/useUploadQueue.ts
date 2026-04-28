@@ -535,28 +535,86 @@ const uploadLargeVideoInParts = async (
   const totalParts = Math.ceil(file.size / SPLIT_PART_BYTES);
   const base = path.replace(/\.[^.]+$/, "");
   const ext = path.split(".").pop() || "mp4";
-  let uploadedBytes = 0;
 
+  // Progresso por parte (0..1) — somamos ponderado pelo tamanho de cada parte.
+  const partProgress = new Array<number>(totalParts).fill(0);
+  const partSizes = new Array<number>(totalParts).fill(0);
   for (let i = 0; i < totalParts; i++) {
+    const start = i * SPLIT_PART_BYTES;
+    const end = Math.min(file.size, start + SPLIT_PART_BYTES);
+    partSizes[i] = end - start;
+  }
+  const startedAt = Date.now();
+
+  const reportProgress = () => {
+    let uploaded = 0;
+    for (let i = 0; i < totalParts; i++) uploaded += partSizes[i] * partProgress[i];
+    const pct = (uploaded / file.size) * 100;
+    const elapsed = Math.max(0.1, (Date.now() - startedAt) / 1000);
+    const speedMBs = uploaded / 1024 / 1024 / elapsed;
+    const remainingMB = (file.size - uploaded) / 1024 / 1024;
+    const etaSec = remainingMB / Math.max(speedMBs, 0.01);
+    onProgress(pct, speedMBs, etaSec);
+  };
+
+  // Aborts de cada parte ativa
+  const partAborts = new Map<number, () => void>();
+  registerAbort(() => {
+    partAborts.forEach((fn) => {
+      try { fn(); } catch { /* noop */ }
+    });
+  });
+
+  // ⚡ Paralelismo: sobe N partes ao mesmo tempo. Sinal agressivo = banda toda.
+  const PARALLEL_PARTS = turboForced ? 1 : 3;
+
+  const uploadPart = async (i: number): Promise<void> => {
     const start = i * SPLIT_PART_BYTES;
     const end = Math.min(file.size, start + SPLIT_PART_BYTES);
     const part = file.slice(start, end, file.type || "video/mp4");
     const partPath = `${base}.part-${String(i).padStart(4, "0")}.${ext}`;
 
-    await uploadFileFast(
-      "videos",
-      partPath,
-      part,
-      (partPct, speedMBs, etaSec) => {
-        const partUploaded = ((end - start) * partPct) / 100;
-        const totalPct = ((uploadedBytes + partUploaded) / file.size) * 100;
-        onProgress(totalPct, speedMBs, etaSec);
-      },
-      registerAbort,
-      true,
-    );
-    uploadedBytes = end;
+    let attempt = 0;
+    // Loop infinito de retomada — só sai com sucesso ou abort do usuário.
+    while (true) {
+      try {
+        await uploadFileFast(
+          "videos",
+          partPath,
+          part,
+          (partPct) => {
+            partProgress[i] = Math.max(0, Math.min(1, partPct / 100));
+            reportProgress();
+          },
+          (fn) => partAborts.set(i, fn),
+          true,
+        );
+        partProgress[i] = 1;
+        partAborts.delete(i);
+        reportProgress();
+        return;
+      } catch (err) {
+        if (isAbortUploadError(err)) throw err;
+        attempt++;
+        // Backoff curto (max 10s). Nunca desiste.
+        await new Promise((r) => setTimeout(r, Math.min(10_000, 1_000 * attempt)));
+      }
+    }
+  };
+
+  // Janela deslizante de PARALLEL_PARTS uploads simultâneos
+  let nextIndex = 0;
+  const workers: Promise<void>[] = [];
+  const launch = async (): Promise<void> => {
+    while (nextIndex < totalParts) {
+      const i = nextIndex++;
+      await uploadPart(i);
+    }
+  };
+  for (let w = 0; w < Math.min(PARALLEL_PARTS, totalParts); w++) {
+    workers.push(launch());
   }
+  await Promise.all(workers);
 
   return `split://${base}|${totalParts}|${ext}`;
 };
