@@ -256,6 +256,113 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // 📸 Foto solta (sem vídeo nem URL): tenta enviar pro Drive na pasta configurada
+        if (!hasContent && photo) {
+          try {
+            const { data: setting } = await supabase
+              .from("platform_settings")
+              .select("value")
+              .eq("key", "telegram_image_drive_folder")
+              .maybeSingle();
+            const driveFolder = setting?.value?.trim();
+            const GDRIVE_KEY = Deno.env.get("GOOGLE_DRIVE_API_KEY");
+
+            if (!driveFolder || !GDRIVE_KEY) {
+              await supabase.from("telegram_messages").update({
+                processing_status: "ignored",
+                processing_error: !driveFolder
+                  ? "Pasta Drive não configurada"
+                  : "Google Drive não conectado",
+                processed_at: new Date().toISOString(),
+              }).eq("update_id", update.update_id);
+              continue;
+            }
+
+            // Extrai folderId de URL ou usa direto
+            const folderMatch = driveFolder.match(/\/folders\/([\w-]+)/);
+            const folderId = folderMatch ? folderMatch[1] : driveFolder;
+
+            // Baixa a foto do Telegram
+            const { result: photoInfo } = await tg(
+              "getFile",
+              { file_id: photo.file_id },
+              LOVABLE_API_KEY,
+              TELEGRAM_API_KEY,
+            );
+            const pdl = await fetch(`${GATEWAY_URL}/file/${photoInfo.file_path}`, {
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "X-Connection-Api-Key": TELEGRAM_API_KEY,
+              },
+            });
+            if (!pdl.ok) throw new Error(`download foto falhou ${pdl.status}`);
+            const photoBytes = new Uint8Array(await pdl.arrayBuffer());
+            const ext = (photoInfo.file_path.split(".").pop() || "jpg").toLowerCase();
+            const mime = ext === "png" ? "image/png" : "image/jpeg";
+
+            // Nome do arquivo: caption (se houver) ou timestamp
+            const safeName = (captionOrText || `tg-${update.update_id}`)
+              .split(/\r?\n/)[0]
+              .replace(/[^\w\s-]/g, "")
+              .trim()
+              .slice(0, 80) || `tg-${update.update_id}`;
+            const fileName = `${safeName}.${ext}`;
+
+            // Multipart upload pro Drive via gateway
+            const boundary = `----lovable-${crypto.randomUUID()}`;
+            const metadata = JSON.stringify({
+              name: fileName,
+              parents: [folderId],
+            });
+            const head = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`;
+            const tail = `\r\n--${boundary}--`;
+            const headBytes = new TextEncoder().encode(head);
+            const tailBytes = new TextEncoder().encode(tail);
+            const body = new Uint8Array(headBytes.length + photoBytes.length + tailBytes.length);
+            body.set(headBytes, 0);
+            body.set(photoBytes, headBytes.length);
+            body.set(tailBytes, headBytes.length + photoBytes.length);
+
+            const upResp = await fetch(
+              `https://connector-gateway.lovable.dev/google_drive/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  "X-Connection-Api-Key": GDRIVE_KEY,
+                  "Content-Type": `multipart/related; boundary=${boundary}`,
+                },
+                body,
+              },
+            );
+            const upData = await upResp.json();
+            if (!upResp.ok) throw new Error(`Drive upload: ${JSON.stringify(upData)}`);
+
+            await supabase.from("telegram_messages").update({
+              processing_status: "done",
+              processing_error: `Imagem salva no Drive: ${fileName}`,
+              processed_at: new Date().toISOString(),
+            }).eq("update_id", update.update_id);
+
+            try {
+              await tg("sendMessage", {
+                chat_id: msg.chat.id,
+                reply_to_message_id: msg.message_id,
+                text: `📸 Imagem salva no Drive: ${fileName}`,
+              }, LOVABLE_API_KEY, TELEGRAM_API_KEY);
+            } catch (_) { /* ignora */ }
+          } catch (imgErr) {
+            const em = (imgErr as Error).message;
+            log.push(`foto-drive ${update.update_id}: ${em}`);
+            await supabase.from("telegram_messages").update({
+              processing_status: "error",
+              processing_error: em,
+              processed_at: new Date().toISOString(),
+            }).eq("update_id", update.update_id);
+          }
+          continue;
+        }
+
         if (!hasContent) continue;
 
         try {
