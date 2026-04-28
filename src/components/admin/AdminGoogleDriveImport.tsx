@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink } from "lucide-react";
+import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X } from "lucide-react";
 
 interface DriveFile {
   id: string;
@@ -30,6 +30,26 @@ export default function AdminGoogleDriveImport() {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
+
+  const uploadCover = async (fileId: string, file: File) => {
+    setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `gdrive/${fileId}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("thumbnails").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("thumbnails").getPublicUrl(path);
+      setCovers((c) => ({ ...c, [fileId]: { url: data.publicUrl, uploading: false } }));
+      toast({ title: "Capa carregada" });
+    } catch (e) {
+      setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: false } }));
+      toast({ title: "Erro ao subir capa", description: (e as Error).message, variant: "destructive" });
+    }
+  };
 
   const extractFolderId = (input: string): string => {
     const m = input.match(/\/folders\/([\w-]+)/);
@@ -71,6 +91,7 @@ export default function AdminGoogleDriveImport() {
         body: {
           fileId: file.id,
           title: file.name.replace(/\.(mp4|mkv|webm|mov|avi)$/i, ""),
+          thumbnailUrl: covers[file.id]?.url || undefined,
         },
       });
       if (error) throw error;
