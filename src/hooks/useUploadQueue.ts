@@ -354,16 +354,27 @@ const uploadFileDirect = async (
   });
 };
 
+const uploadErrorMessage = (err: unknown) =>
+  err instanceof Error ? err.message : String(err || "");
+
+const isAbortUploadError = (err: unknown) =>
+  /cancelado|abort|aborted/i.test(uploadErrorMessage(err));
+
 const uploadFileTus = (
   bucket: string,
   path: string,
   file: File,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
+  options: { resumePrevious?: boolean; cleanPrevious?: boolean } = {},
 ): Promise<string> =>
   new Promise(async (resolve, reject) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
+    if (!token) {
+      reject(new Error("Sessão expirada. Faça login novamente."));
+      return;
+    }
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     // ⚡ Hostname direto do storage = MUITO mais rápido (otimização oficial Supabase).
     // Pula o gateway principal e vai direto pros servidores de upload.
@@ -374,7 +385,7 @@ const uploadFileTus = (
 
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000],
+      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
@@ -408,8 +419,20 @@ const uploadFileTus = (
     });
 
     registerAbort(() => upload.abort(true).catch(() => {}));
-    const prev = await upload.findPreviousUploads();
-    if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
+    try {
+      const prev = await upload.findPreviousUploads();
+      if (options.cleanPrevious) {
+        await Promise.all(
+          prev.map((p) =>
+            tus.defaultOptions.urlStorage.removeUpload(p.urlStorageKey).catch(() => {}),
+          ),
+        );
+      } else if (options.resumePrevious !== false && prev.length) {
+        upload.resumeFromPreviousUpload(prev[0]);
+      }
+    } catch {
+      /* se a retomada local estiver corrompida, inicia um TUS novo */
+    }
     upload.start();
   });
 
