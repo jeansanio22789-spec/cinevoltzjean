@@ -162,6 +162,50 @@ const AdminSettings = () => {
           </div>
         </div>
 
+        {/* Atualização do App — publica nova versão e mostra banner pra todos */}
+        <div className="bg-card border border-border rounded-lg p-5">
+          <div className="flex items-center gap-3 mb-1">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <h3 className="font-bold">Atualização do App</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Ao publicar uma nova versão, todos os usuários verão um banner no topo
+            do app com botão "Atualizar". Use sempre que subir uma versão importante.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Número da versão (ex.: 1.0.1, 2.3.0)
+              </label>
+              <input
+                className="mt-1 w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="1.0.0"
+                value={settings.app_version || ""}
+                onChange={(e) => updateSetting("app_version", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Mensagem (opcional)
+              </label>
+              <input
+                className="mt-1 w-full px-3 py-2 bg-background border border-border rounded text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Novidades: novos filmes e correções"
+                value={settings.app_update_message || ""}
+                onChange={(e) => updateSetting("app_update_message", e.target.value)}
+              />
+            </div>
+            <button
+              onClick={publishAppVersion}
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              Publicar nova versão
+            </button>
+          </div>
+        </div>
+
         {/* Dispositivos autorizados */}
         <div className="bg-card border border-border rounded-lg p-5">
           <div className="flex items-center gap-3 mb-1">
