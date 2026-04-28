@@ -438,7 +438,13 @@ const isAbortUploadError = (err: unknown) =>
   /cancelado|abort|aborted/i.test(uploadErrorMessage(err));
 
 const isStorageLimitUploadError = (err: unknown) =>
-  /Maximum size exceeded|response code: 413|\b413\b/i.test(uploadErrorMessage(err));
+  /Maximum size exceeded|response code: 413|\b413\b|limite de tamanho|limite do bucket|armazenamento recusou/i.test(uploadErrorMessage(err));
+
+const canAutoRecoverStorageLimitJob = (job: { file?: File; errorMsg?: string; uploadMode?: UploadJob["uploadMode"] }) =>
+  !!job.file &&
+  job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES &&
+  job.uploadMode !== "direct-parts" &&
+  isStorageLimitUploadError(new Error(job.errorMsg || ""));
 
 const formatUploadSize = (bytes: number) =>
   bytes >= 1024 ** 3
