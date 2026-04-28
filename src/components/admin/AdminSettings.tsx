@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Globe, Bell, Shield, Save, Loader2, Smartphone, Trash2, Plus, Radio } from "lucide-react";
+import { Globe, Bell, Shield, Save, Loader2, Smartphone, Trash2, Plus, Radio, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getDeviceId, getDeviceLabel } from "@/lib/deviceId";
