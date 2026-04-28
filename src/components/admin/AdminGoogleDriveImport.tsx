@@ -59,10 +59,6 @@ export default function AdminGoogleDriveImport() {
   const loadFiles = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (folderId.trim()) params.set("folderId", extractFolderId(folderId));
-      if (search.trim()) params.set("q", search.trim());
-
       const { data, error } = await supabase.functions.invoke("gdrive-list", {
         body: {
           folderId: folderId.trim() ? extractFolderId(folderId) : undefined,
