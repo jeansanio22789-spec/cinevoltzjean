@@ -7,6 +7,7 @@ import {
   Sparkles, Search, Film, Tv, Bot, Cpu, Radar, Copy,
 } from "lucide-react";
 import TelegramImageDriveFolder from "./TelegramImageDriveFolder";
+import DriveCoverSync from "./DriveCoverSync";
 
 const WORKER_URL_KEY = "telegram_worker_url";
 const WORKER_TOKEN_KEY = "telegram_worker_token";
@@ -656,6 +657,8 @@ const AdminTelegramImport = () => {
       </div>
 
       <TelegramImageDriveFolder />
+
+      <DriveCoverSync />
 
       {/* Config do worker (só aparece no modo worker) */}
       {mode === "worker" && (
