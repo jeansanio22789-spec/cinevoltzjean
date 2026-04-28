@@ -49,12 +49,21 @@ Deno.serve(async (req) => {
       } catch (_) { /* body opcional */ }
     }
 
+    // Limpa entradas
+    folderId = folderId?.trim() || null;
+    search = search?.trim() || null;
+    // Se vier um link inteiro de pasta, extrai o ID
+    if (folderId) {
+      const m = folderId.match(/\/folders\/([\w-]+)/);
+      if (m) folderId = m[1];
+    }
+
     // Filtro: vídeos + opcional pasta + opcional busca
     const queryParts: string[] = [
       "mimeType contains 'video/'",
       "trashed = false",
     ];
-    if (folderId) queryParts.push(`'${folderId}' in parents`);
+    if (folderId) queryParts.push(`'${folderId.replace(/'/g, "\\'")}' in parents`);
     if (search) queryParts.push(`name contains '${search.replace(/'/g, "\\'")}'`);
 
     const params = new URLSearchParams();
