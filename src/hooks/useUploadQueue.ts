@@ -711,11 +711,7 @@ const runJob = async (job: UploadJob) => {
       store.update(job.id, { uploadPath: path });
     }
 
-    const videoUrl = await uploadFileFast(
-      "videos",
-      path,
-      job.file,
-      (pct, speedMBs, etaSec) => {
+    const onVideoProgress = (pct: number, speedMBs: number, etaSec: number) => {
         const cur = store.jobs.find((j) => j.id === job.id);
         const keepWarn = cur?.status === "warning";
 
@@ -758,10 +754,18 @@ const runJob = async (job: UploadJob) => {
           // progresso, um upload que avança 1% e cai sempre nunca
           // atingiria o teto de tentativas e ficaria "reiniciando" eternamente.
         });
-      },
-      (abortFn) => store.update(job.id, { abort: abortFn }),
-      isResuming, // forceTus quando estamos retomando após refresh
-    );
+      };
+    const registerVideoAbort = (abortFn: () => void) => store.update(job.id, { abort: abortFn });
+    const videoUrl = job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES
+      ? await uploadLargeVideoInParts(path, job.file, onVideoProgress, registerVideoAbort)
+      : await uploadFileFast(
+          "videos",
+          path,
+          job.file,
+          onVideoProgress,
+          registerVideoAbort,
+          isResuming, // forceTus quando estamos retomando após refresh
+        );
 
     let thumbnailUrl: string | null = null;
     if (job.thumbnail) {
