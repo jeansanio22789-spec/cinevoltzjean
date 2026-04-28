@@ -28,6 +28,7 @@ const InstallAppPrompt = lazy(() => import("@/components/InstallAppPrompt"));
 const UploadFloatingIndicator = lazy(
   () => import("@/components/UploadFloatingIndicator"),
 );
+const AppUpdateBanner = lazy(() => import("@/components/AppUpdateBanner"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,6 +95,7 @@ const App = () => {
                 </Routes>
               </Suspense>
               <Suspense fallback={null}>
+                <AppUpdateBanner />
                 <InstallAppPrompt />
                 <UploadFloatingIndicator />
               </Suspense>
