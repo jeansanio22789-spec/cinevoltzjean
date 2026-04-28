@@ -605,6 +605,22 @@ const AdminVideos = () => {
         </button>
       </div>
 
+      {/* Aviso: caminho oficial agora é o Telegram */}
+      <div className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <div className="text-sm leading-relaxed">
+          <p className="font-semibold text-foreground">
+            Caminho oficial: enviar pelo Telegram
+          </p>
+          <p className="text-muted-foreground mt-0.5">
+            Poste o vídeo no canal do Telegram conectado — o app cataloga sozinho
+            sem ocupar armazenamento. O envio pelo painel ainda funciona, mas
+            consome a cota da nuvem do app e pode falhar com arquivos grandes.
+          </p>
+        </div>
+      </div>
+
+
       {showUpload && (
         <div className="bg-card border border-border rounded-lg p-6">
           <div
