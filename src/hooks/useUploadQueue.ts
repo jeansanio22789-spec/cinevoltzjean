@@ -484,6 +484,25 @@ const uploadFileFast = async (
 // Execução do job (continua rodando mesmo se o componente desmontar)
 // ---------------------------------------------------------------------------
 const runningJobIds = new Set<string>();
+const retryJobIds = new Set<string>();
+
+const queueJobRetry = (jobId: string, delayMs: number) => {
+  if (retryJobIds.has(jobId)) return;
+  retryJobIds.add(jobId);
+  window.setTimeout(() => {
+    retryJobIds.delete(jobId);
+    const fresh = store.jobs.find((j) => j.id === jobId);
+    if (!fresh || fresh.status === "done" || runningJobIds.has(jobId)) return;
+    void runJob(fresh);
+  }, delayMs);
+};
+
+const isRetryableUploadError = (err: unknown) => {
+  const msg = uploadErrorMessage(err);
+  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload|Maximum size exceeded|413/i.test(
+    msg,
+  );
+};
 
 // 🚦 Fila sequencial inteligente
 // Em conexões lentas, vários uploads em paralelo dividem a banda e o overhead
