@@ -75,9 +75,12 @@ export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSour
   for (const re of gdPatterns) {
     const m = url.match(re);
     if (m) {
+      // Streama direto pelo nosso proxy (nunca pede login do Google).
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const direct = `https://drive.usercontent.google.com/download?id=${m[1]}&export=download&authuser=0&confirm=t`;
       return {
-        kind: "iframe",
-        url: `https://drive.google.com/file/d/${m[1]}/preview`,
+        kind: "video",
+        url: `${baseUrl}/functions/v1/proxy-stream?url=${encodeURIComponent(direct)}`,
       };
     }
   }
