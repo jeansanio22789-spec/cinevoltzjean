@@ -31,6 +31,23 @@ const BuildStatusCard = () => {
   const [publishedVersion, setPublishedVersion] = useState<string>("");
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  const localVersion = LOCAL_BUILD;
+
+  const publishCurrent = async () => {
+    setPublishing(true);
+    const { error } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "app_version", value: localVersion }, { onConflict: "key" });
+    setPublishing(false);
+    if (error) {
+      toast.error("Falha ao publicar versão", { description: error.message });
+      return;
+    }
+    toast.success("Versão publicada para os usuários");
+    await fetchPublished();
+  };
 
   const fetchPublished = async () => {
     setLoading(true);
