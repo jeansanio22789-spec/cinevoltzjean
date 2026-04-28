@@ -157,17 +157,22 @@ export default function AdminGoogleDriveImport() {
                   key={f.id}
                   className="flex items-center gap-3 rounded-md border p-2 hover:bg-muted/40"
                 >
-                  {f.thumbnailLink ? (
-                    <img
-                      src={f.thumbnailLink}
-                      alt=""
-                      className="h-12 w-20 rounded object-cover bg-muted"
-                    />
-                  ) : (
-                    <div className="h-12 w-20 rounded bg-muted flex items-center justify-center">
-                      <FolderOpen className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  )}
+                  <div className="relative h-12 w-20 shrink-0">
+                    {covers[f.id]?.url ? (
+                      <img src={covers[f.id].url} alt="" className="h-12 w-20 rounded object-cover bg-muted" />
+                    ) : f.thumbnailLink ? (
+                      <img src={f.thumbnailLink} alt="" className="h-12 w-20 rounded object-cover bg-muted" />
+                    ) : (
+                      <div className="h-12 w-20 rounded bg-muted flex items-center justify-center">
+                        <FolderOpen className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    {covers[f.id]?.uploading && (
+                      <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{f.name}</div>
                     <div className="text-xs text-muted-foreground">
@@ -175,13 +180,39 @@ export default function AdminGoogleDriveImport() {
                       {f.videoMediaMetadata?.durationMillis && (
                         <> · {Math.round(Number(f.videoMediaMetadata.durationMillis) / 60000)} min</>
                       )}
+                      {covers[f.id]?.url && <> · <span className="text-primary">capa custom</span></>}
                     </div>
                   </div>
+                  <label
+                    className="cursor-pointer text-muted-foreground hover:text-foreground p-1"
+                    title="Enviar capa própria"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadCover(f.id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {covers[f.id]?.url && (
+                    <button
+                      onClick={() => setCovers((c) => { const n = { ...c }; delete n[f.id]; return n; })}
+                      className="text-muted-foreground hover:text-destructive p-1"
+                      title="Remover capa custom"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                   <a
                     href={`https://drive.google.com/file/d/${f.id}/view`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground p-1"
                     title="Abrir no Drive"
                   >
                     <ExternalLink className="h-4 w-4" />
