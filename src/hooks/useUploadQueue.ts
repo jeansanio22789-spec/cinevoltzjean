@@ -452,16 +452,31 @@ const uploadFileFast = async (
 ): Promise<string> => {
   // Retomada, modo turbo OU arquivos > 40MB vão direto pro TUS — única forma
   // de não bater no limite de 50MB do gateway de upload do Storage.
-  if (forceTus || turboForced || file.size >= TUS_THRESHOLD_BYTES) {
-    return uploadFileTus(bucket, path, file, onProgress, registerAbort);
+  const shouldUseTus = forceTus || turboForced || file.size >= TUS_THRESHOLD_BYTES;
+  if (shouldUseTus) {
+    try {
+      return await uploadFileTus(bucket, path, file, onProgress, registerAbort, {
+        resumePrevious: forceTus,
+      });
+    } catch (err) {
+      if (isAbortUploadError(err)) throw err;
+      // Alguns 413/offset vêm de URL TUS antiga/corrompida no navegador.
+      // Limpa essa retomada local e cria uma sessão TUS nova para o mesmo arquivo.
+      return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
+        resumePrevious: false,
+        cleanPrevious: true,
+      });
+    }
   }
   try {
     return await uploadFileDirect(bucket, path, file, onProgress, registerAbort);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "";
-    if (/cancelado|abort/i.test(msg)) throw err;
+    if (isAbortUploadError(err)) throw err;
     // Fallback resiliente: 413 (tamanho), falha de rede, etc → retoma com TUS.
-    return uploadFileTus(bucket, path, file, onProgress, registerAbort);
+    return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
+      resumePrevious: false,
+      cleanPrevious: true,
+    });
   }
 };
 
