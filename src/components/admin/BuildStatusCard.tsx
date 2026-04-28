@@ -3,14 +3,11 @@ import { AlertCircle, CheckCircle2, RefreshCw, Rocket } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
-const LOCAL_VERSION = __BUILD_VERSION__;
+const LOCAL_BUILD = __BUILD_VERSION__;
 
-// URL pública do app (definida no projeto Lovable). Mantemos hardcoded
-// porque é o domínio público fixo do CineVoltz.
-const PUBLISHED_URL = "https://cinevoltzjean.lovable.app";
-
-const formatDate = (iso: string) => {
+const formatBuild = (iso: string) => {
   try {
     return new Date(iso).toLocaleString("pt-BR", {
       day: "2-digit",
@@ -24,41 +21,33 @@ const formatDate = (iso: string) => {
   }
 };
 
+/**
+ * Mostra o status entre a versão que ESTE dispositivo está rodando
+ * (carimbo do build) e a versão que o admin marcou como "publicada"
+ * em platform_settings.app_version.
+ */
 const BuildStatusCard = () => {
-  const [publishedVersion, setPublishedVersion] = useState<string | null>(null);
+  const [publishedVersion, setPublishedVersion] = useState<string>("");
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const fetchPublished = async () => {
     setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `${PUBLISHED_URL}/version.json?ts=${Date.now()}`,
-        { cache: "no-store" },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { version?: string };
-      setPublishedVersion(data.version ?? null);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Não foi possível consultar o app público.",
-      );
-    } finally {
-      setLoading(false);
-    }
+    const { data } = await supabase
+      .from("platform_settings")
+      .select("key, value, updated_at")
+      .eq("key", "app_version")
+      .maybeSingle();
+    setPublishedVersion(((data?.value as string) || "").trim());
+    setPublishedAt((data?.updated_at as string) || null);
+    setLoading(false);
   };
 
   useEffect(() => {
     void fetchPublished();
   }, []);
 
-  const isSameVersion =
-    publishedVersion !== null && publishedVersion === LOCAL_VERSION;
-  const isOutdated =
-    publishedVersion !== null && publishedVersion !== LOCAL_VERSION;
+  const hasPublished = publishedVersion.length > 0;
 
   return (
     <Card className="border-border/60 bg-card/60">
@@ -73,76 +62,67 @@ const BuildStatusCard = () => {
           onClick={() => void fetchPublished()}
           disabled={loading}
         >
-          <RefreshCw
-            className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-          />
+          <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           Atualizar
         </Button>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-background/40 p-3">
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Versão do preview (esta tela)
+            Build deste dispositivo
           </span>
-          <span className="font-medium">{formatDate(LOCAL_VERSION)}</span>
+          <span className="font-medium">{formatBuild(LOCAL_BUILD)}</span>
         </div>
 
         <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-background/40 p-3">
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            Versão do app público
+            Versão publicada para os usuários
           </span>
-          {loading && !publishedVersion ? (
+          {loading && !hasPublished ? (
             <span className="text-muted-foreground">Consultando...</span>
-          ) : error ? (
-            <span className="text-destructive">{error}</span>
-          ) : publishedVersion ? (
-            <span className="font-medium">{formatDate(publishedVersion)}</span>
+          ) : hasPublished ? (
+            <>
+              <span className="font-medium">{publishedVersion}</span>
+              {publishedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Atualizado em {formatBuild(publishedAt)}
+                </span>
+              )}
+            </>
           ) : (
-            <span className="text-muted-foreground">Sem dados</span>
+            <span className="text-muted-foreground">
+              Nenhuma versão publicada ainda
+            </span>
           )}
         </div>
 
-        {isSameVersion && (
+        {hasPublished ? (
           <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-300">
             <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
             <div className="space-y-1">
-              <p className="font-medium">Tudo sincronizado</p>
+              <p className="font-medium">Aviso de atualização ativo</p>
               <p className="text-xs opacity-80">
-                O app público está rodando exatamente a mesma versão deste
-                preview.
+                Os usuários veem o banner "Atualizar" sempre que a versão
+                publicada mudar. Para anunciar nova versão, vá em{" "}
+                <strong>Configurações → Atualização do App</strong>.
               </p>
             </div>
           </div>
-        )}
-
-        {isOutdated && (
+        ) : (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
             <div className="space-y-1">
-              <p className="font-medium">App público desatualizado</p>
+              <p className="font-medium">Nenhuma versão publicada</p>
               <p className="text-xs opacity-90">
-                Existem alterações que ainda não foram publicadas. Clique em{" "}
-                <strong>Publicar → Atualizar</strong> no canto superior direito
-                do editor para enviar a nova versão para{" "}
-                <span className="font-mono">{PUBLISHED_URL.replace(/^https?:\/\//, "")}</span>.
-              </p>
-              <p className="text-xs opacity-75">
-                Dica PWA: depois de publicar, feche e reabra o app no celular
-                para forçar o novo cache.
+                Vá em <strong>Configurações → Atualização do App</strong>,
+                informe um número (ex.: 1.0.0) e clique em "Publicar nova
+                versão" para que o aviso apareça para os usuários.
               </p>
             </div>
             <Badge variant="outline" className="ml-auto border-amber-400/40 text-amber-200">
               Pendente
             </Badge>
           </div>
-        )}
-
-        {error && (
-          <p className="text-xs text-muted-foreground">
-            Não foi possível ler <span className="font-mono">/version.json</span>{" "}
-            do app público — pode ser que ele ainda esteja na versão antiga
-            (sem este recurso). Publique uma vez para começar a comparar.
-          </p>
         )}
       </CardContent>
     </Card>
