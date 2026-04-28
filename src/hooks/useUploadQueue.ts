@@ -593,9 +593,9 @@ const uploadLargeVideoInParts = async (
     // Loop infinito de retomada — só sai com sucesso ou abort do usuário.
     while (true) {
       try {
-        // forceTus=false + parte < 40MB → cada parte sobe via XHR direto (POST único),
-        // sem overhead do TUS. É o "download invertido" pedido pelo usuário.
-        await uploadFileFast(
+        // Parte grande SEMPRE sobe via XHR direto. Não passa por uploadFileFast
+        // porque o modo Turbo global força TUS lá dentro e deixava tudo lento.
+        await uploadFileDirect(
           "videos",
           partPath,
           part,
@@ -604,7 +604,6 @@ const uploadLargeVideoInParts = async (
             reportProgress();
           },
           (fn) => partAborts.set(i, fn),
-          false,
         );
         partProgress[i] = 1;
         partAborts.delete(i);
