@@ -143,15 +143,27 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const isDrive = /(^|\.)google(usercontent)?\.com$/.test(remote.hostname) ||
+      remote.hostname.endsWith("googleusercontent.com");
+
+    const fwdHeaders: Record<string, string> = {
+      "User-Agent": BROWSER_UA,
+      Accept: req.headers.get("accept") || "*/*",
+      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+    };
+    // Repassa Range do cliente pra suportar seek/streaming parcial
+    const range = req.headers.get("range");
+    if (range) fwdHeaders["Range"] = range;
+
+    // Pra Google Drive NÃO mandar Referer/Origin (gera "login required").
+    if (!isDrive) {
+      fwdHeaders["Referer"] = `${remote.protocol}//${remote.host}/`;
+      fwdHeaders["Origin"] = `${remote.protocol}//${remote.host}`;
+    }
+
     const upstream = await fetch(remote.toString(), {
       method: req.method === "HEAD" ? "HEAD" : "GET",
-      headers: {
-        "User-Agent": BROWSER_UA,
-        Accept: req.headers.get("accept") || "*/*",
-        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-        Referer: `${remote.protocol}//${remote.host}/`,
-        Origin: `${remote.protocol}//${remote.host}`,
-      },
+      headers: fwdHeaders,
       redirect: "follow",
     });
 
