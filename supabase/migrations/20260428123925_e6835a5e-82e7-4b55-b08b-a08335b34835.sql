@@ -1,0 +1,1 @@
+DELETE FROM public.upload_jobs WHERE status IN ('uploading','warning','queued','saving','error','failed') OR progress < 100;
