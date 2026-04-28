@@ -279,7 +279,13 @@ export default function AdminGoogleDriveImport() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{f.name}</div>
+                    <input
+                      type="text"
+                      value={titles[f.id] ?? cleanTitleFromFilename(f.name)}
+                      onChange={(e) => setTitles((t) => ({ ...t, [f.id]: e.target.value }))}
+                      className="w-full bg-transparent text-sm font-medium outline-none border-b border-transparent hover:border-border focus:border-primary py-0.5"
+                      title={`Arquivo: ${f.name}`}
+                    />
                     <div className="text-xs text-muted-foreground">
                       {formatSize(f.size)}
                       {f.videoMediaMetadata?.durationMillis && (
