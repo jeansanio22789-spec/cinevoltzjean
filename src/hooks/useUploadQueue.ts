@@ -426,7 +426,7 @@ const uploadFileTus = (
 
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000],
+      retryDelays: [0, 500, 1000, 2000, 3000, 5000, 8000, 10000, 15000, 20000, 30000, 45000, 60000, 90000, 120000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
