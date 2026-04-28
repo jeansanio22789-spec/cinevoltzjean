@@ -1124,6 +1124,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
   const retry = (id: string) => {
     const target = store.jobs.find((j) => j.id === id);
     if (!target) return;
+    const restartInParts = canAutoRecoverStorageLimitJob(target);
     // Aborta qualquer XHR/TUS que ainda esteja rodando para esse job
     try {
       target.abort?.();
@@ -1133,14 +1134,18 @@ export const useUploadQueue = (onJobDone?: () => void) => {
     runningJobIds.delete(id);
     store.update(id, {
       status: "queued",
-      // Mantém o progresso atual — o TUS vai retomar de onde parou,
-      // não faz sentido voltar a barra para 0.
-      progress: target.uploadPath ? target.progress : 0,
+      // Erro 413 antigo não deve pedir remover: reinicia automaticamente
+      // no modo novo em partes pequenas, sem apagar vídeos do catálogo.
+      progress: restartInParts ? 0 : target.uploadPath ? target.progress : 0,
       speedMBs: 0,
       etaSec: 0,
       lockedEtaSec: undefined,
       lockedEndAt: undefined,
-      errorMsg: undefined,
+      uploadPath: restartInParts ? undefined : target.uploadPath,
+      uploadMode: restartInParts ? undefined : target.uploadMode,
+      uploadPartsTotal: restartInParts ? undefined : target.uploadPartsTotal,
+      uploadPartBytes: restartInParts ? undefined : target.uploadPartBytes,
+      errorMsg: restartInParts ? "Corrigindo limite: reenviando em partes pequenas." : undefined,
       timedOut: false,
       abort: undefined,
       lastProgressAt: Date.now(),
