@@ -792,11 +792,11 @@ const runJob = async (job: UploadJob) => {
         queueJobRetry(job.id, delayMs);
       }
     } else {
+      // Mostra o erro REAL retornado pelo servidor para facilitar o diagnóstico,
+      // em vez de mascarar tudo como "limite de tamanho".
       store.update(job.id, {
         status: "error",
-        errorMsg: isStorageLimitUploadError(err)
-          ? "O armazenamento recusou este envio por limite de tamanho. O limite do bucket foi reajustado; remova este item da fila e envie novamente."
-          : msg,
+        errorMsg: msg || "Falha desconhecida no envio.",
       });
     }
   } finally {
