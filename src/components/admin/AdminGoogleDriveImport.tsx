@@ -63,10 +63,12 @@ export default function AdminGoogleDriveImport() {
       if (folderId.trim()) params.set("folderId", extractFolderId(folderId));
       if (search.trim()) params.set("q", search.trim());
 
-      const { data, error } = await supabase.functions.invoke(
-        `gdrive-list?${params.toString()}`,
-        { method: "GET" },
-      );
+      const { data, error } = await supabase.functions.invoke("gdrive-list", {
+        body: {
+          folderId: folderId.trim() ? extractFolderId(folderId) : undefined,
+          q: search.trim() || undefined,
+        },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(JSON.stringify(data.error));
       setFiles(data?.files || []);
