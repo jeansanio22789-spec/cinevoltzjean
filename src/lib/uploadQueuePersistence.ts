@@ -22,6 +22,7 @@ export interface PersistedUploadJob {
   timedOut: boolean;
   /** Caminho do arquivo no Storage — persistido para retomar com TUS. */
   uploadPath?: string;
+  retryCount?: number;
 }
 
 const canUseIndexedDb = () =>
