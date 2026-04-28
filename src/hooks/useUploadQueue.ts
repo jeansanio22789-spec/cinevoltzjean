@@ -672,6 +672,7 @@ const runJob = async (job: UploadJob) => {
           lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
           lastProgressAt: Date.now(),
+          retryCount: 0,
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
@@ -875,6 +876,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
       timedOut: false,
       abort: undefined,
       lastProgressAt: Date.now(),
+      retryCount: 0,
     });
     // Pequeno delay pra garantir que o abort propagou antes de redisparar
     setTimeout(() => {
