@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import LivePreview from "./LivePreview";
+import BuildStatusCard from "./BuildStatusCard";
 
 interface Transaction {
   amount: number;
