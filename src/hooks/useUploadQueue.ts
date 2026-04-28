@@ -362,6 +362,14 @@ const uploadErrorMessage = (err: unknown) =>
 const isAbortUploadError = (err: unknown) =>
   /cancelado|abort|aborted/i.test(uploadErrorMessage(err));
 
+const isStorageLimitUploadError = (err: unknown) =>
+  /Maximum size exceeded|response code: 413|\b413\b/i.test(uploadErrorMessage(err));
+
+const formatUploadSize = (bytes: number) =>
+  bytes >= 1024 ** 3
+    ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
+    : `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+
 const uploadFileTus = (
   bucket: string,
   path: string,
@@ -440,6 +448,7 @@ const uploadFileTus = (
 // "Maximum size exceeded". Por isso baixamos o threshold pra 40MB —
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
+const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024 * 1024; // 50 GB
 
 const uploadFileFast = async (
   bucket: string,
@@ -459,6 +468,7 @@ const uploadFileFast = async (
       });
     } catch (err) {
       if (isAbortUploadError(err)) throw err;
+      if (isStorageLimitUploadError(err)) throw err;
       // Alguns 413/offset vêm de URL TUS antiga/corrompida no navegador.
       // Limpa essa retomada local e cria uma sessão TUS nova para o mesmo arquivo.
       return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
@@ -498,9 +508,8 @@ const queueJobRetry = (jobId: string, delayMs: number) => {
 
 const isRetryableUploadError = (err: unknown) => {
   const msg = uploadErrorMessage(err);
-  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload|Maximum size exceeded|413/i.test(
-    msg,
-  );
+  if (isStorageLimitUploadError(err)) return false;
+  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload/i.test(msg);
 };
 
 // 🚦 Fila sequencial inteligente
@@ -607,6 +616,12 @@ const runJob = async (job: UploadJob) => {
   }, TIMEOUT_MS);
 
   try {
+    if (job.file.size > MAX_VIDEO_FILE_BYTES) {
+      throw new Error(
+        `Arquivo muito grande (${formatUploadSize(job.file.size)}). O limite por vídeo é 50 GB.`,
+      );
+    }
+
     // Quando retomando após refresh, mantém o progresso já carregado (não zera)
     const existing = store.jobs.find((j) => j.id === job.id);
     const isResuming = !!existing?.uploadPath;
@@ -733,7 +748,12 @@ const runJob = async (job: UploadJob) => {
       });
       queueJobRetry(job.id, delayMs);
     } else {
-      store.update(job.id, { status: "error", errorMsg: msg });
+      store.update(job.id, {
+        status: "error",
+        errorMsg: isStorageLimitUploadError(err)
+          ? "O armazenamento recusou este envio por limite de tamanho. O limite do bucket foi reajustado; remova este item da fila e envie novamente."
+          : msg,
+      });
     }
   } finally {
     runningJobIds.delete(job.id);
