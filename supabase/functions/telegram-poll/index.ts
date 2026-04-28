@@ -98,6 +98,18 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // 0. Garante que NÃO existe webhook ativo (webhook bloqueia getUpdates)
+    try {
+      await tg(
+        "deleteWebhook",
+        { drop_pending_updates: false },
+        LOVABLE_API_KEY,
+        TELEGRAM_API_KEY,
+      );
+    } catch (e) {
+      log.push(`deleteWebhook: ${(e as Error).message}`);
+    }
+
     // 1. Lê offset atual
     const { data: state, error: stateErr } = await supabase
       .from("telegram_bot_state")
