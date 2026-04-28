@@ -6,6 +6,7 @@ import {
   Loader2, Save, Download, Server, ExternalLink, CheckCircle2,
   Sparkles, Search, Film, Tv, Bot, Cpu, Radar, Copy,
 } from "lucide-react";
+import TelegramImageDriveFolder from "./TelegramImageDriveFolder";
 
 const WORKER_URL_KEY = "telegram_worker_url";
 const WORKER_TOKEN_KEY = "telegram_worker_token";
