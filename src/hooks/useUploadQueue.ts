@@ -413,12 +413,11 @@ const uploadFileTus = (
     upload.start();
   });
 
-// Limite acima do qual usamos TUS desde o início (paralelismo + retomada).
-// Abaixo disso, POST direto é MUITO mais rápido (1 única requisição HTTP,
-// sem overhead de criar sessão + chunks de 6MB com round-trip a cada um).
-// Subimos pra 200MB porque até esse tamanho o POST direto ganha disparado
-// — TUS só vale a pena pra arquivos onde retomar é critico.
-const TUS_THRESHOLD_BYTES = 200 * 1024 * 1024; // 200 MB
+// Limite acima do qual usamos TUS desde o início.
+// ⚠️ O gateway do Supabase Storage rejeita POSTs únicos > 50MB com erro 413
+// "Maximum size exceeded". Por isso baixamos o threshold pra 40MB —
+// arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
+const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
 
 const uploadFileFast = async (
   bucket: string,
@@ -428,9 +427,9 @@ const uploadFileFast = async (
   registerAbort: (fn: () => void) => void,
   forceTus = false,
 ): Promise<string> => {
-  // Retomada (após refresh) ou arquivos grandes vão direto pro TUS — só assim
-  // dá pra continuar de onde parou em vez de recomeçar do zero.
-  if (forceTus || file.size >= TUS_THRESHOLD_BYTES) {
+  // Retomada, modo turbo OU arquivos > 40MB vão direto pro TUS — única forma
+  // de não bater no limite de 50MB do gateway de upload do Storage.
+  if (forceTus || turboForced || file.size >= TUS_THRESHOLD_BYTES) {
     return uploadFileTus(bucket, path, file, onProgress, registerAbort);
   }
   try {
@@ -438,7 +437,7 @@ const uploadFileFast = async (
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
     if (/cancelado|abort/i.test(msg)) throw err;
-    // Fallback resiliente: se o upload direto falhar, retoma com TUS.
+    // Fallback resiliente: 413 (tamanho), falha de rede, etc → retoma com TUS.
     return uploadFileTus(bucket, path, file, onProgress, registerAbort);
   }
 };
