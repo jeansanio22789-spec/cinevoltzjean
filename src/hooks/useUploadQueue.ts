@@ -201,6 +201,36 @@ const store = {
     doneIds.forEach((id) => void deleteRemoteJob(id));
     this.emit();
   },
+  /**
+   * Remove jobs antigos com erro (especialmente 413 / "Maximum size exceeded").
+   * Útil pra limpar a fila quando o limite do Storage foi aumentado e os
+   * envios antigos ficaram travados em estado de falha.
+   * Retorna a quantidade de jobs removidos.
+   */
+  clearErrors(opts: { onlyOversize?: boolean } = {}): number {
+    const isOversize = (msg?: string) =>
+      !!msg && /Maximum size exceeded|response code: 413|\b413\b|muito grande/i.test(msg);
+    const targets = this.jobs.filter((j) => {
+      if (j.status !== "error") return false;
+      if (opts.onlyOversize) return isOversize(j.errorMsg);
+      return true;
+    });
+    if (targets.length === 0) return 0;
+    const ids = targets.map((j) => j.id);
+    targets.forEach((j) => {
+      try {
+        j.abort?.();
+      } catch {
+        /* noop */
+      }
+      if (j.thumbPreviewUrl) URL.revokeObjectURL(j.thumbPreviewUrl);
+    });
+    this.jobs = this.jobs.filter((j) => !ids.includes(j.id));
+    void deletePersistedUploadJobs(ids);
+    ids.forEach((id) => void deleteRemoteJob(id));
+    this.emit();
+    return targets.length;
+  },
   subscribe(l: Listener) {
     this.listeners.add(l);
     return () => this.listeners.delete(l);
