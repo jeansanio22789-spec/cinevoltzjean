@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import LivePreview from "./LivePreview";
+import BuildStatusCard from "./BuildStatusCard";
 
 interface Transaction {
   amount: number;
@@ -159,6 +160,9 @@ const AdminDashboard = () => {
 
       {/* Live preview do app */}
       <LivePreview />
+
+      {/* Status de publicação: compara preview x app público */}
+      <BuildStatusCard />
 
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
