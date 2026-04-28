@@ -539,8 +539,10 @@ const uploadLargeVideoInParts = async (
   file: File,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
+  onPlan?: (totalParts: number) => void,
 ): Promise<string> => {
   const totalParts = Math.ceil(file.size / SPLIT_PART_BYTES);
+  onPlan?.(totalParts);
   const base = path.replace(/\.[^.]+$/, "");
   const ext = path.split(".").pop() || "mp4";
 
