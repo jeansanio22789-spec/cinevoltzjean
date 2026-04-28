@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
     const title = String(body.title || "").trim() || null;
     const description = String(body.description || "").trim() || "";
     const genre = String(body.genre || "Ação").trim();
+    const customThumbnail = String(body.thumbnailUrl || "").trim() || null;
 
     // 1. Pega metadados
     const metaResp = await fetch(
@@ -88,7 +89,7 @@ Deno.serve(async (req) => {
         description,
         genre,
         video_url: videoUrl,
-        thumbnail_url: meta.thumbnailLink || null,
+        thumbnail_url: customThumbnail || meta.thumbnailLink || null,
         duration: durationStr,
         status: "published",
         year: new Date().getFullYear(),
