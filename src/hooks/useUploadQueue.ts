@@ -717,7 +717,12 @@ const runJob = async (job: UploadJob) => {
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
-    if (!isAbortUploadError(err) && isRetryableUploadError(err)) {
+    if (isAbortUploadError(err)) {
+      const cur = store.jobs.find((j) => j.id === job.id);
+      if (cur && cur.status !== "queued" && cur.status !== "done") {
+        store.update(job.id, { status: "queued", speedMBs: 0, etaSec: 0 });
+      }
+    } else if (isRetryableUploadError(err)) {
       const cur = store.jobs.find((j) => j.id === job.id);
       const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
       const delayMs = Math.min(60_000, 3_000 * retryCount);
