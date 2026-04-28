@@ -159,6 +159,25 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   uploadPartBytes: job.uploadPartBytes,
 });
 
+// Throttle de UI/persistência para updates de progresso puro.
+// Sem isso, 8 partes em paralelo disparam centenas de re-renders/segundo
+// e travam o app inteiro (mexer em menus, abrir páginas, etc).
+const PROGRESS_EMIT_MS = 400;
+const lastEmitAt = new Map<string, number>();
+const lastPersistAt = new Map<string, number>();
+const PERSIST_MS = 1500;
+
+const isProgressOnlyPatch = (patch: Partial<UploadJob>): boolean => {
+  // Considera "só progresso" quando não muda status/erro/path/abort.
+  if (patch.status !== undefined) return false;
+  if (patch.errorMsg !== undefined) return false;
+  if (patch.uploadPath !== undefined) return false;
+  if (patch.abort !== undefined) return false;
+  if (patch.uploadMode !== undefined) return false;
+  if (patch.uploadPartsTotal !== undefined) return false;
+  return true;
+};
+
 const store = {
   jobs: [] as UploadJob[],
   listeners: new Set<Listener>(),
@@ -169,16 +188,29 @@ const store = {
   update(id: string, patch: Partial<UploadJob>) {
     this.jobs = this.jobs.map((j) => (j.id === id ? { ...j, ...patch } : j));
     const updated = this.jobs.find((j) => j.id === id);
-    if (updated && updated.status !== "done") void persistUploadJob(toPersistedJob(updated));
-    if (updated) {
-      // Status crítico vai imediato; progresso vai com debounce.
-      const immediate =
-        patch.status !== undefined ||
-        patch.errorMsg !== undefined ||
-        patch.uploadPath !== undefined;
-      syncJobToRemote(updated, immediate);
+    if (!updated) return;
+
+    const progressOnly = isProgressOnlyPatch(patch);
+    const now = Date.now();
+
+    // Persistência local: throttle agressivo em progresso puro.
+    if (updated.status !== "done") {
+      const lastP = lastPersistAt.get(id) ?? 0;
+      if (!progressOnly || now - lastP >= PERSIST_MS) {
+        lastPersistAt.set(id, now);
+        void persistUploadJob(toPersistedJob(updated));
+      }
     }
-    this.emit();
+
+    // Sync remoto: status crítico vai imediato; progresso vai debounced (4s).
+    syncJobToRemote(updated, !progressOnly);
+
+    // Emit pra React: throttle em progresso puro pra não inundar re-renders.
+    const lastE = lastEmitAt.get(id) ?? 0;
+    if (!progressOnly || now - lastE >= PROGRESS_EMIT_MS) {
+      lastEmitAt.set(id, now);
+      this.emit();
+    }
   },
   add(jobs: UploadJob[]) {
     this.jobs = [...this.jobs, ...jobs];
@@ -198,6 +230,8 @@ const store = {
     target?.abort?.();
     if (target?.thumbPreviewUrl) URL.revokeObjectURL(target.thumbPreviewUrl);
     this.jobs = this.jobs.filter((j) => j.id !== id);
+    lastEmitAt.delete(id);
+    lastPersistAt.delete(id);
     void deletePersistedUploadJob(id);
     void deleteRemoteJob(id);
     this.emit();
