@@ -777,6 +777,10 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          upload_mode: string | null
+          upload_part_bytes: number | null
+          upload_part_current: number | null
+          upload_parts_total: number | null
           upload_path: string | null
           user_id: string
         }
@@ -796,6 +800,10 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          upload_mode?: string | null
+          upload_part_bytes?: number | null
+          upload_part_current?: number | null
+          upload_parts_total?: number | null
           upload_path?: string | null
           user_id: string
         }
@@ -815,6 +823,10 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          upload_mode?: string | null
+          upload_part_bytes?: number | null
+          upload_part_current?: number | null
+          upload_parts_total?: number | null
           upload_path?: string | null
           user_id?: string
         }
