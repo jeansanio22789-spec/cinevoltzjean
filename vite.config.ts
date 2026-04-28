@@ -26,22 +26,22 @@ export default defineConfig(({ mode }) => ({
     {
       name: "lovable-build-version",
       // Em dev, expõe /version.json com o timestamp do servidor atual
-      configureServer(server) {
-        server.middlewares.use("/version.json", (_req, res) => {
+      configureServer(server: any) {
+        server.middlewares.use("/version.json", (_req: any, res: any) => {
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Cache-Control", "no-store");
           res.end(JSON.stringify({ version: BUILD_VERSION }));
         });
       },
       // No build de produção, escreve o version.json no dist
-      generateBundle() {
+      generateBundle(this: any) {
         this.emitFile({
           type: "asset",
           fileName: "version.json",
           source: JSON.stringify({ version: BUILD_VERSION }),
         });
       },
-    },
+    } as any,
     VitePWA({
       registerType: "autoUpdate",
       // Use the static public/manifest.webmanifest instead of generating one
