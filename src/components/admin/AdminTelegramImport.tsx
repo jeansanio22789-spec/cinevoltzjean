@@ -655,6 +655,8 @@ const AdminTelegramImport = () => {
         </div>
       </div>
 
+      <TelegramImageDriveFolder />
+
       {/* Config do worker (só aparece no modo worker) */}
       {mode === "worker" && (
         <div className="rounded-lg border border-[hsl(var(--admin-border))] bg-[hsl(var(--admin-panel))] p-5 space-y-4">
