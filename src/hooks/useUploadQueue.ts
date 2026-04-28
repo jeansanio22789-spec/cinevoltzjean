@@ -415,7 +415,11 @@ const uploadFileTus = (
       reject(new Error("Sessão expirada. Faça login novamente."));
       return;
     }
-    const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const storageBaseUrl = projectId
+      ? `https://${projectId}.storage.supabase.co`
+      : import.meta.env.VITE_SUPABASE_URL;
+    const endpoint = `${storageBaseUrl}/storage/v1/upload/resumable`;
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
     let lastProgressAt = 0;
@@ -478,7 +482,7 @@ const uploadFileTus = (
 // "Maximum size exceeded". Por isso baixamos o threshold pra 40MB —
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
-const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024 * 1024; // 50 GB
+const MAX_VIDEO_FILE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
 
 const uploadFileFast = async (
   bucket: string,
@@ -498,7 +502,6 @@ const uploadFileFast = async (
       });
     } catch (err) {
       if (isAbortUploadError(err)) throw err;
-      if (isStorageLimitUploadError(err)) throw err;
       // Alguns 413/offset vêm de URL TUS antiga/corrompida no navegador.
       // Limpa essa retomada local e cria uma sessão TUS nova para o mesmo arquivo.
       return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
