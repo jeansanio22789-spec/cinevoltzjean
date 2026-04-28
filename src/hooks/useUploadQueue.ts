@@ -779,11 +779,22 @@ const runJob = async (job: UploadJob) => {
     const ext = job.file.name.split(".").pop() || "mp4";
     // Reusa o caminho persistido para que o TUS consiga retomar exatamente
     // o mesmo objeto no Storage. Se for primeiro envio, gera novo.
+    const shouldSplitVideo = job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES;
+    const persistedPathIsLegacyLargeUpload =
+      shouldSplitVideo && !!existing?.uploadPath && existing.uploadMode !== "direct-parts";
     const path =
-      existing?.uploadPath ??
+      persistedPathIsLegacyLargeUpload
+        ? `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
+        : existing?.uploadPath ??
       `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-    if (!existing?.uploadPath) {
-      store.update(job.id, { uploadPath: path });
+    if (!existing?.uploadPath || persistedPathIsLegacyLargeUpload) {
+      store.update(job.id, {
+        uploadPath: path,
+        progress: persistedPathIsLegacyLargeUpload ? 0 : existing?.progress ?? 0,
+        errorMsg: persistedPathIsLegacyLargeUpload
+          ? "Reiniciando no modo rápido em partes — envio antigo era do modo lento."
+          : undefined,
+      });
     }
 
     const onVideoProgress = (pct: number, speedMBs: number, etaSec: number) => {
@@ -831,8 +842,19 @@ const runJob = async (job: UploadJob) => {
         });
       };
     const registerVideoAbort = (abortFn: () => void) => store.update(job.id, { abort: abortFn });
-    const videoUrl = job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES
-      ? await uploadLargeVideoInParts(path, job.file, onVideoProgress, registerVideoAbort)
+    const videoUrl = shouldSplitVideo
+      ? await uploadLargeVideoInParts(
+          path,
+          job.file,
+          onVideoProgress,
+          registerVideoAbort,
+          (totalParts) => store.update(job.id, {
+            uploadMode: "direct-parts",
+            uploadPartsTotal: totalParts,
+            uploadPartBytes: SPLIT_PART_BYTES,
+            errorMsg: `Modo rápido ativo: ${totalParts} partes diretas de até ${Math.round(SPLIT_PART_BYTES / 1024 / 1024)}MB.`,
+          }),
+        )
       : await uploadFileFast(
           "videos",
           path,
