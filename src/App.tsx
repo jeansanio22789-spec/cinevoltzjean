@@ -95,6 +95,7 @@ const App = () => {
                 </Routes>
               </Suspense>
               <Suspense fallback={null}>
+                <AppUpdateBanner />
                 <InstallAppPrompt />
                 <UploadFloatingIndicator />
               </Suspense>
