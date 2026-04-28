@@ -993,6 +993,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
     enqueue,
     removeJob,
     clearDone,
+    clearErrors,
     retry,
     activeCount,
     timeoutMs: TIMEOUT_MS,
