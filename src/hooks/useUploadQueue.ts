@@ -949,6 +949,26 @@ const runJob = async (job: UploadJob) => {
       if (cur && cur.status !== "queued" && cur.status !== "done") {
         store.update(job.id, { status: "queued", speedMBs: 0, etaSec: 0 });
       }
+    } else if (isStorageLimitUploadError(err) && job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES) {
+      const cur = store.jobs.find((j) => j.id === job.id);
+      if (cur?.uploadMode === "direct-parts") {
+        store.update(job.id, { status: "error", errorMsg: msg || "Falha desconhecida no envio." });
+      } else {
+        store.update(job.id, {
+          status: "warning",
+          progress: 0,
+          uploadPath: undefined,
+          uploadMode: undefined,
+          uploadPartsTotal: undefined,
+          uploadPartBytes: undefined,
+          errorMsg: "Corrigindo limite: reenviando automaticamente em partes pequenas.",
+          speedMBs: 0,
+          etaSec: 0,
+          retryCount: 0,
+          lastProgressAt: Date.now(),
+        });
+        queueJobRetry(job.id, 500);
+      }
     } else if (isRetryableUploadError(err)) {
       const cur = store.jobs.find((j) => j.id === job.id);
       const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
