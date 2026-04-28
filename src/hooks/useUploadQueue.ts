@@ -38,8 +38,7 @@ const syncJobToRemote = (job: UploadJob, immediate = false) => {
       const { data: sess } = await supabase.auth.getSession();
       const userId = sess.session?.user.id;
       if (!userId) return;
-      await supabase.from("upload_jobs").upsert(
-        {
+      const payload = {
           id: job.id,
           user_id: userId,
           device_label: getDeviceLabel(),
@@ -58,7 +57,9 @@ const syncJobToRemote = (job: UploadJob, immediate = false) => {
           upload_part_bytes: job.uploadPartBytes ?? null,
           error_msg: job.errorMsg ?? null,
           started_at: job.startedAt ? new Date(job.startedAt).toISOString() : null,
-        },
+        };
+      await supabase.from("upload_jobs").upsert(
+        payload as any,
         { onConflict: "id" },
       );
     } catch {
