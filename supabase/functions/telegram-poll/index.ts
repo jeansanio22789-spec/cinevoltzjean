@@ -247,37 +247,10 @@ Deno.serve(async (req) => {
           if (externalUrl) {
             videoUrl = externalUrl;
           } else {
-            const { result: fileInfo } = await tg(
-              "getFile",
-              { file_id: video!.file_id },
-              LOVABLE_API_KEY,
-              TELEGRAM_API_KEY,
-            );
-
-            const dl = await fetch(`${GATEWAY_URL}/file/${fileInfo.file_path}`, {
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "X-Connection-Api-Key": TELEGRAM_API_KEY,
-              },
-            });
-            if (!dl.ok) throw new Error(`Download vídeo [${dl.status}]`);
-            const videoBytes = new Uint8Array(await dl.arrayBuffer());
-            const ext = (fileInfo.file_path.split(".").pop() || "mp4")
-              .toLowerCase();
-            const videoPath = `telegram/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-
-            const { error: vUpErr } = await supabase.storage
-              .from("videos")
-              .upload(videoPath, videoBytes, {
-                contentType: video!.mime_type || "video/mp4",
-                upsert: false,
-              });
-            if (vUpErr) throw new Error(`Upload vídeo: ${vUpErr.message}`);
-
-            const { data: vPub } = supabase.storage
-              .from("videos")
-              .getPublicUrl(videoPath);
-            videoUrl = vPub.publicUrl;
+            // ✅ Storage do Telegram: NÃO baixa, NÃO copia pro bucket.
+            // Salva apenas o file_id como "tg://<file_id>". O player resolve via
+            // edge function `telegram-stream` em tempo real (CDN do Telegram).
+            videoUrl = `tg://${video!.file_id}`;
           }
 
           let thumbnailUrl: string | null = null;
