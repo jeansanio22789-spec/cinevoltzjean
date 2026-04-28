@@ -76,7 +76,9 @@ const extractVideoUrl = (text: string | null | undefined): string | null => {
   return videoExt || matches[0];
 };
 
-const TELEGRAM_DOWNLOAD_LIMIT = 20 * 1024 * 1024; // 20 MB
+// Não há mais limite de tamanho: o vídeo NÃO é baixado nem copiado pro bucket.
+// Apenas o file_id é salvo, e o stream é feito sob demanda pela função telegram-stream.
+const TELEGRAM_DOWNLOAD_LIMIT = Number.MAX_SAFE_INTEGER;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -98,6 +100,18 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // 0. Garante que NÃO existe webhook ativo (webhook bloqueia getUpdates)
+    try {
+      await tg(
+        "deleteWebhook",
+        { drop_pending_updates: false },
+        LOVABLE_API_KEY,
+        TELEGRAM_API_KEY,
+      );
+    } catch (e) {
+      log.push(`deleteWebhook: ${(e as Error).message}`);
+    }
+
     // 1. Lê offset atual
     const { data: state, error: stateErr } = await supabase
       .from("telegram_bot_state")
@@ -115,7 +129,8 @@ Deno.serve(async (req) => {
       const elapsed = Date.now() - startTime;
       const remainingMs = MAX_RUNTIME_MS - elapsed;
       if (remainingMs < MIN_REMAINING_MS) break;
-      const timeout = Math.min(50, Math.floor(remainingMs / 1000) - 5);
+      // Gateway costuma cortar requests longos, mantém timeout curto
+      const timeout = Math.min(20, Math.max(1, Math.floor(remainingMs / 1000) - 5));
       if (timeout < 1) break;
 
       const { result: updates } = await tg(
@@ -233,37 +248,10 @@ Deno.serve(async (req) => {
           if (externalUrl) {
             videoUrl = externalUrl;
           } else {
-            const { result: fileInfo } = await tg(
-              "getFile",
-              { file_id: video!.file_id },
-              LOVABLE_API_KEY,
-              TELEGRAM_API_KEY,
-            );
-
-            const dl = await fetch(`${GATEWAY_URL}/file/${fileInfo.file_path}`, {
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "X-Connection-Api-Key": TELEGRAM_API_KEY,
-              },
-            });
-            if (!dl.ok) throw new Error(`Download vídeo [${dl.status}]`);
-            const videoBytes = new Uint8Array(await dl.arrayBuffer());
-            const ext = (fileInfo.file_path.split(".").pop() || "mp4")
-              .toLowerCase();
-            const videoPath = `telegram/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-
-            const { error: vUpErr } = await supabase.storage
-              .from("videos")
-              .upload(videoPath, videoBytes, {
-                contentType: video!.mime_type || "video/mp4",
-                upsert: false,
-              });
-            if (vUpErr) throw new Error(`Upload vídeo: ${vUpErr.message}`);
-
-            const { data: vPub } = supabase.storage
-              .from("videos")
-              .getPublicUrl(videoPath);
-            videoUrl = vPub.publicUrl;
+            // ✅ Storage do Telegram: NÃO baixa, NÃO copia pro bucket.
+            // Salva apenas o file_id como "tg://<file_id>". O player resolve via
+            // edge function `telegram-stream` em tempo real (CDN do Telegram).
+            videoUrl = `tg://${video!.file_id}`;
           }
 
           let thumbnailUrl: string | null = null;

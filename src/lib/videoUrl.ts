@@ -26,6 +26,18 @@ export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSour
     };
   }
 
+  // Vídeo armazenado no Telegram (nuvem do Telegram). Não passa pelo bucket:
+  // o player streama direto via edge function telegram-stream que faz proxy
+  // do CDN do Telegram com suporte a Range.
+  if (url.startsWith("tg://")) {
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const fileId = url.slice("tg://".length);
+    return {
+      kind: "video",
+      url: `${baseUrl}/functions/v1/telegram-stream?id=${encodeURIComponent(fileId)}`,
+    };
+  }
+
   // YouTube
   const yt = url.match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/
