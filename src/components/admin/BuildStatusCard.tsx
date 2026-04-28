@@ -143,6 +143,19 @@ const BuildStatusCard = () => {
             </Badge>
           </div>
         )}
+
+        <Button
+          className="w-full"
+          onClick={() => void publishCurrent()}
+          disabled={publishing || isUpToDate}
+        >
+          <Send className={`mr-2 h-4 w-4 ${publishing ? "animate-pulse" : ""}`} />
+          {isUpToDate
+            ? "Esta versão já é a publicada"
+            : publishing
+            ? "Publicando..."
+            : "Publicar esta versão para os usuários"}
+        </Button>
       </CardContent>
     </Card>
   );
