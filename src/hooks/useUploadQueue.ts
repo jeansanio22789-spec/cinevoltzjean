@@ -815,28 +815,18 @@ const runJob = async (job: UploadJob) => {
     } else if (isRetryableUploadError(err)) {
       const cur = store.jobs.find((j) => j.id === job.id);
       const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
-      const MAX_RETRIES = 5;
-      if (retryCount > MAX_RETRIES) {
-        // 🛑 Esgotamos as tentativas — para de reiniciar e deixa o usuário decidir.
-        store.update(job.id, {
-          status: "error",
-          errorMsg: `Não foi possível concluir o envio após ${MAX_RETRIES} tentativas. Verifique sua conexão e clique em "Tentar novamente".`,
-          retryCount,
-          speedMBs: 0,
-          etaSec: 0,
-        });
-      } else {
-        const delayMs = Math.min(60_000, 3_000 * retryCount);
-        store.update(job.id, {
-          status: "warning",
-          errorMsg: `Conexão instável — tentando retomar automaticamente (${retryCount}/${MAX_RETRIES})...`,
-          speedMBs: 0,
-          etaSec: 0,
-          retryCount,
-          lastProgressAt: Date.now(),
-        });
-        queueJobRetry(job.id, delayMs);
-      }
+      // 🔥 Sinal agressivo: nunca desiste sozinho. Reconecta indefinidamente.
+      // Backoff curto (máx 15s) pra retomar rápido assim que a rede voltar.
+      const delayMs = Math.min(15_000, 1_500 * retryCount);
+      store.update(job.id, {
+        status: "warning",
+        errorMsg: `Reconectando automaticamente (tentativa ${retryCount})...`,
+        speedMBs: 0,
+        etaSec: 0,
+        retryCount,
+        lastProgressAt: Date.now(),
+      });
+      queueJobRetry(job.id, delayMs);
     } else {
       // Mostra o erro REAL retornado pelo servidor para facilitar o diagnóstico,
       // em vez de mascarar tudo como "limite de tamanho".
