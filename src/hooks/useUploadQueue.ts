@@ -946,6 +946,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
 
   const removeJob = (id: string) => store.remove(id);
   const clearDone = () => store.clearDone();
+  const clearErrors = (opts?: { onlyOversize?: boolean }) => store.clearErrors(opts ?? {});
 
   const retry = (id: string) => {
     const target = store.jobs.find((j) => j.id === id);
