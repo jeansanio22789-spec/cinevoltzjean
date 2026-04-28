@@ -24,6 +24,25 @@ const formatSize = (bytes?: string) => {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 };
 
+// Limpa nome de arquivo do Drive transformando em título legível.
+// Ex: "Os.Cupidos.Gemeos.2024.1080p.WEB-DL.x264.mp4" -> "Os Cupidos Gemeos 2024"
+const cleanTitleFromFilename = (raw: string): string => {
+  let t = raw.replace(/\.(mp4|mkv|webm|mov|avi|m4v|ts|flv|wmv)$/i, "");
+  // Substitui pontos/underlines por espaço
+  t = t.replace(/[._]+/g, " ");
+  // Remove tags técnicas comuns
+  t = t.replace(
+    /\b(1080p|720p|480p|2160p|4k|web[-\s]?dl|web[-\s]?rip|bluray|bdrip|hdrip|dvdrip|x264|x265|h264|h265|hevc|aac|ac3|dts|dual[-\s]?audio|dublado|legendado|leg|dub|nacional|hdtv|hdr|sdr|10bit|amzn|nf|hulu|atmos|repack|proper|extended|remastered|imax)\b/gi,
+    "",
+  );
+  // Remove colchetes e parênteses com conteúdo
+  t = t.replace(/[\[\(].*?[\]\)]/g, "");
+  // Espaços duplicados / lixo nas pontas
+  t = t.replace(/\s{2,}/g, " ").replace(/^[\s\-_]+|[\s\-_]+$/g, "").trim();
+  return t;
+};
+
+
 export default function AdminGoogleDriveImport() {
   const { toast } = useToast();
   const [folderId, setFolderId] = useState("");
@@ -33,6 +52,7 @@ export default function AdminGoogleDriveImport() {
   const [importing, setImporting] = useState<string | null>(null);
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
+  const [titles, setTitles] = useState<Record<string, string>>({});
   const [autoDetecting, setAutoDetecting] = useState(false);
   const [autoWatch, setAutoWatch] = useState(false);
   const watchRef = useRef<number | null>(null);
@@ -143,10 +163,14 @@ export default function AdminGoogleDriveImport() {
   const importFile = async (file: DriveFile) => {
     setImporting(file.id);
     try {
+      const finalTitle = (titles[file.id] ?? cleanTitleFromFilename(file.name)).trim();
+      if (!finalTitle || finalTitle.length < 2) {
+        throw new Error("Título inválido. Renomeie antes de importar.");
+      }
       const { data, error } = await supabase.functions.invoke("gdrive-import", {
         body: {
           fileId: file.id,
-          title: file.name.replace(/\.(mp4|mkv|webm|mov|avi)$/i, ""),
+          title: finalTitle,
           thumbnailUrl: covers[file.id]?.url || undefined,
         },
       });
@@ -255,7 +279,13 @@ export default function AdminGoogleDriveImport() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{f.name}</div>
+                    <input
+                      type="text"
+                      value={titles[f.id] ?? cleanTitleFromFilename(f.name)}
+                      onChange={(e) => setTitles((t) => ({ ...t, [f.id]: e.target.value }))}
+                      className="w-full bg-transparent text-sm font-medium outline-none border-b border-transparent hover:border-border focus:border-primary py-0.5"
+                      title={`Arquivo: ${f.name}`}
+                    />
                     <div className="text-xs text-muted-foreground">
                       {formatSize(f.size)}
                       {f.videoMediaMetadata?.durationMillis && (
