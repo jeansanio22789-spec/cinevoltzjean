@@ -230,6 +230,8 @@ const store = {
     target?.abort?.();
     if (target?.thumbPreviewUrl) URL.revokeObjectURL(target.thumbPreviewUrl);
     this.jobs = this.jobs.filter((j) => j.id !== id);
+    lastEmitAt.delete(id);
+    lastPersistAt.delete(id);
     void deletePersistedUploadJob(id);
     void deleteRemoteJob(id);
     this.emit();
