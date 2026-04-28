@@ -1,27 +1,37 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, LogOut, Bell, Search } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AdminSidebar, { type AdminTab } from "@/components/AdminSidebar";
-import AdminDashboard from "@/components/admin/AdminDashboard";
-import AdminMovies from "@/components/admin/AdminMovies";
-import AdminChannels from "@/components/admin/AdminChannels";
-import AdminVideos from "@/components/admin/AdminVideos";
-import AdminBilling from "@/components/admin/AdminBilling";
-import AdminUsers from "@/components/admin/AdminUsers";
-import AdminSettings from "@/components/admin/AdminSettings";
-import AdminAuditLog from "@/components/admin/AdminAuditLog";
-import AdminPurchases from "@/components/admin/AdminPurchases";
-import AdminAccessLinks from "@/components/admin/AdminAccessLinks";
-import AdminSponsors from "@/components/admin/AdminSponsors";
-import AdminTelegramImport from "@/components/admin/AdminTelegramImport";
-import AdminVideoLibrary from "@/components/admin/AdminVideoLibrary";
-import AdminPlans from "@/components/admin/AdminPlans";
-import AdminReports from "@/components/admin/AdminReports";
-import AdminBranding from "@/components/admin/AdminBranding";
-import AdminNotifications from "@/components/admin/AdminNotifications";
-import AdminNfcTagsPage from "@/components/admin/AdminNfcTagsPage";
+
+// Cada aba do admin é carregada sob demanda — antes todas vinham juntas
+// no boot, deixando a entrada do app muito lenta.
+const AdminDashboard = lazy(() => import("@/components/admin/AdminDashboard"));
+const AdminMovies = lazy(() => import("@/components/admin/AdminMovies"));
+const AdminChannels = lazy(() => import("@/components/admin/AdminChannels"));
+const AdminVideos = lazy(() => import("@/components/admin/AdminVideos"));
+const AdminBilling = lazy(() => import("@/components/admin/AdminBilling"));
+const AdminUsers = lazy(() => import("@/components/admin/AdminUsers"));
+const AdminSettings = lazy(() => import("@/components/admin/AdminSettings"));
+const AdminAuditLog = lazy(() => import("@/components/admin/AdminAuditLog"));
+const AdminPurchases = lazy(() => import("@/components/admin/AdminPurchases"));
+const AdminAccessLinks = lazy(() => import("@/components/admin/AdminAccessLinks"));
+const AdminSponsors = lazy(() => import("@/components/admin/AdminSponsors"));
+const AdminTelegramImport = lazy(() => import("@/components/admin/AdminTelegramImport"));
+const AdminVideoLibrary = lazy(() => import("@/components/admin/AdminVideoLibrary"));
+const AdminPlans = lazy(() => import("@/components/admin/AdminPlans"));
+const AdminReports = lazy(() => import("@/components/admin/AdminReports"));
+const AdminBranding = lazy(() => import("@/components/admin/AdminBranding"));
+const AdminNotifications = lazy(() => import("@/components/admin/AdminNotifications"));
+const AdminNfcTagsPage = lazy(() => import("@/components/admin/AdminNfcTagsPage"));
+
+const TabFallback = () => (
+  <div className="flex items-center justify-center py-20">
+    <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+  </div>
+);
+
 
 
 const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
@@ -145,25 +155,27 @@ const Admin = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            {activeTab === "dashboard" && <AdminDashboard />}
-            {activeTab === "reports" && <AdminReports />}
-            {activeTab === "movies" && <AdminMovies />}
-            {activeTab === "content" && <AdminMovies />}
-            {activeTab === "plans" && <AdminPlans />}
-            {activeTab === "channels" && <AdminChannels />}
-            {activeTab === "videos" && <AdminVideos />}
-            {activeTab === "library" && <AdminVideoLibrary />}
-            {activeTab === "telegram" && <AdminTelegramImport />}
-            {activeTab === "billing" && <AdminBilling />}
-            {activeTab === "sponsors" && <AdminSponsors />}
-            {activeTab === "purchases" && <AdminPurchases />}
-            {activeTab === "links" && <AdminAccessLinks />}
-            {activeTab === "users" && <AdminUsers />}
-            {activeTab === "notifications" && <AdminNotifications />}
-            {activeTab === "branding" && <AdminBranding />}
-            {activeTab === "nfc" && <AdminNfcTagsPage />}
-            {activeTab === "audit" && <AdminAuditLog />}
-            {activeTab === "settings" && <AdminSettings />}
+            <Suspense fallback={<TabFallback />}>
+              {activeTab === "dashboard" && <AdminDashboard />}
+              {activeTab === "reports" && <AdminReports />}
+              {activeTab === "movies" && <AdminMovies />}
+              {activeTab === "content" && <AdminMovies />}
+              {activeTab === "plans" && <AdminPlans />}
+              {activeTab === "channels" && <AdminChannels />}
+              {activeTab === "videos" && <AdminVideos />}
+              {activeTab === "library" && <AdminVideoLibrary />}
+              {activeTab === "telegram" && <AdminTelegramImport />}
+              {activeTab === "billing" && <AdminBilling />}
+              {activeTab === "sponsors" && <AdminSponsors />}
+              {activeTab === "purchases" && <AdminPurchases />}
+              {activeTab === "links" && <AdminAccessLinks />}
+              {activeTab === "users" && <AdminUsers />}
+              {activeTab === "notifications" && <AdminNotifications />}
+              {activeTab === "branding" && <AdminBranding />}
+              {activeTab === "nfc" && <AdminNfcTagsPage />}
+              {activeTab === "audit" && <AdminAuditLog />}
+              {activeTab === "settings" && <AdminSettings />}
+            </Suspense>
           </main>
         </div>
       </div>
