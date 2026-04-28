@@ -377,10 +377,7 @@ const uploadFileTus = (
       reject(new Error("Sessão expirada. Faça login novamente."));
       return;
     }
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    // ⚡ Hostname direto do storage = MUITO mais rápido (otimização oficial Supabase).
-    // Pula o gateway principal e vai direto pros servidores de upload.
-    const endpoint = `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`;
+    const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
     let lastProgressAt = 0;
