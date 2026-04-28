@@ -581,7 +581,9 @@ const queueJobRetry = (jobId: string, delayMs: number) => {
 const isRetryableUploadError = (err: unknown) => {
   const msg = uploadErrorMessage(err);
   if (isStorageLimitUploadError(err)) return false;
-  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload/i.test(msg);
+  // Praticamente tudo que não é 413 deve ser retomado — sinal agressivo.
+  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload|connection|reset|ECONN|ETIMEDOUT|socket|stream|aborted by network|503|502|504|500|429|unknown|empty response/i.test(msg)
+    || msg.length === 0;
 };
 
 // 🚦 Fila sequencial inteligente
