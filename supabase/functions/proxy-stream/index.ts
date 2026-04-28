@@ -10,6 +10,8 @@
 // - Para playlists HLS (.m3u8), reescreve URLs de chunks pra também
 //   passar pelo proxy (CORS livre).
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
@@ -79,6 +81,45 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
+  const split = url.searchParams.get("split");
+  if (split) {
+    try {
+      const [base, totalRaw, extRaw] = split.split("|");
+      const total = Number(totalRaw || 0);
+      const ext = extRaw || "mp4";
+      if (!base || !Number.isFinite(total) || total <= 0) throw new Error("invalid_split");
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+      const parts: Uint8Array[] = [];
+      for (let i = 0; i < total; i++) {
+        const partPath = `${base}.part-${String(i).padStart(4, "0")}.${ext}`;
+        const { data, error } = await admin.storage.from("videos").download(partPath);
+        if (error || !data) throw new Error(error?.message || "missing_part");
+        parts.push(new Uint8Array(await data.arrayBuffer()));
+      }
+
+      const size = parts.reduce((sum, p) => sum + p.byteLength, 0);
+      const body = new Blob(parts, { type: "video/mp4" });
+      return new Response(body, {
+        status: 200,
+        headers: {
+          ...CORS,
+          "content-type": "video/mp4",
+          "content-length": String(size),
+          "accept-ranges": "bytes",
+        },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "split_failed", message: (e as Error).message }), {
+        status: 502,
+        headers: { ...CORS, "content-type": "application/json" },
+      });
+    }
+  }
+
   const target = url.searchParams.get("url");
   if (!target) {
     return new Response(JSON.stringify({ error: "missing_url" }), {
