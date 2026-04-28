@@ -24,6 +24,25 @@ const formatSize = (bytes?: string) => {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
 };
 
+// Limpa nome de arquivo do Drive transformando em título legível.
+// Ex: "Os.Cupidos.Gemeos.2024.1080p.WEB-DL.x264.mp4" -> "Os Cupidos Gemeos 2024"
+const cleanTitleFromFilename = (raw: string): string => {
+  let t = raw.replace(/\.(mp4|mkv|webm|mov|avi|m4v|ts|flv|wmv)$/i, "");
+  // Substitui pontos/underlines por espaço
+  t = t.replace(/[._]+/g, " ");
+  // Remove tags técnicas comuns
+  t = t.replace(
+    /\b(1080p|720p|480p|2160p|4k|web[-\s]?dl|web[-\s]?rip|bluray|bdrip|hdrip|dvdrip|x264|x265|h264|h265|hevc|aac|ac3|dts|dual[-\s]?audio|dublado|legendado|leg|dub|nacional|hdtv|hdr|sdr|10bit|amzn|nf|hulu|atmos|repack|proper|extended|remastered|imax)\b/gi,
+    "",
+  );
+  // Remove colchetes e parênteses com conteúdo
+  t = t.replace(/[\[\(].*?[\]\)]/g, "");
+  // Espaços duplicados / lixo nas pontas
+  t = t.replace(/\s{2,}/g, " ").replace(/^[\s\-_]+|[\s\-_]+$/g, "").trim();
+  return t;
+};
+
+
 export default function AdminGoogleDriveImport() {
   const { toast } = useToast();
   const [folderId, setFolderId] = useState("");
