@@ -524,6 +524,41 @@ const uploadFileFast = async (
   }
 };
 
+const uploadLargeVideoInParts = async (
+  path: string,
+  file: File,
+  onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
+  registerAbort: (fn: () => void) => void,
+): Promise<string> => {
+  const totalParts = Math.ceil(file.size / SPLIT_PART_BYTES);
+  const base = path.replace(/\.[^.]+$/, "");
+  const ext = path.split(".").pop() || "mp4";
+  let uploadedBytes = 0;
+
+  for (let i = 0; i < totalParts; i++) {
+    const start = i * SPLIT_PART_BYTES;
+    const end = Math.min(file.size, start + SPLIT_PART_BYTES);
+    const part = file.slice(start, end, file.type || "video/mp4");
+    const partPath = `${base}.part-${String(i).padStart(4, "0")}.${ext}`;
+
+    await uploadFileFast(
+      "videos",
+      partPath,
+      part,
+      (partPct, speedMBs, etaSec) => {
+        const partUploaded = ((end - start) * partPct) / 100;
+        const totalPct = ((uploadedBytes + partUploaded) / file.size) * 100;
+        onProgress(totalPct, speedMBs, etaSec);
+      },
+      registerAbort,
+      true,
+    );
+    uploadedBytes = end;
+  }
+
+  return `split://${base}|${totalParts}|${ext}`;
+};
+
 // ---------------------------------------------------------------------------
 // Execução do job (continua rodando mesmo se o componente desmontar)
 // ---------------------------------------------------------------------------
