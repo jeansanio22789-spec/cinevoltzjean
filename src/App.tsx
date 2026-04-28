@@ -50,6 +50,7 @@ const RouteFallback = () => (
 );
 
 const App = () => {
+  useAutoUpdate();
   useEffect(() => {
     installAudioUnlock();
     // Garante que uploads em andamento continuem mesmo se o usuário sair
