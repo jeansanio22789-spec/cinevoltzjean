@@ -40,15 +40,16 @@ export const useAppVersionAlert = () => {
 
     const seen = localStorage.getItem(SEEN_KEY);
     const dismissed = localStorage.getItem(DISMISSED_KEY);
+    const localBuild = (typeof __BUILD_VERSION__ !== "undefined" ? __BUILD_VERSION__ : "").trim();
 
-    // Primeira execução: marca como "vista" pra não mostrar pra quem já está atualizado.
-    if (!seen) {
-      localStorage.setItem(SEEN_KEY, version);
-      setInfo({ version, message: map["app_update_message"] || "", hasUpdate: false });
-      return;
-    }
+    // Compara com o que o cliente já viu E com o build local deste dispositivo.
+    // Se a versão publicada é diferente do build atual, há atualização disponível.
+    const differsFromSeen = seen ? seen !== version : true;
+    const differsFromLocal = localBuild ? localBuild !== version : false;
+    const notDismissed = dismissed !== version;
 
-    const hasUpdate = seen !== version && dismissed !== version;
+    const hasUpdate = (differsFromSeen || differsFromLocal) && notDismissed;
+
     setInfo({
       version,
       message: map["app_update_message"] || "",
