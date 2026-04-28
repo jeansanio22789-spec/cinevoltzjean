@@ -338,7 +338,7 @@ const updateProgress = (
 const uploadFileDirect = async (
   bucket: string,
   path: string,
-  file: File,
+  file: Blob,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
 ): Promise<string> => {
@@ -403,7 +403,7 @@ const formatUploadSize = (bytes: number) =>
 const uploadFileTus = (
   bucket: string,
   path: string,
-  file: File,
+  file: Blob,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
   options: { resumePrevious?: boolean; cleanPrevious?: boolean } = {},
@@ -483,11 +483,13 @@ const uploadFileTus = (
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
 const MAX_VIDEO_FILE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
+const SPLIT_VIDEO_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // limite real do upload por objeto
+const SPLIT_PART_BYTES = 512 * 1024 * 1024; // partes seguras abaixo do teto
 
 const uploadFileFast = async (
   bucket: string,
   path: string,
-  file: File,
+  file: Blob,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
   forceTus = false,
