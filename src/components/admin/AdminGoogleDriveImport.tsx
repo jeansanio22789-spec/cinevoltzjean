@@ -89,6 +89,8 @@ export default function AdminGoogleDriveImport() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoWatch, folderId]);
+
+  const uploadCover = async (fileId: string, file: File) => {
     setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
     try {
       const ext = file.name.split(".").pop() || "jpg";
