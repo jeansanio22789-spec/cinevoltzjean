@@ -1,5 +1,5 @@
-// Detecta novos vídeos no Google Drive e cria automaticamente como filmes publicados (estreia).
-// Usa video_url como chave de deduplicação para não importar duas vezes.
+// Detecta vídeos + imagens (capas) no Google Drive e cria automaticamente como filmes publicados.
+// Capas e vídeos são pareados pelo nome base (sem extensão). Imagem com mesmo nome do vídeo vira a capa.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -8,6 +8,9 @@ const corsHeaders = {
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_drive/drive/v3";
+
+const baseName = (n: string) =>
+  n.replace(/\.[^.]+$/, "").trim().toLowerCase().replace(/\s+/g, " ");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -37,13 +40,14 @@ Deno.serve(async (req) => {
     const m = folderId.match(/\/folders\/([\w-]+)/);
     if (m) folderId = m[1];
 
-    // 1. Lista vídeos do Drive
-    const qParts = ["mimeType contains 'video/'", "trashed = false"];
+    // 1. Lista vídeos E imagens (juntos) – tudo da pasta informada
+    const mimeFilter = "(mimeType contains 'video/' or mimeType contains 'image/')";
+    const qParts = [mimeFilter, "trashed = false"];
     if (folderId) qParts.push(`'${folderId.replace(/'/g, "\\'")}' in parents`);
     const params = new URLSearchParams({
       q: qParts.join(" and "),
       fields: "files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime)",
-      pageSize: "100",
+      pageSize: "1000",
       orderBy: "createdTime desc",
       supportsAllDrives: "true",
       includeItemsFromAllDrives: "true",
@@ -56,29 +60,37 @@ Deno.serve(async (req) => {
     });
     const listData = await listResp.json();
     if (!listResp.ok) throw new Error(`Drive list: ${JSON.stringify(listData)}`);
-    const driveFiles: any[] = listData.files || [];
+    const all: any[] = listData.files || [];
 
-    if (driveFiles.length === 0) {
-      return new Response(JSON.stringify({ ok: true, scanned: 0, imported: 0, items: [] }), {
+    const videos = all.filter((f) => String(f.mimeType || "").startsWith("video/"));
+    const images = all.filter((f) => String(f.mimeType || "").startsWith("image/"));
+
+    // Indexa imagens por nome base
+    const coverByName = new Map<string, any>();
+    for (const img of images) coverByName.set(baseName(img.name || ""), img);
+
+    if (videos.length === 0) {
+      return new Response(JSON.stringify({ ok: true, scanned: 0, imported: 0, items: [], covers: images.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // 2. Busca filmes já existentes (por video_url contendo o fileId)
-    const { data: existing } = await supabase
-      .from("movies")
-      .select("id, video_url");
+    // 2. Filmes existentes (dedup por fileId no video_url)
+    const { data: existing } = await supabase.from("movies").select("id, video_url");
     const existingIds = new Set<string>();
-    (existing || []).forEach((m: any) => {
-      const match = String(m.video_url || "").match(/\/file\/d\/([\w-]+)/);
+    (existing || []).forEach((mv: any) => {
+      const match = String(mv.video_url || "").match(/\/file\/d\/([\w-]+)/);
       if (match) existingIds.add(match[1]);
     });
 
     const created: any[] = [];
-    for (const file of driveFiles) {
+    for (const file of videos) {
       if (existingIds.has(file.id)) continue;
 
-      // Marca como público
+      const nameKey = baseName(file.name || "");
+      const cover = coverByName.get(nameKey);
+
+      // Marca vídeo como público
       try {
         await fetch(`${GATEWAY_URL}/files/${file.id}/permissions`, {
           method: "POST",
@@ -91,7 +103,27 @@ Deno.serve(async (req) => {
         });
       } catch (_) { /* ignora */ }
 
-      const finalTitle = (file.name || `Filme ${file.id}`).replace(/\.(mp4|mkv|webm|mov|avi)$/i, "").slice(0, 200);
+      // Capa custom: deixa pública e usa link direto
+      let thumbUrl: string | null = file.thumbnailLink || null;
+      if (cover) {
+        try {
+          await fetch(`${GATEWAY_URL}/files/${cover.id}/permissions`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "X-Connection-Api-Key": GDRIVE_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ role: "reader", type: "anyone" }),
+          });
+        } catch (_) { /* ignora */ }
+        // URL pública direta da imagem no Drive
+        thumbUrl = `https://drive.google.com/thumbnail?id=${cover.id}&sz=w800`;
+      }
+
+      const finalTitle = (file.name || `Filme ${file.id}`)
+        .replace(/\.(mp4|mkv|webm|mov|avi)$/i, "")
+        .slice(0, 200);
       const videoUrl = `https://drive.google.com/file/d/${file.id}/view`;
 
       let durationStr = "";
@@ -109,7 +141,7 @@ Deno.serve(async (req) => {
           description: "",
           genre,
           video_url: videoUrl,
-          thumbnail_url: file.thumbnailLink || null,
+          thumbnail_url: thumbUrl,
           duration: durationStr,
           status: "published",
           year: new Date().getFullYear(),
@@ -117,12 +149,13 @@ Deno.serve(async (req) => {
         .select("id, title, thumbnail_url")
         .single();
 
-      if (!error && movie) created.push(movie);
+      if (!error && movie) created.push({ ...movie, has_custom_cover: !!cover });
     }
 
     return new Response(JSON.stringify({
       ok: true,
-      scanned: driveFiles.length,
+      scanned: videos.length,
+      covers_found: images.length,
       imported: created.length,
       items: created,
     }), {
