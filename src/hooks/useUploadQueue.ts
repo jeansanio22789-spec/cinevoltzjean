@@ -688,7 +688,7 @@ const runJob = async (job: UploadJob) => {
   try {
     if (job.file.size > MAX_VIDEO_FILE_BYTES) {
       throw new Error(
-        `Arquivo muito grande (${formatUploadSize(job.file.size)}). O limite por vídeo é 50 GB.`,
+        `Arquivo muito grande (${formatUploadSize(job.file.size)}). O limite por vídeo é 1 TB.`,
       );
     }
 
