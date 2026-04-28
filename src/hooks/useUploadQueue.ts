@@ -115,6 +115,10 @@ export interface UploadJob {
   /** Timestamp do último progresso recebido — usado para detectar travamento. */
   lastProgressAt?: number;
   retryCount?: number;
+  /** Estratégia real em uso, para evitar retomar job grande no caminho antigo. */
+  uploadMode?: "direct" | "direct-parts" | "tus" | "tus-resume";
+  uploadPartsTotal?: number;
+  uploadPartBytes?: number;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
@@ -146,6 +150,9 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   timedOut: false,
   uploadPath: job.uploadPath,
   retryCount: job.retryCount ?? 0,
+  uploadMode: job.uploadMode,
+  uploadPartsTotal: job.uploadPartsTotal,
+  uploadPartBytes: job.uploadPartBytes,
 });
 
 const store = {
