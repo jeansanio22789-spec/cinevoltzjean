@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Film, Users, Upload, DollarSign, Settings, Tv2, Shield,
   ShoppingBag, Link2, Radio, Megaphone, Send, Library, Crown, BarChart3, Bell, Palette,
-  CreditCard,
+  CreditCard, FolderOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,6 +26,7 @@ export type AdminTab =
   | "videos"
   | "library"
   | "telegram"
+  | "gdrive"
   | "billing"
   | "purchases"
   | "sponsors"
@@ -52,6 +53,7 @@ const sections = [
       { title: "Canais Ao Vivo", tab: "channels" as AdminTab, icon: Radio },
       { title: "Envio de Vídeos", tab: "videos" as AdminTab, icon: Upload },
       { title: "Importar Telegram", tab: "telegram" as AdminTab, icon: Send },
+      { title: "Importar Google Drive", tab: "gdrive" as AdminTab, icon: FolderOpen },
     ],
   },
   {

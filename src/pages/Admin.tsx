@@ -19,6 +19,7 @@ const AdminPurchases = lazy(() => import("@/components/admin/AdminPurchases"));
 const AdminAccessLinks = lazy(() => import("@/components/admin/AdminAccessLinks"));
 const AdminSponsors = lazy(() => import("@/components/admin/AdminSponsors"));
 const AdminTelegramImport = lazy(() => import("@/components/admin/AdminTelegramImport"));
+const AdminGoogleDriveImport = lazy(() => import("@/components/admin/AdminGoogleDriveImport"));
 const AdminVideoLibrary = lazy(() => import("@/components/admin/AdminVideoLibrary"));
 const AdminPlans = lazy(() => import("@/components/admin/AdminPlans"));
 const AdminReports = lazy(() => import("@/components/admin/AdminReports"));
@@ -44,6 +45,7 @@ const tabTitles: Record<AdminTab, { title: string; subtitle: string }> = {
   videos: { title: "Envio de Vídeos", subtitle: "Faça upload e publique novos conteúdos" },
   library: { title: "Biblioteca de Vídeos", subtitle: "Pesquise e filtre vídeos por mês, canal e status" },
   telegram: { title: "Importar Telegram", subtitle: "Conectado ao worker MTProto externo" },
+  gdrive: { title: "Importar Google Drive", subtitle: "Liste e importe vídeos da sua conta do Drive" },
   billing: { title: "Faturamento", subtitle: "Receita, transações e métricas financeiras" },
   sponsors: { title: "Patrocinadores", subtitle: "Anunciantes pagos no player e na página Ao Vivo" },
   purchases: { title: "Compras PIX", subtitle: "Pagamentos Mercado Pago e liberação automática" },
@@ -165,6 +167,7 @@ const Admin = () => {
               {activeTab === "videos" && <AdminVideos />}
               {activeTab === "library" && <AdminVideoLibrary />}
               {activeTab === "telegram" && <AdminTelegramImport />}
+              {activeTab === "gdrive" && <AdminGoogleDriveImport />}
               {activeTab === "billing" && <AdminBilling />}
               {activeTab === "sponsors" && <AdminSponsors />}
               {activeTab === "purchases" && <AdminPurchases />}
