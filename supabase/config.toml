@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.notify-unknown-device]
 verify_jwt = false
+
+[functions.telegram-stream]
+verify_jwt = false
