@@ -566,8 +566,9 @@ const uploadLargeVideoInParts = async (
     });
   });
 
-  // ⚡ Paralelismo: sobe N partes ao mesmo tempo. Sinal agressivo = banda toda.
-  const PARALLEL_PARTS = turboForced ? 1 : 3;
+  // ⚡ Paralelismo agressivo: 6 partes por vez = banda saturada.
+  // Cada parte é POST único (XHR direto), igual baixar arquivo em partes.
+  const PARALLEL_PARTS = turboForced ? 2 : 6;
 
   const uploadPart = async (i: number): Promise<void> => {
     const start = i * SPLIT_PART_BYTES;
@@ -579,6 +580,8 @@ const uploadLargeVideoInParts = async (
     // Loop infinito de retomada — só sai com sucesso ou abort do usuário.
     while (true) {
       try {
+        // forceTus=false → cada parte sobe via XHR direto (POST único),
+        // sem overhead do TUS. É o "download invertido" pedido pelo usuário.
         await uploadFileFast(
           "videos",
           partPath,
@@ -588,7 +591,7 @@ const uploadLargeVideoInParts = async (
             reportProgress();
           },
           (fn) => partAborts.set(i, fn),
-          true,
+          false,
         );
         partProgress[i] = 1;
         partAborts.delete(i);
