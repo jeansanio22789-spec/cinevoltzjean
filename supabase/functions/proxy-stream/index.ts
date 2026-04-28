@@ -90,25 +90,31 @@ Deno.serve(async (req) => {
       if (!base || !Number.isFinite(total) || total <= 0) throw new Error("invalid_split");
 
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-      const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+      const partUrls = Array.from({ length: total }, (_, i) =>
+        `${SUPABASE_URL}/storage/v1/object/public/videos/${base}.part-${String(i).padStart(4, "0")}.${ext}`,
+      );
 
-      const parts: Uint8Array[] = [];
-      for (let i = 0; i < total; i++) {
-        const partPath = `${base}.part-${String(i).padStart(4, "0")}.${ext}`;
-        const { data, error } = await admin.storage.from("videos").download(partPath);
-        if (error || !data) throw new Error(error?.message || "missing_part");
-        parts.push(new Uint8Array(await data.arrayBuffer()));
-      }
+      const body = new ReadableStream({
+        async start(controller) {
+          for (const partUrl of partUrls) {
+            const part = await fetch(partUrl);
+            if (!part.ok || !part.body) throw new Error(`part_fetch_${part.status}`);
+            const reader = part.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          }
+          controller.close();
+        },
+      });
 
-      const size = parts.reduce((sum, p) => sum + p.byteLength, 0);
-      const body = new Blob(parts, { type: "video/mp4" });
       return new Response(body, {
         status: 200,
         headers: {
           ...CORS,
           "content-type": "video/mp4",
-          "content-length": String(size),
           "accept-ranges": "bytes",
         },
       });
