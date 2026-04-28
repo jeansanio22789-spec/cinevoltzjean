@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X, Sparkles, Radio } from "lucide-react";
 
 interface DriveFile {
   id: string;
