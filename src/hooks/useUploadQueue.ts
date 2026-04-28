@@ -776,37 +776,65 @@ export const initUploadQueue = () => {
   void loadPersistedUploadJobs().then(async (saved) => {
     if (!saved.length || store.jobs.length > 0) return;
 
-    const candidates = saved.filter((j) => j.status !== "done");
+    // 🧹 Remove automaticamente da fila tudo que já terminou ou ficou com erro.
+    // Mantemos apenas o que ainda não foi concluído (queued/uploading/warning/etc).
+    const discarded = saved.filter(
+      (j) => j.status === "done" || j.status === "error",
+    );
+    if (discarded.length) {
+      void deletePersistedUploadJobs(discarded.map((j) => j.id));
+      void Promise.all(
+        discarded.map((j) =>
+          supabase.from("upload_jobs").delete().eq("id", j.id),
+        ),
+      ).catch(() => {});
+    }
 
-    // Valida cada arquivo ANTES de hidratar — assim quem perdeu o blob
-    // aparece imediatamente como "precisa selecionar de novo" em vez de
-    // ficar travado em 0% pra sempre.
-    const restoredJobs: UploadJob[] = await Promise.all(
+    const candidates = saved.filter(
+      (j) => j.status !== "done" && j.status !== "error",
+    );
+
+    // Valida cada arquivo ANTES de hidratar — se o blob se perdeu, descarta
+    // direto em vez de deixar um item travado eternamente na fila.
+    const restoredJobs: UploadJob[] = [];
+    const deadIds: string[] = [];
+
+    await Promise.all(
       candidates.map(async (j) => {
         const fileOk = await isFileReadable(j.file);
+        if (!fileOk) {
+          deadIds.push(j.id);
+          return;
+        }
         const thumbOk = j.thumbnail ? await isFileReadable(j.thumbnail) : true;
-        const dead = !fileOk;
-        return {
+        restoredJobs.push({
           ...j,
-          status: dead ? "error" : j.status === "error" ? "error" : "queued",
-          progress: j.status === "error" ? j.progress : (j.progress ?? 0),
+          status: "queued",
+          progress: j.progress ?? 0,
           speedMBs: 0,
           etaSec: 0,
           timedOut: false,
           thumbPreviewUrl:
             j.thumbnail && thumbOk ? URL.createObjectURL(j.thumbnail) : null,
           uploadPath: j.uploadPath,
-          errorMsg: dead
-            ? "O app foi fechado e o arquivo precisa ser selecionado novamente. Toque em remover e reenvie o vídeo."
-            : j.errorMsg,
-        } satisfies UploadJob;
+          errorMsg: undefined,
+        } satisfies UploadJob);
       }),
     );
 
+    if (deadIds.length) {
+      void deletePersistedUploadJobs(deadIds);
+      void Promise.all(
+        deadIds.map((id) =>
+          supabase.from("upload_jobs").delete().eq("id", id),
+        ),
+      ).catch(() => {});
+    }
+
+    if (!restoredJobs.length) return;
+
     store.hydrate(restoredJobs);
-    restoredJobs
-      .filter((j) => j.status !== "error")
-      .forEach((j) => void runJob(j));
+    restoredJobs.forEach((j) => void runJob(j));
   });
 };
 
