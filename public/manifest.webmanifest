@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "CineVoltz - Filmes e Séries",
-  "short_name": "CineVoltz",
+  "name": "StreamFlix - Filmes e Séries",
+  "short_name": "StreamFlix",
   "description": "Assista filmes, séries e canais ao vivo direto no seu celular. Catálogo completo, qualidade HD.",
   "lang": "pt-BR",
   "dir": "ltr",
@@ -33,7 +33,7 @@
       "sizes": "540x720",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Tela inicial do CineVoltz"
+      "label": "Tela inicial do StreamFlix"
     }
   ],
   "shortcuts": [
