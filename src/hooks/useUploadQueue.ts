@@ -438,7 +438,7 @@ const isAbortUploadError = (err: unknown) =>
   /cancelado|abort|aborted/i.test(uploadErrorMessage(err));
 
 const isStorageLimitUploadError = (err: unknown) =>
-  /Maximum size exceeded|response code: 413|\b413\b/i.test(uploadErrorMessage(err));
+  /Maximum size exceeded|response code: 413|\b413\b|limite de tamanho|limite do bucket|armazenamento recusou/i.test(uploadErrorMessage(err));
 
 const formatUploadSize = (bytes: number) =>
   bytes >= 1024 ** 3
@@ -533,6 +533,11 @@ const MAX_VIDEO_FILE_BYTES = Number.MAX_SAFE_INTEGER; // sem teto de tamanho
 // só que ao contrário. Muito mais rápido em conexões boas.
 const SPLIT_VIDEO_THRESHOLD_BYTES = 30 * 1024 * 1024; // > 30MB já parte
 const SPLIT_PART_BYTES = 30 * 1024 * 1024; // 30MB por parte: fica ABAIXO do TUS_THRESHOLD e força XHR direto
+
+const canAutoRecoverStorageLimitJob = (job: UploadJob) =>
+  job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES &&
+  job.uploadMode !== "direct-parts" &&
+  isStorageLimitUploadError(new Error(job.errorMsg || ""));
 
 const uploadFileFast = async (
   bucket: string,
@@ -944,6 +949,26 @@ const runJob = async (job: UploadJob) => {
       if (cur && cur.status !== "queued" && cur.status !== "done") {
         store.update(job.id, { status: "queued", speedMBs: 0, etaSec: 0 });
       }
+    } else if (isStorageLimitUploadError(err) && job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES) {
+      const cur = store.jobs.find((j) => j.id === job.id);
+      if (cur?.uploadMode === "direct-parts") {
+        store.update(job.id, { status: "error", errorMsg: msg || "Falha desconhecida no envio." });
+      } else {
+        store.update(job.id, {
+          status: "warning",
+          progress: 0,
+          uploadPath: undefined,
+          uploadMode: undefined,
+          uploadPartsTotal: undefined,
+          uploadPartBytes: undefined,
+          errorMsg: "Corrigindo limite: reenviando automaticamente em partes pequenas.",
+          speedMBs: 0,
+          etaSec: 0,
+          retryCount: 0,
+          lastProgressAt: Date.now(),
+        });
+        queueJobRetry(job.id, 500);
+      }
     } else if (isRetryableUploadError(err)) {
       const cur = store.jobs.find((j) => j.id === job.id);
       const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
@@ -1010,8 +1035,15 @@ export const initUploadQueue = () => {
 
     // 🧹 Remove automaticamente da fila tudo que já terminou ou ficou com erro.
     // Mantemos apenas o que ainda não foi concluído (queued/uploading/warning/etc).
+    const isRecoverableStorageLimit = (j: PersistedUploadJob) =>
+      j.status === "error" &&
+      !!j.file &&
+      j.file.size > SPLIT_VIDEO_THRESHOLD_BYTES &&
+      j.uploadMode !== "direct-parts" &&
+      isStorageLimitUploadError(new Error(j.errorMsg || ""));
+
     const discarded = saved.filter(
-      (j) => j.status === "done" || j.status === "error",
+      (j) => j.status === "done" || (j.status === "error" && !isRecoverableStorageLimit(j)),
     );
     if (discarded.length) {
       void deletePersistedUploadJobs(discarded.map((j) => j.id));
@@ -1023,7 +1055,7 @@ export const initUploadQueue = () => {
     }
 
     const candidates = saved.filter(
-      (j) => j.status !== "done" && j.status !== "error",
+      (j) => j.status !== "done" && (j.status !== "error" || isRecoverableStorageLimit(j)),
     );
 
     // Valida cada arquivo ANTES de hidratar — se o blob se perdeu, descarta
@@ -1119,6 +1151,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
   const retry = (id: string) => {
     const target = store.jobs.find((j) => j.id === id);
     if (!target) return;
+    const restartInParts = canAutoRecoverStorageLimitJob(target);
     // Aborta qualquer XHR/TUS que ainda esteja rodando para esse job
     try {
       target.abort?.();
@@ -1128,14 +1161,18 @@ export const useUploadQueue = (onJobDone?: () => void) => {
     runningJobIds.delete(id);
     store.update(id, {
       status: "queued",
-      // Mantém o progresso atual — o TUS vai retomar de onde parou,
-      // não faz sentido voltar a barra para 0.
-      progress: target.uploadPath ? target.progress : 0,
+      // Erro 413 antigo não deve pedir remover: reinicia automaticamente
+      // no modo novo em partes pequenas, sem apagar vídeos do catálogo.
+      progress: restartInParts ? 0 : target.uploadPath ? target.progress : 0,
       speedMBs: 0,
       etaSec: 0,
       lockedEtaSec: undefined,
       lockedEndAt: undefined,
-      errorMsg: undefined,
+      uploadPath: restartInParts ? undefined : target.uploadPath,
+      uploadMode: restartInParts ? undefined : target.uploadMode,
+      uploadPartsTotal: restartInParts ? undefined : target.uploadPartsTotal,
+      uploadPartBytes: restartInParts ? undefined : target.uploadPartBytes,
+      errorMsg: restartInParts ? "Corrigindo limite: reenviando em partes pequenas." : undefined,
       timedOut: false,
       abort: undefined,
       lastProgressAt: Date.now(),

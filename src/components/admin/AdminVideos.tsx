@@ -562,16 +562,18 @@ const AdminVideos = () => {
     (j) =>
       j.status === "error" &&
       !!j.errorMsg &&
-      /Maximum size exceeded|response code: 413|\b413\b|muito grande/i.test(j.errorMsg),
+      /Maximum size exceeded|response code: 413|\b413\b|muito grande|limite de tamanho|limite do bucket|armazenamento recusou/i.test(j.errorMsg),
   ).length;
 
   const handleClearOversize = () => {
-    const removed = clearErrors({ onlyOversize: true });
-    if (removed > 0) {
-      toast.success(`${removed} envio(s) com erro de tamanho removido(s) da fila.`);
-    } else {
-      toast.info("Nenhum envio antigo com erro 413 para remover.");
-    }
+    const targets = jobs.filter(
+      (j) =>
+        j.status === "error" &&
+        !!j.errorMsg &&
+        /Maximum size exceeded|response code: 413|\b413\b|muito grande|limite de tamanho|limite do bucket|armazenamento recusou/i.test(j.errorMsg),
+    );
+    targets.forEach((j) => retry(j.id));
+    toast.success(`${targets.length} envio(s) corrigido(s) para reenviar em partes.`);
   };
 
   const handleClearAllErrors = () => {
@@ -918,10 +920,10 @@ const AdminVideos = () => {
                 <button
                   onClick={handleClearOversize}
                   className="text-xs font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1 bg-amber-500/15 text-amber-600 hover:bg-amber-500/25 transition-colors"
-                  title="Remove envios antigos que falharam por excederem o limite de tamanho (erro 413)"
+                  title="Corrige envios antigos que falharam por limite de tamanho e reenvia em partes"
                 >
-                  <Trash2 className="w-3 h-3" />
-                  Limpar erros 413 ({oversizeErrorCount})
+                  <RotateCw className="w-3 h-3" />
+                  Corrigir erro 413 ({oversizeErrorCount})
                 </button>
               )}
 
