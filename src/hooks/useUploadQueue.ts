@@ -338,7 +338,7 @@ const updateProgress = (
 const uploadFileDirect = async (
   bucket: string,
   path: string,
-  file: File,
+  file: Blob,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
 ): Promise<string> => {
@@ -403,7 +403,7 @@ const formatUploadSize = (bytes: number) =>
 const uploadFileTus = (
   bucket: string,
   path: string,
-  file: File,
+  file: Blob,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
   options: { resumePrevious?: boolean; cleanPrevious?: boolean } = {},
@@ -415,7 +415,11 @@ const uploadFileTus = (
       reject(new Error("Sessão expirada. Faça login novamente."));
       return;
     }
-    const endpoint = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/upload/resumable`;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const storageBaseUrl = projectId
+      ? `https://${projectId}.storage.supabase.co`
+      : import.meta.env.VITE_SUPABASE_URL;
+    const endpoint = `${storageBaseUrl}/storage/v1/upload/resumable`;
     const startTime = Date.now();
     const samples: { t: number; bytes: number }[] = [];
     let lastProgressAt = 0;
@@ -478,12 +482,14 @@ const uploadFileTus = (
 // "Maximum size exceeded". Por isso baixamos o threshold pra 40MB —
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
-const MAX_VIDEO_FILE_BYTES = 50 * 1024 * 1024 * 1024; // 50 GB
+const MAX_VIDEO_FILE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
+const SPLIT_VIDEO_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // limite real do upload por objeto
+const SPLIT_PART_BYTES = 512 * 1024 * 1024; // partes seguras abaixo do teto
 
 const uploadFileFast = async (
   bucket: string,
   path: string,
-  file: File,
+  file: Blob,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
   forceTus = false,
@@ -498,7 +504,6 @@ const uploadFileFast = async (
       });
     } catch (err) {
       if (isAbortUploadError(err)) throw err;
-      if (isStorageLimitUploadError(err)) throw err;
       // Alguns 413/offset vêm de URL TUS antiga/corrompida no navegador.
       // Limpa essa retomada local e cria uma sessão TUS nova para o mesmo arquivo.
       return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
@@ -517,6 +522,41 @@ const uploadFileFast = async (
       cleanPrevious: true,
     });
   }
+};
+
+const uploadLargeVideoInParts = async (
+  path: string,
+  file: File,
+  onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
+  registerAbort: (fn: () => void) => void,
+): Promise<string> => {
+  const totalParts = Math.ceil(file.size / SPLIT_PART_BYTES);
+  const base = path.replace(/\.[^.]+$/, "");
+  const ext = path.split(".").pop() || "mp4";
+  let uploadedBytes = 0;
+
+  for (let i = 0; i < totalParts; i++) {
+    const start = i * SPLIT_PART_BYTES;
+    const end = Math.min(file.size, start + SPLIT_PART_BYTES);
+    const part = file.slice(start, end, file.type || "video/mp4");
+    const partPath = `${base}.part-${String(i).padStart(4, "0")}.${ext}`;
+
+    await uploadFileFast(
+      "videos",
+      partPath,
+      part,
+      (partPct, speedMBs, etaSec) => {
+        const partUploaded = ((end - start) * partPct) / 100;
+        const totalPct = ((uploadedBytes + partUploaded) / file.size) * 100;
+        onProgress(totalPct, speedMBs, etaSec);
+      },
+      registerAbort,
+      true,
+    );
+    uploadedBytes = end;
+  }
+
+  return `split://${base}|${totalParts}|${ext}`;
 };
 
 // ---------------------------------------------------------------------------
@@ -648,7 +688,7 @@ const runJob = async (job: UploadJob) => {
   try {
     if (job.file.size > MAX_VIDEO_FILE_BYTES) {
       throw new Error(
-        `Arquivo muito grande (${formatUploadSize(job.file.size)}). O limite por vídeo é 50 GB.`,
+        `Arquivo muito grande (${formatUploadSize(job.file.size)}). O limite por vídeo é 1 TB.`,
       );
     }
 
@@ -671,11 +711,7 @@ const runJob = async (job: UploadJob) => {
       store.update(job.id, { uploadPath: path });
     }
 
-    const videoUrl = await uploadFileFast(
-      "videos",
-      path,
-      job.file,
-      (pct, speedMBs, etaSec) => {
+    const onVideoProgress = (pct: number, speedMBs: number, etaSec: number) => {
         const cur = store.jobs.find((j) => j.id === job.id);
         const keepWarn = cur?.status === "warning";
 
@@ -718,10 +754,18 @@ const runJob = async (job: UploadJob) => {
           // progresso, um upload que avança 1% e cai sempre nunca
           // atingiria o teto de tentativas e ficaria "reiniciando" eternamente.
         });
-      },
-      (abortFn) => store.update(job.id, { abort: abortFn }),
-      isResuming, // forceTus quando estamos retomando após refresh
-    );
+      };
+    const registerVideoAbort = (abortFn: () => void) => store.update(job.id, { abort: abortFn });
+    const videoUrl = job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES
+      ? await uploadLargeVideoInParts(path, job.file, onVideoProgress, registerVideoAbort)
+      : await uploadFileFast(
+          "videos",
+          path,
+          job.file,
+          onVideoProgress,
+          registerVideoAbort,
+          isResuming, // forceTus quando estamos retomando após refresh
+        );
 
     let thumbnailUrl: string | null = null;
     if (job.thumbnail) {

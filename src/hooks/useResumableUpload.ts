@@ -3,6 +3,10 @@ import * as tus from "tus-js-client";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
+const STORAGE_BASE_URL = SUPABASE_PROJECT_ID
+  ? `https://${SUPABASE_PROJECT_ID}.storage.supabase.co`
+  : SUPABASE_URL;
 
 export interface UploadState {
   uploading: boolean;
@@ -61,7 +65,7 @@ function tryTurboUpload(args: {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     args.xhrRef.current = xhr;
-    const url = `${SUPABASE_URL}/storage/v1/object/${args.bucket}/${args.objectName}`;
+    const url = `${STORAGE_BASE_URL}/storage/v1/object/${args.bucket}/${args.objectName}`;
     xhr.open("POST", url, true);
     xhr.setRequestHeader("authorization", `Bearer ${args.accessToken}`);
     xhr.setRequestHeader("x-upsert", "false");
@@ -146,10 +150,9 @@ export function useResumableUpload() {
       });
 
       // ⚡⚡ MODO TURBO ⚡⚡
-      // Para arquivos até 4 GB tenta upload direto (uma única requisição
-      // HTTP, sem overhead de chunks/locking do TUS) — é 3-10x mais
-      // rápido. Se falhar, cai automaticamente pro TUS resumível.
-      const TURBO_LIMIT = 4 * 1024 * 1024 * 1024;
+      // O gateway rejeita POST único grande com 413. Turbo só para arquivos
+      // pequenos; vídeo grande entra direto no TUS resumível em chunks.
+      const TURBO_LIMIT = 40 * 1024 * 1024;
       if (file.size <= TURBO_LIMIT) {
         const turboOk = await tryTurboUpload({
           file,
@@ -205,7 +208,7 @@ export function useResumableUpload() {
       }
 
       const upload = new tus.Upload(file, {
-        endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
+        endpoint: `${STORAGE_BASE_URL}/storage/v1/upload/resumable`,
         // Retentativas rápidas: reconecta em <1s se cair
         retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000, 30000],
         headers: {

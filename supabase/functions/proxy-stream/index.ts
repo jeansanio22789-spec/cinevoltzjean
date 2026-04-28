@@ -79,6 +79,51 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
+  const split = url.searchParams.get("split");
+  if (split) {
+    try {
+      const [base, totalRaw, extRaw] = split.split("|");
+      const total = Number(totalRaw || 0);
+      const ext = extRaw || "mp4";
+      if (!base || !Number.isFinite(total) || total <= 0) throw new Error("invalid_split");
+
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+      const partUrls = Array.from({ length: total }, (_, i) =>
+        `${SUPABASE_URL}/storage/v1/object/public/videos/${base}.part-${String(i).padStart(4, "0")}.${ext}`,
+      );
+
+      const body = new ReadableStream({
+        async start(controller) {
+          for (const partUrl of partUrls) {
+            const part = await fetch(partUrl);
+            if (!part.ok || !part.body) throw new Error(`part_fetch_${part.status}`);
+            const reader = part.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          }
+          controller.close();
+        },
+      });
+
+      return new Response(body, {
+        status: 200,
+        headers: {
+          ...CORS,
+          "content-type": "video/mp4",
+          "accept-ranges": "bytes",
+        },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "split_failed", message: (e as Error).message }), {
+        status: 502,
+        headers: { ...CORS, "content-type": "application/json" },
+      });
+    }
+  }
+
   const target = url.searchParams.get("url");
   if (!target) {
     return new Response(JSON.stringify({ error: "missing_url" }), {

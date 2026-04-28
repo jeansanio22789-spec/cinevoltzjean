@@ -18,6 +18,14 @@ export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSour
     return { kind: "local", url };
   }
 
+  if (url.startsWith("split://")) {
+    const baseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    return {
+      kind: "video",
+      url: `${baseUrl}/functions/v1/proxy-stream?split=${encodeURIComponent(url.slice("split://".length))}`,
+    };
+  }
+
   // YouTube
   const yt = url.match(
     /(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/
