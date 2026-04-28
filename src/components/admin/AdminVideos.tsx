@@ -249,7 +249,7 @@ const AdminVideos = () => {
     setLoading(false);
   };
 
-  const { jobs, enqueue, removeJob, clearDone, retry, activeCount } = useUploadQueue(
+  const { jobs, enqueue, removeJob, clearDone, clearErrors, retry, activeCount } = useUploadQueue(
     () => fetchVideos(),
   );
 
@@ -557,6 +557,29 @@ const AdminVideos = () => {
   const published = videos.filter((v) => v.status === "published").length;
   const draftCount = videos.filter((v) => v.status === "draft").length;
   const doneCount = jobs.filter((j) => j.status === "done").length;
+  const errorCount = jobs.filter((j) => j.status === "error").length;
+  const oversizeErrorCount = jobs.filter(
+    (j) =>
+      j.status === "error" &&
+      !!j.errorMsg &&
+      /Maximum size exceeded|response code: 413|\b413\b|muito grande/i.test(j.errorMsg),
+  ).length;
+
+  const handleClearOversize = () => {
+    const removed = clearErrors({ onlyOversize: true });
+    if (removed > 0) {
+      toast.success(`${removed} envio(s) com erro de tamanho removido(s) da fila.`);
+    } else {
+      toast.info("Nenhum envio antigo com erro 413 para remover.");
+    }
+  };
+
+  const handleClearAllErrors = () => {
+    const removed = clearErrors();
+    if (removed > 0) {
+      toast.success(`${removed} envio(s) com erro removido(s) da fila.`);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -869,9 +892,12 @@ const AdminVideos = () => {
               Fila de envios
               <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
                 {activeCount} ativo{activeCount === 1 ? "" : "s"} • {doneCount} concluído{doneCount === 1 ? "" : "s"}
+                {errorCount > 0 && (
+                  <> • <span className="text-destructive font-semibold">{errorCount} com erro</span></>
+                )}
               </span>
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {/* ⚡ Modo Turbo — força 1 upload por vez pra usar 100% da banda */}
               <button
                 onClick={() => setTurboMode(!turboOn)}
@@ -889,6 +915,29 @@ const AdminVideos = () => {
                 <Rocket className="w-3 h-3" />
                 {turboOn ? "Turbo ON" : "Forçar Turbo"}
               </button>
+
+              {oversizeErrorCount > 0 && (
+                <button
+                  onClick={handleClearOversize}
+                  className="text-xs font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1 bg-amber-500/15 text-amber-600 hover:bg-amber-500/25 transition-colors"
+                  title="Remove envios antigos que falharam por excederem o limite de tamanho (erro 413)"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Limpar erros 413 ({oversizeErrorCount})
+                </button>
+              )}
+
+              {errorCount > 0 && errorCount !== oversizeErrorCount && (
+                <button
+                  onClick={handleClearAllErrors}
+                  className="text-xs font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1 bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors"
+                  title="Remove todos os envios que estão em estado de erro"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Limpar todos os erros ({errorCount})
+                </button>
+              )}
+
               {doneCount > 0 && (
                 <button
                   onClick={clearDone}
