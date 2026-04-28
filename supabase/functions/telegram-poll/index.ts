@@ -93,10 +93,14 @@ Deno.serve(async (req) => {
     const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const STORAGE_CHAT_ID = Deno.env.get("TELEGRAM_STORAGE_CHAT_ID");
 
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY ausente");
     if (!TELEGRAM_API_KEY) throw new Error("TELEGRAM_API_KEY ausente");
     if (!SUPABASE_URL || !SERVICE_KEY) throw new Error("Supabase ausente");
+
+    // Aceita "-1002261842036" ou "@meucanal". Se vazio, processa tudo (legado).
+    const allowedChatId = STORAGE_CHAT_ID?.trim() || null;
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -149,6 +153,18 @@ Deno.serve(async (req) => {
       for (const update of updates) {
         const msg = update.message || update.channel_post;
         if (!msg) continue;
+
+        // Filtra apenas o canal configurado como nuvem de armazenamento
+        if (allowedChatId) {
+          const chatIdStr = String(msg.chat.id);
+          const chatUsername = msg.chat.username ? `@${msg.chat.username}` : null;
+          const matches = chatIdStr === allowedChatId ||
+            chatUsername === allowedChatId;
+          if (!matches) {
+            log.push(`ignorado chat ${chatIdStr} (esperado ${allowedChatId})`);
+            continue;
+          }
+        }
 
         const video = extractVideo(msg);
         const photo = extractPhoto(msg);
