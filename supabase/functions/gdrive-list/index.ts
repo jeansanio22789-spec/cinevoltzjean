@@ -49,21 +49,31 @@ Deno.serve(async (req) => {
       } catch (_) { /* body opcional */ }
     }
 
+    // Limpa entradas
+    folderId = folderId?.trim() || null;
+    search = search?.trim() || null;
+    // Se vier um link inteiro de pasta, extrai o ID
+    if (folderId) {
+      const m = folderId.match(/\/folders\/([\w-]+)/);
+      if (m) folderId = m[1];
+    }
+
     // Filtro: vídeos + opcional pasta + opcional busca
     const queryParts: string[] = [
       "mimeType contains 'video/'",
       "trashed = false",
     ];
-    if (folderId) queryParts.push(`'${folderId}' in parents`);
+    if (folderId) queryParts.push(`'${folderId.replace(/'/g, "\\'")}' in parents`);
     if (search) queryParts.push(`name contains '${search.replace(/'/g, "\\'")}'`);
 
-    const params = new URLSearchParams({
-      q: queryParts.join(" and "),
-      fields: "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime)",
-      pageSize: "50",
-      orderBy: "modifiedTime desc",
-    });
-    if (pageToken) params.set("pageToken", pageToken);
+    const params = new URLSearchParams();
+    params.set("q", queryParts.join(" and "));
+    params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime)");
+    params.set("pageSize", "50");
+    params.set("orderBy", "modifiedTime desc");
+    params.set("supportsAllDrives", "true");
+    params.set("includeItemsFromAllDrives", "true");
+    if (pageToken && pageToken.trim()) params.set("pageToken", pageToken);
 
     const resp = await fetch(`${GATEWAY_URL}/files?${params}`, {
       headers: {
