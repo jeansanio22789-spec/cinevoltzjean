@@ -52,6 +52,7 @@ export default function AdminGoogleDriveImport() {
   const [importing, setImporting] = useState<string | null>(null);
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
+  const [titles, setTitles] = useState<Record<string, string>>({});
   const [autoDetecting, setAutoDetecting] = useState(false);
   const [autoWatch, setAutoWatch] = useState(false);
   const watchRef = useRef<number | null>(null);
@@ -162,10 +163,14 @@ export default function AdminGoogleDriveImport() {
   const importFile = async (file: DriveFile) => {
     setImporting(file.id);
     try {
+      const finalTitle = (titles[file.id] ?? cleanTitleFromFilename(file.name)).trim();
+      if (!finalTitle || finalTitle.length < 2) {
+        throw new Error("Título inválido. Renomeie antes de importar.");
+      }
       const { data, error } = await supabase.functions.invoke("gdrive-import", {
         body: {
           fileId: file.id,
-          title: file.name.replace(/\.(mp4|mkv|webm|mov|avi)$/i, ""),
+          title: finalTitle,
           thumbnailUrl: covers[file.id]?.url || undefined,
         },
       });
