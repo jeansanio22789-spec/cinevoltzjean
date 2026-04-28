@@ -483,10 +483,11 @@ const uploadFileTus = (
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
 const MAX_VIDEO_FILE_BYTES = Number.MAX_SAFE_INTEGER; // sem teto de tamanho
-// Partes menores = se uma falhar, perde menos tempo retomando.
-// 100MB é seguro pro gateway e dá pra paralelizar várias.
-const SPLIT_VIDEO_THRESHOLD_BYTES = 200 * 1024 * 1024; // tudo > 200MB já vai em partes
-const SPLIT_PART_BYTES = 100 * 1024 * 1024; // 100MB por parte
+// 🚀 MODO DOWNLOAD-INVERTIDO: tudo > 45MB vai em partes pequenas via XHR direto
+// (POST único por parte, sem overhead do TUS). Igual baixar arquivo em partes,
+// só que ao contrário. Muito mais rápido em conexões boas.
+const SPLIT_VIDEO_THRESHOLD_BYTES = 45 * 1024 * 1024; // > 45MB já parte
+const SPLIT_PART_BYTES = 45 * 1024 * 1024; // 45MB por parte (abaixo do teto de 50MB)
 
 const uploadFileFast = async (
   bucket: string,
@@ -565,8 +566,9 @@ const uploadLargeVideoInParts = async (
     });
   });
 
-  // ⚡ Paralelismo: sobe N partes ao mesmo tempo. Sinal agressivo = banda toda.
-  const PARALLEL_PARTS = turboForced ? 1 : 3;
+  // ⚡ Paralelismo agressivo: 6 partes por vez = banda saturada.
+  // Cada parte é POST único (XHR direto), igual baixar arquivo em partes.
+  const PARALLEL_PARTS = turboForced ? 2 : 6;
 
   const uploadPart = async (i: number): Promise<void> => {
     const start = i * SPLIT_PART_BYTES;
@@ -578,6 +580,8 @@ const uploadLargeVideoInParts = async (
     // Loop infinito de retomada — só sai com sucesso ou abort do usuário.
     while (true) {
       try {
+        // forceTus=false → cada parte sobe via XHR direto (POST único),
+        // sem overhead do TUS. É o "download invertido" pedido pelo usuário.
         await uploadFileFast(
           "videos",
           partPath,
@@ -587,7 +591,7 @@ const uploadLargeVideoInParts = async (
             reportProgress();
           },
           (fn) => partAborts.set(i, fn),
-          true,
+          false,
         );
         partProgress[i] = 1;
         partAborts.delete(i);
