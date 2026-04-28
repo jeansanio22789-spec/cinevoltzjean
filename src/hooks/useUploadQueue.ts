@@ -482,9 +482,11 @@ const uploadFileTus = (
 // "Maximum size exceeded". Por isso baixamos o threshold pra 40MB —
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
-const MAX_VIDEO_FILE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
-const SPLIT_VIDEO_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // limite real do upload por objeto
-const SPLIT_PART_BYTES = 512 * 1024 * 1024; // partes seguras abaixo do teto
+const MAX_VIDEO_FILE_BYTES = Number.MAX_SAFE_INTEGER; // sem teto de tamanho
+// Partes menores = se uma falhar, perde menos tempo retomando.
+// 100MB é seguro pro gateway e dá pra paralelizar várias.
+const SPLIT_VIDEO_THRESHOLD_BYTES = 200 * 1024 * 1024; // tudo > 200MB já vai em partes
+const SPLIT_PART_BYTES = 100 * 1024 * 1024; // 100MB por parte
 
 const uploadFileFast = async (
   bucket: string,
