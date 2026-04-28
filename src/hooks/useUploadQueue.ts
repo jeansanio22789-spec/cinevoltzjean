@@ -483,10 +483,11 @@ const uploadFileTus = (
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
 const MAX_VIDEO_FILE_BYTES = Number.MAX_SAFE_INTEGER; // sem teto de tamanho
-// Partes menores = se uma falhar, perde menos tempo retomando.
-// 100MB é seguro pro gateway e dá pra paralelizar várias.
-const SPLIT_VIDEO_THRESHOLD_BYTES = 200 * 1024 * 1024; // tudo > 200MB já vai em partes
-const SPLIT_PART_BYTES = 100 * 1024 * 1024; // 100MB por parte
+// 🚀 MODO DOWNLOAD-INVERTIDO: tudo > 45MB vai em partes pequenas via XHR direto
+// (POST único por parte, sem overhead do TUS). Igual baixar arquivo em partes,
+// só que ao contrário. Muito mais rápido em conexões boas.
+const SPLIT_VIDEO_THRESHOLD_BYTES = 45 * 1024 * 1024; // > 45MB já parte
+const SPLIT_PART_BYTES = 45 * 1024 * 1024; // 45MB por parte (abaixo do teto de 50MB)
 
 const uploadFileFast = async (
   bucket: string,
