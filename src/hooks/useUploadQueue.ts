@@ -114,6 +114,7 @@ export interface UploadJob {
   uploadPath?: string;
   /** Timestamp do último progresso recebido — usado para detectar travamento. */
   lastProgressAt?: number;
+  retryCount?: number;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
@@ -144,6 +145,7 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   startedAt: job.startedAt,
   timedOut: false,
   uploadPath: job.uploadPath,
+  retryCount: job.retryCount ?? 0,
 });
 
 const store = {
