@@ -114,6 +114,7 @@ export interface UploadJob {
   uploadPath?: string;
   /** Timestamp do último progresso recebido — usado para detectar travamento. */
   lastProgressAt?: number;
+  retryCount?: number;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
@@ -144,6 +145,7 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   startedAt: job.startedAt,
   timedOut: false,
   uploadPath: job.uploadPath,
+  retryCount: job.retryCount ?? 0,
 });
 
 const store = {
@@ -354,16 +356,27 @@ const uploadFileDirect = async (
   });
 };
 
+const uploadErrorMessage = (err: unknown) =>
+  err instanceof Error ? err.message : String(err || "");
+
+const isAbortUploadError = (err: unknown) =>
+  /cancelado|abort|aborted/i.test(uploadErrorMessage(err));
+
 const uploadFileTus = (
   bucket: string,
   path: string,
   file: File,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
+  options: { resumePrevious?: boolean; cleanPrevious?: boolean } = {},
 ): Promise<string> =>
   new Promise(async (resolve, reject) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
+    if (!token) {
+      reject(new Error("Sessão expirada. Faça login novamente."));
+      return;
+    }
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     // ⚡ Hostname direto do storage = MUITO mais rápido (otimização oficial Supabase).
     // Pula o gateway principal e vai direto pros servidores de upload.
@@ -374,7 +387,7 @@ const uploadFileTus = (
 
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 500, 1500, 3000, 5000, 10000, 20000],
+      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
@@ -408,8 +421,20 @@ const uploadFileTus = (
     });
 
     registerAbort(() => upload.abort(true).catch(() => {}));
-    const prev = await upload.findPreviousUploads();
-    if (prev.length) upload.resumeFromPreviousUpload(prev[0]);
+    try {
+      const prev = await upload.findPreviousUploads();
+      if (options.cleanPrevious) {
+        await Promise.all(
+          prev.map((p) =>
+            tus.defaultOptions.urlStorage.removeUpload(p.urlStorageKey).catch(() => {}),
+          ),
+        );
+      } else if (options.resumePrevious !== false && prev.length) {
+        upload.resumeFromPreviousUpload(prev[0]);
+      }
+    } catch {
+      /* se a retomada local estiver corrompida, inicia um TUS novo */
+    }
     upload.start();
   });
 
@@ -429,16 +454,31 @@ const uploadFileFast = async (
 ): Promise<string> => {
   // Retomada, modo turbo OU arquivos > 40MB vão direto pro TUS — única forma
   // de não bater no limite de 50MB do gateway de upload do Storage.
-  if (forceTus || turboForced || file.size >= TUS_THRESHOLD_BYTES) {
-    return uploadFileTus(bucket, path, file, onProgress, registerAbort);
+  const shouldUseTus = forceTus || turboForced || file.size >= TUS_THRESHOLD_BYTES;
+  if (shouldUseTus) {
+    try {
+      return await uploadFileTus(bucket, path, file, onProgress, registerAbort, {
+        resumePrevious: forceTus,
+      });
+    } catch (err) {
+      if (isAbortUploadError(err)) throw err;
+      // Alguns 413/offset vêm de URL TUS antiga/corrompida no navegador.
+      // Limpa essa retomada local e cria uma sessão TUS nova para o mesmo arquivo.
+      return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
+        resumePrevious: false,
+        cleanPrevious: true,
+      });
+    }
   }
   try {
     return await uploadFileDirect(bucket, path, file, onProgress, registerAbort);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "";
-    if (/cancelado|abort/i.test(msg)) throw err;
+    if (isAbortUploadError(err)) throw err;
     // Fallback resiliente: 413 (tamanho), falha de rede, etc → retoma com TUS.
-    return uploadFileTus(bucket, path, file, onProgress, registerAbort);
+    return uploadFileTus(bucket, path, file, onProgress, registerAbort, {
+      resumePrevious: false,
+      cleanPrevious: true,
+    });
   }
 };
 
@@ -446,6 +486,25 @@ const uploadFileFast = async (
 // Execução do job (continua rodando mesmo se o componente desmontar)
 // ---------------------------------------------------------------------------
 const runningJobIds = new Set<string>();
+const retryJobIds = new Set<string>();
+
+const queueJobRetry = (jobId: string, delayMs: number) => {
+  if (retryJobIds.has(jobId)) return;
+  retryJobIds.add(jobId);
+  window.setTimeout(() => {
+    retryJobIds.delete(jobId);
+    const fresh = store.jobs.find((j) => j.id === jobId);
+    if (!fresh || fresh.status === "done" || runningJobIds.has(jobId)) return;
+    void runJob(fresh);
+  }, delayMs);
+};
+
+const isRetryableUploadError = (err: unknown) => {
+  const msg = uploadErrorMessage(err);
+  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload|Maximum size exceeded|413/i.test(
+    msg,
+  );
+};
 
 // 🚦 Fila sequencial inteligente
 // Em conexões lentas, vários uploads em paralelo dividem a banda e o overhead
@@ -613,6 +672,7 @@ const runJob = async (job: UploadJob) => {
           lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
           lastProgressAt: Date.now(),
+          retryCount: 0,
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
@@ -657,7 +717,27 @@ const runJob = async (job: UploadJob) => {
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
-    store.update(job.id, { status: "error", errorMsg: msg });
+    if (isAbortUploadError(err)) {
+      const cur = store.jobs.find((j) => j.id === job.id);
+      if (cur && cur.status !== "queued" && cur.status !== "done") {
+        store.update(job.id, { status: "queued", speedMBs: 0, etaSec: 0 });
+      }
+    } else if (isRetryableUploadError(err)) {
+      const cur = store.jobs.find((j) => j.id === job.id);
+      const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
+      const delayMs = Math.min(60_000, 3_000 * retryCount);
+      store.update(job.id, {
+        status: "warning",
+        errorMsg: `Conexão instável — tentando retomar automaticamente (${retryCount})...`,
+        speedMBs: 0,
+        etaSec: 0,
+        retryCount,
+        lastProgressAt: Date.now(),
+      });
+      queueJobRetry(job.id, delayMs);
+    } else {
+      store.update(job.id, { status: "error", errorMsg: msg });
+    }
   } finally {
     runningJobIds.delete(job.id);
     window.clearTimeout(timeoutTimer);
@@ -801,6 +881,7 @@ export const useUploadQueue = (onJobDone?: () => void) => {
       timedOut: false,
       abort: undefined,
       lastProgressAt: Date.now(),
+      retryCount: 0,
     });
     // Pequeno delay pra garantir que o abort propagou antes de redisparar
     setTimeout(() => {
