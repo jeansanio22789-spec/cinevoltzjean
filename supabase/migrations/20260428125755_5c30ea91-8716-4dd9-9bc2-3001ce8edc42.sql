@@ -1,0 +1,1 @@
+DELETE FROM public.upload_jobs WHERE id = '1777380842742-7qdml5';
