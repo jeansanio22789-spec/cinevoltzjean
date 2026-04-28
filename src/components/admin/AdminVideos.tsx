@@ -249,7 +249,7 @@ const AdminVideos = () => {
     setLoading(false);
   };
 
-  const { jobs, enqueue, removeJob, clearDone, retry, activeCount } = useUploadQueue(
+  const { jobs, enqueue, removeJob, clearDone, clearErrors, retry, activeCount } = useUploadQueue(
     () => fetchVideos(),
   );
 
