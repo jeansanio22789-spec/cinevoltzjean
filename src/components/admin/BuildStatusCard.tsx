@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, RefreshCw, Rocket } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCw, Rocket, Send } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const LOCAL_BUILD = __BUILD_VERSION__;
 
@@ -30,6 +31,23 @@ const BuildStatusCard = () => {
   const [publishedVersion, setPublishedVersion] = useState<string>("");
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  const localVersion = LOCAL_BUILD;
+
+  const publishCurrent = async () => {
+    setPublishing(true);
+    const { error } = await supabase
+      .from("platform_settings")
+      .upsert({ key: "app_version", value: localVersion }, { onConflict: "key" });
+    setPublishing(false);
+    if (error) {
+      toast.error("Falha ao publicar versão", { description: error.message });
+      return;
+    }
+    toast.success("Versão publicada para os usuários");
+    await fetchPublished();
+  };
 
   const fetchPublished = async () => {
     setLoading(true);
@@ -48,6 +66,7 @@ const BuildStatusCard = () => {
   }, []);
 
   const hasPublished = publishedVersion.length > 0;
+  const isUpToDate = hasPublished && publishedVersion === localVersion;
 
   return (
     <Card className="border-border/60 bg-card/60">
@@ -124,6 +143,19 @@ const BuildStatusCard = () => {
             </Badge>
           </div>
         )}
+
+        <Button
+          className="w-full"
+          onClick={() => void publishCurrent()}
+          disabled={publishing || isUpToDate}
+        >
+          <Send className={`mr-2 h-4 w-4 ${publishing ? "animate-pulse" : ""}`} />
+          {isUpToDate
+            ? "Esta versão já é a publicada"
+            : publishing
+            ? "Publicando..."
+            : "Publicar esta versão para os usuários"}
+        </Button>
       </CardContent>
     </Card>
   );
