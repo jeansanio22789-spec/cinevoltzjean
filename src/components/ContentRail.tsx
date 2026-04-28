@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { forwardRef, useRef } from "react";
+import { useRef } from "react";
 import MovieCard, { type RailMovie } from "./MovieCard";
 
 interface ContentRailProps {
@@ -7,7 +7,7 @@ interface ContentRailProps {
   movies: RailMovie[];
 }
 
-const ContentRail = forwardRef<HTMLElement, ContentRailProps>(({ title, movies }, ref) => {
+const ContentRail = ({ title, movies }: ContentRailProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const scroll = (dir: "left" | "right") => {
@@ -19,7 +19,7 @@ const ContentRail = forwardRef<HTMLElement, ContentRailProps>(({ title, movies }
   if (!movies.length) return null;
 
   return (
-    <section ref={ref} className="relative px-4 md:px-12 mb-8">
+    <section className="relative px-4 md:px-12 mb-8">
       <h2 className="text-lg md:text-xl font-bold mb-3">{title}</h2>
 
       <div className="group relative">
@@ -50,8 +50,6 @@ const ContentRail = forwardRef<HTMLElement, ContentRailProps>(({ title, movies }
       </div>
     </section>
   );
-});
-
-ContentRail.displayName = "ContentRail";
+};
 
 export default ContentRail;
