@@ -66,6 +66,7 @@ const BuildStatusCard = () => {
   }, []);
 
   const hasPublished = publishedVersion.length > 0;
+  const isUpToDate = hasPublished && publishedVersion === localVersion;
 
   return (
     <Card className="border-border/60 bg-card/60">
