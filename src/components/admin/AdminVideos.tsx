@@ -557,6 +557,29 @@ const AdminVideos = () => {
   const published = videos.filter((v) => v.status === "published").length;
   const draftCount = videos.filter((v) => v.status === "draft").length;
   const doneCount = jobs.filter((j) => j.status === "done").length;
+  const errorCount = jobs.filter((j) => j.status === "error").length;
+  const oversizeErrorCount = jobs.filter(
+    (j) =>
+      j.status === "error" &&
+      !!j.errorMsg &&
+      /Maximum size exceeded|response code: 413|\b413\b|muito grande/i.test(j.errorMsg),
+  ).length;
+
+  const handleClearOversize = () => {
+    const removed = clearErrors({ onlyOversize: true });
+    if (removed > 0) {
+      toast.success(`${removed} envio(s) com erro de tamanho removido(s) da fila.`);
+    } else {
+      toast.info("Nenhum envio antigo com erro 413 para remover.");
+    }
+  };
+
+  const handleClearAllErrors = () => {
+    const removed = clearErrors();
+    if (removed > 0) {
+      toast.success(`${removed} envio(s) com erro removido(s) da fila.`);
+    }
+  };
 
   return (
     <div className="space-y-6">
