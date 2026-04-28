@@ -35,9 +35,19 @@ Deno.serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const folderId = url.searchParams.get("folderId");
-    const search = url.searchParams.get("q");
-    const pageToken = url.searchParams.get("pageToken");
+    let folderId = url.searchParams.get("folderId");
+    let search = url.searchParams.get("q");
+    let pageToken = url.searchParams.get("pageToken");
+
+    // Suporta também body JSON (supabase.functions.invoke)
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        folderId = body.folderId ?? folderId;
+        search = body.q ?? search;
+        pageToken = body.pageToken ?? pageToken;
+      } catch (_) { /* body opcional */ }
+    }
 
     // Filtro: vídeos + opcional pasta + opcional busca
     const queryParts: string[] = [

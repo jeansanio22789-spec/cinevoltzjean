@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink } from "lucide-react";
+import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X } from "lucide-react";
 
 interface DriveFile {
   id: string;
@@ -30,6 +30,26 @@ export default function AdminGoogleDriveImport() {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
   const [imported, setImported] = useState<Set<string>>(new Set());
+  const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
+
+  const uploadCover = async (fileId: string, file: File) => {
+    setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `gdrive/${fileId}-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("thumbnails").upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("thumbnails").getPublicUrl(path);
+      setCovers((c) => ({ ...c, [fileId]: { url: data.publicUrl, uploading: false } }));
+      toast({ title: "Capa carregada" });
+    } catch (e) {
+      setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: false } }));
+      toast({ title: "Erro ao subir capa", description: (e as Error).message, variant: "destructive" });
+    }
+  };
 
   const extractFolderId = (input: string): string => {
     const m = input.match(/\/folders\/([\w-]+)/);
@@ -39,14 +59,12 @@ export default function AdminGoogleDriveImport() {
   const loadFiles = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (folderId.trim()) params.set("folderId", extractFolderId(folderId));
-      if (search.trim()) params.set("q", search.trim());
-
-      const { data, error } = await supabase.functions.invoke(
-        `gdrive-list?${params.toString()}`,
-        { method: "GET" },
-      );
+      const { data, error } = await supabase.functions.invoke("gdrive-list", {
+        body: {
+          folderId: folderId.trim() ? extractFolderId(folderId) : undefined,
+          q: search.trim() || undefined,
+        },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(JSON.stringify(data.error));
       setFiles(data?.files || []);
@@ -71,6 +89,7 @@ export default function AdminGoogleDriveImport() {
         body: {
           fileId: file.id,
           title: file.name.replace(/\.(mp4|mkv|webm|mov|avi)$/i, ""),
+          thumbnailUrl: covers[file.id]?.url || undefined,
         },
       });
       if (error) throw error;
@@ -136,17 +155,22 @@ export default function AdminGoogleDriveImport() {
                   key={f.id}
                   className="flex items-center gap-3 rounded-md border p-2 hover:bg-muted/40"
                 >
-                  {f.thumbnailLink ? (
-                    <img
-                      src={f.thumbnailLink}
-                      alt=""
-                      className="h-12 w-20 rounded object-cover bg-muted"
-                    />
-                  ) : (
-                    <div className="h-12 w-20 rounded bg-muted flex items-center justify-center">
-                      <FolderOpen className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  )}
+                  <div className="relative h-12 w-20 shrink-0">
+                    {covers[f.id]?.url ? (
+                      <img src={covers[f.id].url} alt="" className="h-12 w-20 rounded object-cover bg-muted" />
+                    ) : f.thumbnailLink ? (
+                      <img src={f.thumbnailLink} alt="" className="h-12 w-20 rounded object-cover bg-muted" />
+                    ) : (
+                      <div className="h-12 w-20 rounded bg-muted flex items-center justify-center">
+                        <FolderOpen className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    {covers[f.id]?.uploading && (
+                      <div className="absolute inset-0 bg-black/60 rounded flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{f.name}</div>
                     <div className="text-xs text-muted-foreground">
@@ -154,13 +178,39 @@ export default function AdminGoogleDriveImport() {
                       {f.videoMediaMetadata?.durationMillis && (
                         <> · {Math.round(Number(f.videoMediaMetadata.durationMillis) / 60000)} min</>
                       )}
+                      {covers[f.id]?.url && <> · <span className="text-primary">capa custom</span></>}
                     </div>
                   </div>
+                  <label
+                    className="cursor-pointer text-muted-foreground hover:text-foreground p-1"
+                    title="Enviar capa própria"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) uploadCover(f.id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {covers[f.id]?.url && (
+                    <button
+                      onClick={() => setCovers((c) => { const n = { ...c }; delete n[f.id]; return n; })}
+                      className="text-muted-foreground hover:text-destructive p-1"
+                      title="Remover capa custom"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                   <a
                     href={`https://drive.google.com/file/d/${f.id}/view`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground p-1"
                     title="Abrir no Drive"
                   >
                     <ExternalLink className="h-4 w-4" />
