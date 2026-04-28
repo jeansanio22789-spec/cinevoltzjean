@@ -76,7 +76,9 @@ const extractVideoUrl = (text: string | null | undefined): string | null => {
   return videoExt || matches[0];
 };
 
-const TELEGRAM_DOWNLOAD_LIMIT = 20 * 1024 * 1024; // 20 MB
+// Não há mais limite de tamanho: o vídeo NÃO é baixado nem copiado pro bucket.
+// Apenas o file_id é salvo, e o stream é feito sob demanda pela função telegram-stream.
+const TELEGRAM_DOWNLOAD_LIMIT = Number.MAX_SAFE_INTEGER;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
