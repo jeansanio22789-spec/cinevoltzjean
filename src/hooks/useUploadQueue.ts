@@ -684,7 +684,9 @@ const runJob = async (job: UploadJob) => {
           lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
           lastProgressAt: Date.now(),
-          retryCount: 0,
+          // ⚠️ NÃO zera retryCount aqui — se zerasse a cada chunk com
+          // progresso, um upload que avança 1% e cai sempre nunca
+          // atingiria o teto de tentativas e ficaria "reiniciando" eternamente.
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
