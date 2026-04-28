@@ -1,12 +1,13 @@
 // Edge function: telegram-stream
-// Recebe um file_id do Telegram e devolve a URL temporária do CDN (válida ~1h).
-// O player toca direto do CDN do Telegram — NADA passa pelo bucket Supabase.
-// Esta é a função usada pra todos os vídeos armazenados como "tg://<file_id>".
+// Proxy de streaming: recebe um file_id do Telegram e devolve o conteúdo do
+// vídeo direto, com suporte a Range (necessário pro <video> seek/skip).
+// O vídeo NUNCA é copiado pro bucket — vai direto do CDN do Telegram pro player.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, range",
+  "Access-Control-Expose-Headers": "content-length, content-range, accept-ranges",
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
@@ -23,15 +24,8 @@ Deno.serve(async (req) => {
       throw new Error("Telegram não conectado.");
     }
 
-    // Aceita file_id via querystring (?id=...) ou body JSON
     const url = new URL(req.url);
-    let fileId = url.searchParams.get("id");
-    if (!fileId && req.method !== "GET") {
-      try {
-        const body = await req.json();
-        fileId = body?.file_id ?? body?.id ?? null;
-      } catch (_) { /* sem body */ }
-    }
+    const fileId = url.searchParams.get("id");
     if (!fileId) throw new Error("Parâmetro 'id' (file_id) ausente.");
 
     // 1. getFile → file_path
@@ -54,34 +48,43 @@ Deno.serve(async (req) => {
     const filePath = fileData.result?.file_path;
     if (!filePath) throw new Error("file_path ausente");
 
-    // 2. Faz HEAD pra confirmar tamanho/tipo (opcional, mas ajuda no player)
-    const downloadUrl = `${GATEWAY_URL}/file/${filePath}`;
+    // 2. Stream do CDN do Telegram com suporte a Range
+    const range = req.headers.get("range");
+    const upstream = await fetch(`${GATEWAY_URL}/file/${filePath}`, {
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": TELEGRAM_API_KEY,
+        ...(range ? { Range: range } : {}),
+      },
+    });
 
-    // Modo redirect: o cliente aponta o <video src> direto pra cá e a função
-    // redireciona pro download proxy do gateway. O player streama de lá.
-    if (url.searchParams.get("redirect") === "1") {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          ...corsHeaders,
-          Location: downloadUrl,
-        },
-      });
+    if (!upstream.ok && upstream.status !== 206) {
+      const txt = await upstream.text().catch(() => "");
+      throw new Error(`Stream upstream falhou [${upstream.status}]: ${txt.slice(0, 200)}`);
     }
 
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        url: downloadUrl,
-        file_path: filePath,
-        // Token deve ser anexado pelo backend porque o gateway exige header.
-        // Por isso o player usa a rota desta function como src do vídeo.
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    // Repassa o body como stream + headers úteis pro player
+    const passHeaders: Record<string, string> = { ...corsHeaders };
+    const ct = upstream.headers.get("content-type");
+    if (ct) passHeaders["Content-Type"] = ct;
+    else {
+      const ext = (filePath.split(".").pop() || "mp4").toLowerCase();
+      passHeaders["Content-Type"] =
+        ext === "webm" ? "video/webm" :
+        ext === "mkv" ? "video/x-matroska" :
+        "video/mp4";
+    }
+    const cl = upstream.headers.get("content-length");
+    if (cl) passHeaders["Content-Length"] = cl;
+    const cr = upstream.headers.get("content-range");
+    if (cr) passHeaders["Content-Range"] = cr;
+    passHeaders["Accept-Ranges"] = "bytes";
+    passHeaders["Cache-Control"] = "private, max-age=300";
+
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: passHeaders,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "erro desconhecido";
     console.error("[telegram-stream]", msg);
