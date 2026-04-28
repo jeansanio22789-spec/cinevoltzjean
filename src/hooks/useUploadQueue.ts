@@ -716,7 +716,22 @@ const runJob = async (job: UploadJob) => {
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Erro desconhecido";
-    store.update(job.id, { status: "error", errorMsg: msg });
+    if (!isAbortUploadError(err) && isRetryableUploadError(err)) {
+      const cur = store.jobs.find((j) => j.id === job.id);
+      const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
+      const delayMs = Math.min(60_000, 3_000 * retryCount);
+      store.update(job.id, {
+        status: "warning",
+        errorMsg: `Conexão instável — tentando retomar automaticamente (${retryCount})...`,
+        speedMBs: 0,
+        etaSec: 0,
+        retryCount,
+        lastProgressAt: Date.now(),
+      });
+      queueJobRetry(job.id, delayMs);
+    } else {
+      store.update(job.id, { status: "error", errorMsg: msg });
+    }
   } finally {
     runningJobIds.delete(job.id);
     window.clearTimeout(timeoutTimer);
