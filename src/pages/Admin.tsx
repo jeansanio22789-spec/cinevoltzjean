@@ -155,25 +155,27 @@ const Admin = () => {
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            {activeTab === "dashboard" && <AdminDashboard />}
-            {activeTab === "reports" && <AdminReports />}
-            {activeTab === "movies" && <AdminMovies />}
-            {activeTab === "content" && <AdminMovies />}
-            {activeTab === "plans" && <AdminPlans />}
-            {activeTab === "channels" && <AdminChannels />}
-            {activeTab === "videos" && <AdminVideos />}
-            {activeTab === "library" && <AdminVideoLibrary />}
-            {activeTab === "telegram" && <AdminTelegramImport />}
-            {activeTab === "billing" && <AdminBilling />}
-            {activeTab === "sponsors" && <AdminSponsors />}
-            {activeTab === "purchases" && <AdminPurchases />}
-            {activeTab === "links" && <AdminAccessLinks />}
-            {activeTab === "users" && <AdminUsers />}
-            {activeTab === "notifications" && <AdminNotifications />}
-            {activeTab === "branding" && <AdminBranding />}
-            {activeTab === "nfc" && <AdminNfcTagsPage />}
-            {activeTab === "audit" && <AdminAuditLog />}
-            {activeTab === "settings" && <AdminSettings />}
+            <Suspense fallback={<TabFallback />}>
+              {activeTab === "dashboard" && <AdminDashboard />}
+              {activeTab === "reports" && <AdminReports />}
+              {activeTab === "movies" && <AdminMovies />}
+              {activeTab === "content" && <AdminMovies />}
+              {activeTab === "plans" && <AdminPlans />}
+              {activeTab === "channels" && <AdminChannels />}
+              {activeTab === "videos" && <AdminVideos />}
+              {activeTab === "library" && <AdminVideoLibrary />}
+              {activeTab === "telegram" && <AdminTelegramImport />}
+              {activeTab === "billing" && <AdminBilling />}
+              {activeTab === "sponsors" && <AdminSponsors />}
+              {activeTab === "purchases" && <AdminPurchases />}
+              {activeTab === "links" && <AdminAccessLinks />}
+              {activeTab === "users" && <AdminUsers />}
+              {activeTab === "notifications" && <AdminNotifications />}
+              {activeTab === "branding" && <AdminBranding />}
+              {activeTab === "nfc" && <AdminNfcTagsPage />}
+              {activeTab === "audit" && <AdminAuditLog />}
+              {activeTab === "settings" && <AdminSettings />}
+            </Suspense>
           </main>
         </div>
       </div>
