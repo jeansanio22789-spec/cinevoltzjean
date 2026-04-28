@@ -1035,8 +1035,15 @@ export const initUploadQueue = () => {
 
     // 🧹 Remove automaticamente da fila tudo que já terminou ou ficou com erro.
     // Mantemos apenas o que ainda não foi concluído (queued/uploading/warning/etc).
+    const isRecoverableStorageLimit = (j: PersistedUploadJob) =>
+      j.status === "error" &&
+      !!j.file &&
+      j.file.size > SPLIT_VIDEO_THRESHOLD_BYTES &&
+      j.uploadMode !== "direct-parts" &&
+      isStorageLimitUploadError(new Error(j.errorMsg || ""));
+
     const discarded = saved.filter(
-      (j) => j.status === "done" || j.status === "error",
+      (j) => j.status === "done" || (j.status === "error" && !isRecoverableStorageLimit(j)),
     );
     if (discarded.length) {
       void deletePersistedUploadJobs(discarded.map((j) => j.id));
@@ -1048,7 +1055,7 @@ export const initUploadQueue = () => {
     }
 
     const candidates = saved.filter(
-      (j) => j.status !== "done" && j.status !== "error",
+      (j) => j.status !== "done" && (j.status !== "error" || isRecoverableStorageLimit(j)),
     );
 
     // Valida cada arquivo ANTES de hidratar — se o blob se perdeu, descarta
