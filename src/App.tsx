@@ -10,6 +10,7 @@ import MaintenanceGate from "@/components/MaintenanceGate";
 import { Suspense, lazy, useEffect } from "react";
 import { installAudioUnlock } from "@/lib/audioUnlock";
 import { initUploadQueue } from "@/hooks/useUploadQueue";
+import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 
 // Lazy: tudo que não é a Home entra sob demanda. Isso reduz drasticamente
 // o número de scripts baixados no boot (antes ~160, várias páginas/admin).
