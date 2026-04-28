@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, RefreshCw, Rocket } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCw, Rocket, Send } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const LOCAL_BUILD = __BUILD_VERSION__;
 
