@@ -23,6 +23,9 @@ export interface PersistedUploadJob {
   /** Caminho do arquivo no Storage — persistido para retomar com TUS. */
   uploadPath?: string;
   retryCount?: number;
+  uploadMode?: "direct" | "direct-parts" | "tus" | "tus-resume";
+  uploadPartsTotal?: number;
+  uploadPartBytes?: number;
 }
 
 const canUseIndexedDb = () =>

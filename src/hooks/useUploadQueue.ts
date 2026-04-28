@@ -38,8 +38,7 @@ const syncJobToRemote = (job: UploadJob, immediate = false) => {
       const { data: sess } = await supabase.auth.getSession();
       const userId = sess.session?.user.id;
       if (!userId) return;
-      await supabase.from("upload_jobs").upsert(
-        {
+      const payload = {
           id: job.id,
           user_id: userId,
           device_label: getDeviceLabel(),
@@ -53,9 +52,14 @@ const syncJobToRemote = (job: UploadJob, immediate = false) => {
           speed_mbs: Number((job.speedMBs || 0).toFixed(2)),
           eta_sec: Math.round(job.etaSec || 0),
           upload_path: job.uploadPath ?? null,
+          upload_mode: job.uploadMode ?? null,
+          upload_parts_total: job.uploadPartsTotal ?? null,
+          upload_part_bytes: job.uploadPartBytes ?? null,
           error_msg: job.errorMsg ?? null,
           started_at: job.startedAt ? new Date(job.startedAt).toISOString() : null,
-        },
+        };
+      await supabase.from("upload_jobs").upsert(
+        payload as any,
         { onConflict: "id" },
       );
     } catch {
@@ -115,6 +119,10 @@ export interface UploadJob {
   /** Timestamp do último progresso recebido — usado para detectar travamento. */
   lastProgressAt?: number;
   retryCount?: number;
+  /** Estratégia real em uso, para evitar retomar job grande no caminho antigo. */
+  uploadMode?: "direct" | "direct-parts" | "tus" | "tus-resume";
+  uploadPartsTotal?: number;
+  uploadPartBytes?: number;
 }
 
 const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutos (apenas para marcar "warning")
@@ -146,6 +154,9 @@ const toPersistedJob = (job: UploadJob): PersistedUploadJob => ({
   timedOut: false,
   uploadPath: job.uploadPath,
   retryCount: job.retryCount ?? 0,
+  uploadMode: job.uploadMode,
+  uploadPartsTotal: job.uploadPartsTotal,
+  uploadPartBytes: job.uploadPartBytes,
 });
 
 const store = {
@@ -532,8 +543,10 @@ const uploadLargeVideoInParts = async (
   file: File,
   onProgress: (pct: number, speedMBs: number, etaSec: number) => void,
   registerAbort: (fn: () => void) => void,
+  onPlan?: (totalParts: number) => void,
 ): Promise<string> => {
   const totalParts = Math.ceil(file.size / SPLIT_PART_BYTES);
+  onPlan?.(totalParts);
   const base = path.replace(/\.[^.]+$/, "");
   const ext = path.split(".").pop() || "mp4";
 
@@ -580,9 +593,9 @@ const uploadLargeVideoInParts = async (
     // Loop infinito de retomada — só sai com sucesso ou abort do usuário.
     while (true) {
       try {
-        // forceTus=false + parte < 40MB → cada parte sobe via XHR direto (POST único),
-        // sem overhead do TUS. É o "download invertido" pedido pelo usuário.
-        await uploadFileFast(
+        // Parte grande SEMPRE sobe via XHR direto. Não passa por uploadFileFast
+        // porque o modo Turbo global força TUS lá dentro e deixava tudo lento.
+        await uploadFileDirect(
           "videos",
           partPath,
           part,
@@ -591,7 +604,6 @@ const uploadLargeVideoInParts = async (
             reportProgress();
           },
           (fn) => partAborts.set(i, fn),
-          false,
         );
         partProgress[i] = 1;
         partAborts.delete(i);
@@ -770,11 +782,22 @@ const runJob = async (job: UploadJob) => {
     const ext = job.file.name.split(".").pop() || "mp4";
     // Reusa o caminho persistido para que o TUS consiga retomar exatamente
     // o mesmo objeto no Storage. Se for primeiro envio, gera novo.
+    const shouldSplitVideo = job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES;
+    const persistedPathIsLegacyLargeUpload =
+      shouldSplitVideo && !!existing?.uploadPath && existing.uploadMode !== "direct-parts";
     const path =
-      existing?.uploadPath ??
+      persistedPathIsLegacyLargeUpload
+        ? `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`
+        : existing?.uploadPath ??
       `videos/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-    if (!existing?.uploadPath) {
-      store.update(job.id, { uploadPath: path });
+    if (!existing?.uploadPath || persistedPathIsLegacyLargeUpload) {
+      store.update(job.id, {
+        uploadPath: path,
+        progress: persistedPathIsLegacyLargeUpload ? 0 : existing?.progress ?? 0,
+        errorMsg: persistedPathIsLegacyLargeUpload
+          ? "Reiniciando no modo rápido em partes — envio antigo era do modo lento."
+          : undefined,
+      });
     }
 
     const onVideoProgress = (pct: number, speedMBs: number, etaSec: number) => {
@@ -822,8 +845,19 @@ const runJob = async (job: UploadJob) => {
         });
       };
     const registerVideoAbort = (abortFn: () => void) => store.update(job.id, { abort: abortFn });
-    const videoUrl = job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES
-      ? await uploadLargeVideoInParts(path, job.file, onVideoProgress, registerVideoAbort)
+    const videoUrl = shouldSplitVideo
+      ? await uploadLargeVideoInParts(
+          path,
+          job.file,
+          onVideoProgress,
+          registerVideoAbort,
+          (totalParts) => store.update(job.id, {
+            uploadMode: "direct-parts",
+            uploadPartsTotal: totalParts,
+            uploadPartBytes: SPLIT_PART_BYTES,
+            errorMsg: `Modo rápido ativo: ${totalParts} partes diretas de até ${Math.round(SPLIT_PART_BYTES / 1024 / 1024)}MB.`,
+          }),
+        )
       : await uploadFileFast(
           "videos",
           path,
