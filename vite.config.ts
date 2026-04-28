@@ -4,8 +4,15 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Build version (timestamp ISO) — injetado no app e em /version.json para
+// permitir comparar a versão do preview com a versão publicada.
+const BUILD_VERSION = new Date().toISOString();
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: {
+    __BUILD_VERSION__: JSON.stringify(BUILD_VERSION),
+  },
   server: {
     host: "::",
     port: 8080,
