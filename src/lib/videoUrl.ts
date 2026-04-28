@@ -58,13 +58,28 @@ export const resolveVideoSource = (rawUrl: string | null | undefined): VideoSour
     };
   }
 
-  // Google Drive
-  const gd = url.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
-  if (gd) {
-    return {
-      kind: "iframe",
-      url: `https://drive.google.com/file/d/${gd[1]}/preview`,
-    };
+  // Google Drive — cobre todas as variantes de link compartilhado:
+  //  • https://drive.google.com/file/d/<ID>/view?usp=sharing
+  //  • https://drive.google.com/open?id=<ID>
+  //  • https://drive.google.com/uc?export=download&id=<ID>
+  //  • https://drive.google.com/uc?id=<ID>
+  //  • https://drive.usercontent.google.com/download?id=<ID>
+  //  • https://docs.google.com/uc?id=<ID>
+  const gdPatterns = [
+    /drive\.google\.com\/file\/d\/([\w-]{10,})/,
+    /drive\.google\.com\/(?:open|uc)\?(?:[^#]*&)?id=([\w-]{10,})/,
+    /drive\.usercontent\.google\.com\/(?:download|uc)\?(?:[^#]*&)?id=([\w-]{10,})/,
+    /docs\.google\.com\/uc\?(?:[^#]*&)?id=([\w-]{10,})/,
+    /drive\.google\.com\/.*[?&]id=([\w-]{10,})/,
+  ];
+  for (const re of gdPatterns) {
+    const m = url.match(re);
+    if (m) {
+      return {
+        kind: "iframe",
+        url: `https://drive.google.com/file/d/${m[1]}/preview`,
+      };
+    }
   }
 
   // Link direto de vídeo (mp4, webm, mov, m3u8)
