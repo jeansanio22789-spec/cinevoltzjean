@@ -684,7 +684,9 @@ const runJob = async (job: UploadJob) => {
           lockedEndAt,
           status: keepWarn ? "warning" : "uploading",
           lastProgressAt: Date.now(),
-          retryCount: 0,
+          // ⚠️ NÃO zera retryCount aqui — se zerasse a cada chunk com
+          // progresso, um upload que avança 1% e cai sempre nunca
+          // atingiria o teto de tentativas e ficaria "reiniciando" eternamente.
         });
       },
       (abortFn) => store.update(job.id, { abort: abortFn }),
@@ -717,7 +719,7 @@ const runJob = async (job: UploadJob) => {
     });
     if (error) throw error;
 
-    store.update(job.id, { status: "done", progress: 100 });
+    store.update(job.id, { status: "done", progress: 100, retryCount: 0 });
     void deletePersistedUploadJob(job.id);
     void deleteRemoteJob(job.id);
     for (const cb of doneCallbacks) {
@@ -737,16 +739,28 @@ const runJob = async (job: UploadJob) => {
     } else if (isRetryableUploadError(err)) {
       const cur = store.jobs.find((j) => j.id === job.id);
       const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
-      const delayMs = Math.min(60_000, 3_000 * retryCount);
-      store.update(job.id, {
-        status: "warning",
-        errorMsg: `Conexão instável — tentando retomar automaticamente (${retryCount})...`,
-        speedMBs: 0,
-        etaSec: 0,
-        retryCount,
-        lastProgressAt: Date.now(),
-      });
-      queueJobRetry(job.id, delayMs);
+      const MAX_RETRIES = 5;
+      if (retryCount > MAX_RETRIES) {
+        // 🛑 Esgotamos as tentativas — para de reiniciar e deixa o usuário decidir.
+        store.update(job.id, {
+          status: "error",
+          errorMsg: `Não foi possível concluir o envio após ${MAX_RETRIES} tentativas. Verifique sua conexão e clique em "Tentar novamente".`,
+          retryCount,
+          speedMBs: 0,
+          etaSec: 0,
+        });
+      } else {
+        const delayMs = Math.min(60_000, 3_000 * retryCount);
+        store.update(job.id, {
+          status: "warning",
+          errorMsg: `Conexão instável — tentando retomar automaticamente (${retryCount}/${MAX_RETRIES})...`,
+          speedMBs: 0,
+          etaSec: 0,
+          retryCount,
+          lastProgressAt: Date.now(),
+        });
+        queueJobRetry(job.id, delayMs);
+      }
     } else {
       store.update(job.id, {
         status: "error",
