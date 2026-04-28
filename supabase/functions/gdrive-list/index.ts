@@ -57,13 +57,14 @@ Deno.serve(async (req) => {
     if (folderId) queryParts.push(`'${folderId}' in parents`);
     if (search) queryParts.push(`name contains '${search.replace(/'/g, "\\'")}'`);
 
-    const params = new URLSearchParams({
-      q: queryParts.join(" and "),
-      fields: "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime)",
-      pageSize: "50",
-      orderBy: "modifiedTime desc",
-    });
-    if (pageToken) params.set("pageToken", pageToken);
+    const params = new URLSearchParams();
+    params.set("q", queryParts.join(" and "));
+    params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime)");
+    params.set("pageSize", "50");
+    params.set("orderBy", "modifiedTime desc");
+    params.set("supportsAllDrives", "true");
+    params.set("includeItemsFromAllDrives", "true");
+    if (pageToken && pageToken.trim()) params.set("pageToken", pageToken);
 
     const resp = await fetch(`${GATEWAY_URL}/files?${params}`, {
       headers: {
