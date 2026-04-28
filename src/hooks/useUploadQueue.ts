@@ -426,7 +426,7 @@ const uploadFileTus = (
 
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 1000, 3000, 5000, 10000, 20000, 30000, 60000],
+      retryDelays: [0, 500, 1000, 2000, 3000, 5000, 8000, 10000, 15000, 20000, 30000, 45000, 60000, 90000, 120000],
       headers: {
         authorization: `Bearer ${token}`,
         "x-upsert": "true",
@@ -482,9 +482,11 @@ const uploadFileTus = (
 // "Maximum size exceeded". Por isso baixamos o threshold pra 40MB —
 // arquivos maiores DEVEM ir por TUS (chunks de 6MB que passam pelo gateway).
 const TUS_THRESHOLD_BYTES = 40 * 1024 * 1024; // 40 MB (abaixo do limite de 50MB)
-const MAX_VIDEO_FILE_BYTES = 1024 * 1024 * 1024 * 1024; // 1 TB
-const SPLIT_VIDEO_THRESHOLD_BYTES = 2 * 1024 * 1024 * 1024; // limite real do upload por objeto
-const SPLIT_PART_BYTES = 512 * 1024 * 1024; // partes seguras abaixo do teto
+const MAX_VIDEO_FILE_BYTES = Number.MAX_SAFE_INTEGER; // sem teto de tamanho
+// Partes menores = se uma falhar, perde menos tempo retomando.
+// 100MB é seguro pro gateway e dá pra paralelizar várias.
+const SPLIT_VIDEO_THRESHOLD_BYTES = 200 * 1024 * 1024; // tudo > 200MB já vai em partes
+const SPLIT_PART_BYTES = 100 * 1024 * 1024; // 100MB por parte
 
 const uploadFileFast = async (
   bucket: string,
@@ -533,28 +535,86 @@ const uploadLargeVideoInParts = async (
   const totalParts = Math.ceil(file.size / SPLIT_PART_BYTES);
   const base = path.replace(/\.[^.]+$/, "");
   const ext = path.split(".").pop() || "mp4";
-  let uploadedBytes = 0;
 
+  // Progresso por parte (0..1) — somamos ponderado pelo tamanho de cada parte.
+  const partProgress = new Array<number>(totalParts).fill(0);
+  const partSizes = new Array<number>(totalParts).fill(0);
   for (let i = 0; i < totalParts; i++) {
+    const start = i * SPLIT_PART_BYTES;
+    const end = Math.min(file.size, start + SPLIT_PART_BYTES);
+    partSizes[i] = end - start;
+  }
+  const startedAt = Date.now();
+
+  const reportProgress = () => {
+    let uploaded = 0;
+    for (let i = 0; i < totalParts; i++) uploaded += partSizes[i] * partProgress[i];
+    const pct = (uploaded / file.size) * 100;
+    const elapsed = Math.max(0.1, (Date.now() - startedAt) / 1000);
+    const speedMBs = uploaded / 1024 / 1024 / elapsed;
+    const remainingMB = (file.size - uploaded) / 1024 / 1024;
+    const etaSec = remainingMB / Math.max(speedMBs, 0.01);
+    onProgress(pct, speedMBs, etaSec);
+  };
+
+  // Aborts de cada parte ativa
+  const partAborts = new Map<number, () => void>();
+  registerAbort(() => {
+    partAborts.forEach((fn) => {
+      try { fn(); } catch { /* noop */ }
+    });
+  });
+
+  // ⚡ Paralelismo: sobe N partes ao mesmo tempo. Sinal agressivo = banda toda.
+  const PARALLEL_PARTS = turboForced ? 1 : 3;
+
+  const uploadPart = async (i: number): Promise<void> => {
     const start = i * SPLIT_PART_BYTES;
     const end = Math.min(file.size, start + SPLIT_PART_BYTES);
     const part = file.slice(start, end, file.type || "video/mp4");
     const partPath = `${base}.part-${String(i).padStart(4, "0")}.${ext}`;
 
-    await uploadFileFast(
-      "videos",
-      partPath,
-      part,
-      (partPct, speedMBs, etaSec) => {
-        const partUploaded = ((end - start) * partPct) / 100;
-        const totalPct = ((uploadedBytes + partUploaded) / file.size) * 100;
-        onProgress(totalPct, speedMBs, etaSec);
-      },
-      registerAbort,
-      true,
-    );
-    uploadedBytes = end;
+    let attempt = 0;
+    // Loop infinito de retomada — só sai com sucesso ou abort do usuário.
+    while (true) {
+      try {
+        await uploadFileFast(
+          "videos",
+          partPath,
+          part,
+          (partPct) => {
+            partProgress[i] = Math.max(0, Math.min(1, partPct / 100));
+            reportProgress();
+          },
+          (fn) => partAborts.set(i, fn),
+          true,
+        );
+        partProgress[i] = 1;
+        partAborts.delete(i);
+        reportProgress();
+        return;
+      } catch (err) {
+        if (isAbortUploadError(err)) throw err;
+        attempt++;
+        // Backoff curto (max 10s). Nunca desiste.
+        await new Promise((r) => setTimeout(r, Math.min(10_000, 1_000 * attempt)));
+      }
+    }
+  };
+
+  // Janela deslizante de PARALLEL_PARTS uploads simultâneos
+  let nextIndex = 0;
+  const workers: Promise<void>[] = [];
+  const launch = async (): Promise<void> => {
+    while (nextIndex < totalParts) {
+      const i = nextIndex++;
+      await uploadPart(i);
+    }
+  };
+  for (let w = 0; w < Math.min(PARALLEL_PARTS, totalParts); w++) {
+    workers.push(launch());
   }
+  await Promise.all(workers);
 
   return `split://${base}|${totalParts}|${ext}`;
 };
@@ -579,7 +639,9 @@ const queueJobRetry = (jobId: string, delayMs: number) => {
 const isRetryableUploadError = (err: unknown) => {
   const msg = uploadErrorMessage(err);
   if (isStorageLimitUploadError(err)) return false;
-  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload/i.test(msg);
+  // Praticamente tudo que não é 413 deve ser retomado — sinal agressivo.
+  return /tus:|chunk|offset|network|fetch|timeout|falha de rede|failed to upload|connection|reset|ECONN|ETIMEDOUT|socket|stream|aborted by network|503|502|504|500|429|unknown|empty response/i.test(msg)
+    || msg.length === 0;
 };
 
 // 🚦 Fila sequencial inteligente
@@ -813,28 +875,18 @@ const runJob = async (job: UploadJob) => {
     } else if (isRetryableUploadError(err)) {
       const cur = store.jobs.find((j) => j.id === job.id);
       const retryCount = (cur?.retryCount ?? job.retryCount ?? 0) + 1;
-      const MAX_RETRIES = 5;
-      if (retryCount > MAX_RETRIES) {
-        // 🛑 Esgotamos as tentativas — para de reiniciar e deixa o usuário decidir.
-        store.update(job.id, {
-          status: "error",
-          errorMsg: `Não foi possível concluir o envio após ${MAX_RETRIES} tentativas. Verifique sua conexão e clique em "Tentar novamente".`,
-          retryCount,
-          speedMBs: 0,
-          etaSec: 0,
-        });
-      } else {
-        const delayMs = Math.min(60_000, 3_000 * retryCount);
-        store.update(job.id, {
-          status: "warning",
-          errorMsg: `Conexão instável — tentando retomar automaticamente (${retryCount}/${MAX_RETRIES})...`,
-          speedMBs: 0,
-          etaSec: 0,
-          retryCount,
-          lastProgressAt: Date.now(),
-        });
-        queueJobRetry(job.id, delayMs);
-      }
+      // 🔥 Sinal agressivo: nunca desiste sozinho. Reconecta indefinidamente.
+      // Backoff curto (máx 15s) pra retomar rápido assim que a rede voltar.
+      const delayMs = Math.min(15_000, 1_500 * retryCount);
+      store.update(job.id, {
+        status: "warning",
+        errorMsg: `Reconectando automaticamente (tentativa ${retryCount})...`,
+        speedMBs: 0,
+        etaSec: 0,
+        retryCount,
+        lastProgressAt: Date.now(),
+      });
+      queueJobRetry(job.id, delayMs);
     } else {
       // Mostra o erro REAL retornado pelo servidor para facilitar o diagnóstico,
       // em vez de mascarar tudo como "limite de tamanho".
