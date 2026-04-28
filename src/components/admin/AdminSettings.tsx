@@ -56,6 +56,33 @@ const AdminSettings = () => {
     toast.success("Configurações salvas!");
   };
 
+  /**
+   * Publica nova versão do app: grava em platform_settings e dispara
+   * o banner de "Atualizar" para todos os dispositivos.
+   */
+  const publishAppVersion = async () => {
+    const version = (settings.app_version || "").trim();
+    if (!version) {
+      toast.error("Defina um número de versão (ex.: 1.0.1)");
+      return;
+    }
+    setSaving(true);
+    const rows = [
+      { key: "app_version", value: version },
+      { key: "app_update_message", value: settings.app_update_message || "" },
+    ];
+    for (const row of rows) {
+      await supabase
+        .from("platform_settings")
+        .upsert(
+          { ...row, updated_at: new Date().toISOString() },
+          { onConflict: "key" },
+        );
+    }
+    setSaving(false);
+    toast.success(`Versão ${version} publicada! Usuários verão o aviso de atualização.`);
+  };
+
   const removeDevice = async (id: string, deviceId: string) => {
     if (deviceId === currentId) {
       if (!confirm("Remover ESTE aparelho? Você precisará cadastrar a digital novamente.")) return;
