@@ -534,6 +534,11 @@ const MAX_VIDEO_FILE_BYTES = Number.MAX_SAFE_INTEGER; // sem teto de tamanho
 const SPLIT_VIDEO_THRESHOLD_BYTES = 30 * 1024 * 1024; // > 30MB já parte
 const SPLIT_PART_BYTES = 30 * 1024 * 1024; // 30MB por parte: fica ABAIXO do TUS_THRESHOLD e força XHR direto
 
+const canAutoRecoverStorageLimitJob = (job: UploadJob) =>
+  job.file.size > SPLIT_VIDEO_THRESHOLD_BYTES &&
+  job.uploadMode !== "direct-parts" &&
+  isStorageLimitUploadError(new Error(job.errorMsg || ""));
+
 const uploadFileFast = async (
   bucket: string,
   path: string,
