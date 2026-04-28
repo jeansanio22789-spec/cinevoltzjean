@@ -161,6 +161,9 @@ const AdminDashboard = () => {
       {/* Live preview do app */}
       <LivePreview />
 
+      {/* Status de publicação: compara preview x app público */}
+      <BuildStatusCard />
+
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 admin-card p-6">
