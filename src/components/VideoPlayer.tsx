@@ -555,7 +555,6 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
 
   const pct = duration ? (current / duration) * 100 : 0;
   const bufPct = duration ? (buffered / duration) * 100 : 0;
-  const forceOpenUrl = externalUrl || src;
 
   return (
     <div
