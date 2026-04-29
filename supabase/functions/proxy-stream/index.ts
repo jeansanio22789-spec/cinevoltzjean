@@ -29,6 +29,7 @@ const STRIP_HEADERS = [
   "cross-origin-opener-policy",
   "cross-origin-embedder-policy",
   "cross-origin-resource-policy",
+  "content-disposition",
   "permissions-policy",
   "referrer-policy",
 ];
@@ -230,6 +231,7 @@ Deno.serve(async (req) => {
       });
       Object.entries(CORS).forEach(([k, v]) => respHeaders.set(k, v));
       respHeaders.set("content-type", upstream.headers.get("content-type") || contentType);
+      respHeaders.set("content-disposition", "inline");
       respHeaders.set("accept-ranges", "bytes");
       respHeaders.set("cache-control", "public, max-age=300");
 
