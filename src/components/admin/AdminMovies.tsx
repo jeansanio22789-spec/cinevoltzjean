@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2, Send, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2, Send, Users, Sparkles } from "lucide-react";
 import MovieAccessManager from "./MovieAccessManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ interface Movie {
   rating: string | null;
   status: string | null;
   price: number | null;
+  is_premiere?: boolean | null;
 }
 
 const AdminMovies = () => {
@@ -47,6 +48,7 @@ const AdminMovies = () => {
     rating: "14+",
     status: "draft",
     price: 10,
+    is_premiere: false,
   });
 
   const fetchMovies = async () => {
@@ -69,7 +71,7 @@ const AdminMovies = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft", price: 10 });
+    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft", price: 10, is_premiere: false });
     setShowForm(true);
   };
 
@@ -87,6 +89,7 @@ const AdminMovies = () => {
       rating: movie.rating || "14+",
       status: movie.status || "draft",
       price: movie.price ?? 10,
+      is_premiere: !!movie.is_premiere,
     });
     setShowForm(true);
   };
@@ -580,6 +583,23 @@ const AdminMovies = () => {
                   <option value="published">Publicado</option>
                 </select>
               </div>
+
+              <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-background/50 cursor-pointer hover:border-primary/40 transition-colors">
+                <div className="flex-1">
+                  <div className="text-sm font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" /> Marcar como Estreia
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Filmes marcados aparecem na seção <span className="text-primary font-semibold">🎬 Estreias</span> da home.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={form.is_premiere}
+                  onChange={(e) => setForm({ ...form, is_premiere: e.target.checked })}
+                  className="w-5 h-5 accent-primary cursor-pointer"
+                />
+              </label>
             </div>
 
             <div className="flex gap-3 mt-6">

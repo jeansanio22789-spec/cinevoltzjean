@@ -27,6 +27,9 @@ const Index = () => {
   // "Em alta" — pega os 12 mais recentes (proxy de tendência por enquanto)
   const trending = useMemo(() => filtered.slice(0, 12), [filtered]);
 
+  // Estreias — marcadas manualmente pelo admin
+  const premieres = useMemo(() => filtered.filter((m) => m.is_premiere), [filtered]);
+
   // "Para você" — embaralhamento determinístico baseado no id pra dar
   // sensação de recomendação personalizada sem chamar IA.
   const forYou = useMemo(() => {
@@ -94,6 +97,7 @@ const Index = () => {
             {continueWatching.length > 0 && (
               <ContentRail title="Continuar assistindo" movies={continueWatching} />
             )}
+            {premieres.length > 0 && <ContentRail title="🎬 Estreias" movies={premieres} />}
             {trending.length > 0 && <ContentRail title="🔥 Em alta" movies={trending} />}
             {forYou.length > 0 && <ContentRail title="Para você" movies={forYou} />}
             {recent.length > 0 && <ContentRail title="Adicionados recentemente" movies={recent} />}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X } from "lucide-react";
+import DirectVideoUploader from "./DirectVideoUploader";
 
 interface DriveFile {
   id: string;
@@ -137,6 +138,8 @@ export default function AdminGoogleDriveImport() {
 
   return (
     <div className="space-y-4">
+      <DirectVideoUploader />
+
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <FolderOpen className="h-4 w-4 text-primary" />
