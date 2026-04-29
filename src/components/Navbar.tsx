@@ -48,10 +48,12 @@ const Navbar = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 px-4 md:px-12 py-3 flex items-center justify-between transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled ? "navbar-solid" : "navbar-transparent"
       }`}
     >
+      <div className="px-4 md:px-12 py-3 flex items-center justify-between">
+
       <Link to="/" className="flex items-center gap-2 mr-6 shrink-0">
         {brand.logoUrl ? (
           <img src={brand.logoUrl} alt={brand.name} className="w-8 h-8 rounded-md object-contain" />
