@@ -27,6 +27,9 @@ const Index = () => {
   // "Em alta" — pega os 12 mais recentes (proxy de tendência por enquanto)
   const trending = useMemo(() => filtered.slice(0, 12), [filtered]);
 
+  // Estreias — marcadas manualmente pelo admin
+  const premieres = useMemo(() => filtered.filter((m) => m.is_premiere), [filtered]);
+
   // "Para você" — embaralhamento determinístico baseado no id pra dar
   // sensação de recomendação personalizada sem chamar IA.
   const forYou = useMemo(() => {
