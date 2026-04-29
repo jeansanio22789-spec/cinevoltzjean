@@ -255,12 +255,19 @@ export default function AdminGoogleDriveImport() {
                   <div className="min-w-0 flex-1">
                     <input
                       type="text"
-                      value={titles[f.id] ?? cleanTitleFromFilename(f.name)}
+                      value={isDone ? (imported.get(f.id) || cleanTitleFromFilename(f.name)) : (titles[f.id] ?? cleanTitleFromFilename(f.name))}
                       onChange={(e) => setTitles((t) => ({ ...t, [f.id]: e.target.value }))}
-                      className="w-full bg-transparent text-sm font-medium outline-none border-b border-transparent hover:border-border focus:border-primary py-0.5"
-                      title={`Arquivo: ${f.name}`}
+                      readOnly={isDone}
+                      disabled={isDone}
+                      className={`w-full bg-transparent text-sm font-medium outline-none border-b border-transparent py-0.5 ${
+                        isDone
+                          ? "text-muted-foreground cursor-not-allowed"
+                          : "hover:border-border focus:border-primary"
+                      }`}
+                      title={isDone ? `Já no app: ${imported.get(f.id)}` : `Arquivo: ${f.name}`}
                     />
                     <div className="text-xs text-muted-foreground">
+                      {isDone && <span className="text-primary font-medium">✓ já enviado · </span>}
                       {formatSize(f.size)}
                       {f.videoMediaMetadata?.durationMillis && (
                         <> · {Math.round(Number(f.videoMediaMetadata.durationMillis) / 60000)} min</>
