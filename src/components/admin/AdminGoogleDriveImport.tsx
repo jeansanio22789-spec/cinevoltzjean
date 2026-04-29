@@ -182,13 +182,35 @@ export default function AdminGoogleDriveImport() {
 
       </Card>
 
-      {files.length > 0 && (
+      {files.length > 0 && (() => {
+        const visible = hideImported ? files.filter((f) => !imported.has(f.id)) : files;
+        const importedCount = files.filter((f) => imported.has(f.id)).length;
+        return (
         <Card className="p-3">
-          <div className="text-xs text-muted-foreground mb-3">
-            {files.length} vídeo(s) encontrado(s)
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="text-xs text-muted-foreground">
+              {visible.length} de {files.length} vídeo(s)
+              {importedCount > 0 && (
+                <span className="text-primary ml-1">· {importedCount} já no app</span>
+              )}
+            </div>
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideImported}
+                onChange={(e) => setHideImported(e.target.checked)}
+                className="w-3.5 h-3.5 accent-primary cursor-pointer"
+              />
+              Mostrar só os novos
+            </label>
           </div>
+          {visible.length === 0 ? (
+            <div className="text-center py-6 text-xs text-muted-foreground">
+              Tudo dessa pasta já foi importado. Desmarque <strong>"Mostrar só os novos"</strong> para ver de novo.
+            </div>
+          ) : (
           <div className="space-y-2">
-            {files.map((f) => {
+            {visible.map((f) => {
               const isDone = imported.has(f.id);
               const isImporting = importing === f.id;
               return (
