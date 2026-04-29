@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     const listPage = async (q: string, pageToken?: string | null) => {
       const params = new URLSearchParams();
       params.set("q", q);
-      params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime,parents)");
+      params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime,parents,shortcutDetails)");
       params.set("pageSize", "1000");
       params.set("orderBy", "modifiedTime desc");
       params.set("supportsAllDrives", "true");
@@ -107,24 +107,45 @@ Deno.serve(async (req) => {
     let allFiles: any[] = [];
 
     if (folderId) {
-      // Walk recursivo: pasta principal + subpastas
+      // Walk recursivo: pasta principal + subpastas (+ atalhos)
       const visited = new Set<string>();
       const stack: string[] = [folderId];
+      let folderCount = 0;
       while (stack.length) {
         const current = stack.pop()!;
         if (visited.has(current)) continue;
         visited.add(current);
+        folderCount++;
         const items = await listAllInParent(current);
         for (const f of items) {
-          if (f.mimeType === "application/vnd.google-apps.folder") {
+          const mime = String(f.mimeType || "");
+          // Pasta normal
+          if (mime === "application/vnd.google-apps.folder") {
             stack.push(f.id);
-          } else if (typeof f.mimeType === "string" && f.mimeType.startsWith("video/")) {
+            continue;
+          }
+          // Atalho (shortcut) — segue o alvo
+          if (mime === "application/vnd.google-apps.shortcut") {
+            const target = f.shortcutDetails;
+            if (target?.targetMimeType === "application/vnd.google-apps.folder" && target?.targetId) {
+              stack.push(target.targetId);
+            } else if (typeof target?.targetMimeType === "string" && target.targetMimeType.startsWith("video/") && target?.targetId) {
+              allFiles.push({ ...f, id: target.targetId, mimeType: target.targetMimeType });
+            }
+            continue;
+          }
+          // Vídeo
+          if (mime.startsWith("video/")) {
             allFiles.push(f);
           }
         }
-        // Limite de segurança pra não estourar tempo de execução
-        if (visited.size > 200) break;
+        // Limite de segurança aumentado
+        if (folderCount > 1000) {
+          console.warn(`[gdrive-list] folder cap atingido em ${folderCount}`);
+          break;
+        }
       }
+      console.log(`[gdrive-list] varreu ${folderCount} pastas, achou ${allFiles.length} vídeos`);
 
       // Aplica filtro de busca por nome (client-side, case-insensitive)
       if (search) {
