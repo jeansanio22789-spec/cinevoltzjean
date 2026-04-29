@@ -167,7 +167,9 @@ const TurkishSeries = () => {
                   <iframe
                     src={playingEp.player_url}
                     allowFullScreen
-                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    sandbox="allow-same-origin allow-scripts allow-presentation allow-forms"
+                    referrerPolicy="no-referrer"
                     className="w-full h-full"
                   />
                 ) : (
