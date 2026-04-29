@@ -71,7 +71,7 @@ const AdminMovies = () => {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft", price: 10 });
+    setForm({ title: "", video_url: "", telegram_url: "", thumbnail_url: "", description: "", genre: "Ação", year: 2025, duration: "", rating: "14+", status: "draft", price: 10, is_premiere: false });
     setShowForm(true);
   };
 
@@ -89,6 +89,7 @@ const AdminMovies = () => {
       rating: movie.rating || "14+",
       status: movie.status || "draft",
       price: movie.price ?? 10,
+      is_premiere: !!movie.is_premiere,
     });
     setShowForm(true);
   };
