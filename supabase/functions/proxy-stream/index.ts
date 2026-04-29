@@ -174,6 +174,32 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Resolve a URL real de download (com cookie de confirmação se necessário)
+      // através do gateway, e em seguida REDIRECIONA o cliente para baixar
+      // direto do Google — muito mais rápido que streamar pela edge function.
+      try {
+        const meta = await fetch(
+          `${GDRIVE_GATEWAY_URL}/files/${driveFileId}?alt=media&supportsAllDrives=true`,
+          {
+            method: "HEAD",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "X-Connection-Api-Key": GDRIVE_KEY,
+            },
+            redirect: "manual",
+          },
+        );
+        const location = meta.headers.get("location");
+        if (location) {
+          return new Response(null, {
+            status: 302,
+            headers: { ...CORS, Location: location },
+          });
+        }
+      } catch (_) {
+        // cai no streaming via gateway abaixo
+      }
+
       const driveHeaders: Record<string, string> = {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "X-Connection-Api-Key": GDRIVE_KEY,
