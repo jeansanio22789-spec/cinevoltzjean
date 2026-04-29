@@ -11,6 +11,7 @@ const navLinks = [
   { label: "Ao Vivo", path: "/ao-vivo" },
   { label: "Filmes", path: "/" },
   { label: "Séries", path: "/" },
+  { label: "Novelas Turcas", path: "/novelas-turcas" },
   { label: "Minha Lista", path: "/" },
   { label: "Trabalhe Conosco", path: "/carreiras" },
 ];
