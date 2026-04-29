@@ -208,11 +208,22 @@ const TurkishSeries = () => {
                       ref={videoRef}
                       src={videoUrl}
                       controls
+                      autoPlay
                       playsInline
                       className="w-full h-full"
                       controlsList="nodownload noremoteplayback"
                       disablePictureInPicture={false}
                       onContextMenu={(e) => e.preventDefault()}
+                      onEnded={() => {
+                        const idx = episodes.findIndex((e) => e.id === playingEp?.id);
+                        const next = idx >= 0 ? episodes[idx + 1] : null;
+                        if (next) {
+                          toast.success(`Próximo: ${next.title}`);
+                          startEpisode(next);
+                        } else {
+                          toast.info("Você assistiu o último episódio disponível.");
+                        }
+                      }}
                     >
                       {/* Legenda em português, se disponível na origem */}
                     </video>
