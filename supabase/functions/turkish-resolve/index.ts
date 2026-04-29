@@ -42,8 +42,20 @@ async function resolveVideoUrl(playerUrl: string): Promise<string | null> {
     const m = html.match(/src=["']([^"']*video\.php\?token=[^"']+)["']/i);
     if (!m) return null;
     const rel = m[1];
-    const finalUrl = rel.startsWith("http") ? rel : `${base}/p/${rel.replace(/^\.?\//, "")}`;
-    return finalUrl;
+    const videoPhpUrl = rel.startsWith("http") ? rel : `${base}/p/${rel.replace(/^\.?\//, "")}`;
+
+    // video.php (sem referer) faz 302 para o MP4 final no acplay.live
+    const r2 = await fetch(videoPhpUrl, {
+      method: "GET",
+      headers: { "User-Agent": UA },
+      redirect: "manual",
+    });
+    const loc = r2.headers.get("location");
+    if (loc && /\.mp4(\?|$)/i.test(loc)) {
+      return loc.startsWith("http") ? loc : new URL(loc, videoPhpUrl).toString();
+    }
+    // Fallback: se não houver redirect, devolve o video.php (vai funcionar mas servidor pode bloquear)
+    return videoPhpUrl;
   } catch (_) {
     return null;
   }

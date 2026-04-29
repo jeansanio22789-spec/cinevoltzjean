@@ -1,0 +1,1 @@
+UPDATE public.turkish_episodes SET resolved_url = NULL, resolved_at = NULL;
