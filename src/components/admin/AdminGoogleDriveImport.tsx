@@ -90,16 +90,16 @@ export default function AdminGoogleDriveImport() {
   const loadFiles = async () => {
     setLoading(true);
     try {
-      // Busca os já importados primeiro pra marcar/filtrar
+      // Busca os já importados (id do Drive -> título salvo) pra marcar/bloquear
       const { data: existing } = await supabase
         .from("movies")
-        .select("video_url");
-      const existingIds = new Set<string>();
+        .select("title, video_url");
+      const existingMap = new Map<string, string>();
       (existing || []).forEach((mv) => {
         const m = String(mv.video_url || "").match(/\/file\/d\/([\w-]+)/);
-        if (m) existingIds.add(m[1]);
+        if (m) existingMap.set(m[1], mv.title || "");
       });
-      setImported(existingIds);
+      setImported(existingMap);
 
       const { data, error } = await supabase.functions.invoke("gdrive-list", {
         body: {
