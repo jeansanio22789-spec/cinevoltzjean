@@ -51,62 +51,7 @@ export default function AdminGoogleDriveImport() {
   const [imported, setImported] = useState<Set<string>>(new Set());
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
   const [titles, setTitles] = useState<Record<string, string>>({});
-  const [autoDetecting, setAutoDetecting] = useState(false);
-  const [autoWatch, setAutoWatch] = useState(false);
-  const watchRef = useRef<number | null>(null);
 
-  const autoDetect = async (silent = false) => {
-    if (!silent) setAutoDetecting(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("gdrive-auto-import", {
-        body: {
-          folderId: folderId.trim() ? extractFolderId(folderId) : undefined,
-          genre: "Estreias",
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const n = data?.imported || 0;
-      if (n > 0) {
-        toast({
-          title: `🎬 ${n} estreia(s) adicionada(s)!`,
-          description: data.items.map((i: any) => i.title).slice(0, 3).join(", "),
-        });
-        // marca como importados na lista
-        setImported((s) => {
-          const ns = new Set(s);
-          data.items.forEach((i: any) => {
-            const m = String(i.video_url || "").match(/\/file\/d\/([\w-]+)/);
-            if (m) ns.add(m[1]);
-          });
-          return ns;
-        });
-      } else if (!silent) {
-        toast({ title: "Nada novo no Drive", description: `${data?.scanned || 0} vídeos verificados, todos já importados.` });
-      }
-    } catch (e) {
-      if (!silent) {
-        toast({ title: "Erro na detecção", description: (e as Error).message, variant: "destructive" });
-      }
-    } finally {
-      if (!silent) setAutoDetecting(false);
-    }
-  };
-
-  // Auto-watch: verifica a cada 60s
-  useEffect(() => {
-    if (autoWatch) {
-      autoDetect(true);
-      watchRef.current = window.setInterval(() => autoDetect(true), 60000);
-    } else if (watchRef.current) {
-      clearInterval(watchRef.current);
-      watchRef.current = null;
-    }
-    return () => {
-      if (watchRef.current) clearInterval(watchRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoWatch, folderId]);
 
   const uploadCover = async (fileId: string, file: File) => {
     setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
