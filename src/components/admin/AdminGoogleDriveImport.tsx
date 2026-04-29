@@ -175,15 +175,16 @@ export default function AdminGoogleDriveImport() {
           Importar do Google Drive
         </div>
         <p className="text-xs text-muted-foreground">
-          Cole o link da pasta do Drive (ex: <code>https://drive.google.com/drive/folders/ABC123</code>)
-          ou deixe vazio para listar todos os vídeos da sua conta. O arquivo é marcado automaticamente
-          como público ao importar.
+          Pasta fixa do Drive já configurada. Use o campo de busca para filtrar por nome.
+          O arquivo é marcado automaticamente como público ao importar.
         </p>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <Input
-            placeholder="Link/ID da pasta (opcional)"
             value={folderId}
-            onChange={(e) => setFolderId(e.target.value)}
+            readOnly
+            disabled
+            className="cursor-not-allowed opacity-70"
+            title="Link da pasta travado"
           />
           <Input
             placeholder="Buscar por nome (opcional)"
