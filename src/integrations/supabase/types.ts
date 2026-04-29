@@ -769,6 +769,8 @@ export type Database = {
           episode_number: number
           id: string
           player_url: string | null
+          resolved_at: string | null
+          resolved_url: string | null
           series_id: string
           source_url: string | null
           thumbnail_url: string | null
@@ -779,6 +781,8 @@ export type Database = {
           episode_number?: number
           id?: string
           player_url?: string | null
+          resolved_at?: string | null
+          resolved_url?: string | null
           series_id: string
           source_url?: string | null
           thumbnail_url?: string | null
@@ -789,6 +793,8 @@ export type Database = {
           episode_number?: number
           id?: string
           player_url?: string | null
+          resolved_at?: string | null
+          resolved_url?: string | null
           series_id?: string
           source_url?: string | null
           thumbnail_url?: string | null
