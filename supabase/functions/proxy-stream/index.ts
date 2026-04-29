@@ -165,61 +165,13 @@ Deno.serve(async (req) => {
 
     const driveFileId = isDrive ? extractDriveFileId(remote.toString()) : null;
     if (driveFileId) {
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      const GDRIVE_KEY = Deno.env.get("GOOGLE_DRIVE_API_KEY");
-      if (!LOVABLE_API_KEY || !GDRIVE_KEY) {
-        return new Response(JSON.stringify({ error: "drive_connector_missing" }), {
-          status: 500,
-          headers: { ...CORS, "content-type": "application/json" },
-        });
-      }
-
-      // Resolve a URL real de download (com cookie de confirmação se necessário)
-      // através do gateway, e em seguida REDIRECIONA o cliente para baixar
-      // direto do Google — muito mais rápido que streamar pela edge function.
-      try {
-        const meta = await fetch(
-          `${GDRIVE_GATEWAY_URL}/files/${driveFileId}?alt=media&supportsAllDrives=true`,
-          {
-            method: "HEAD",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "X-Connection-Api-Key": GDRIVE_KEY,
-            },
-            redirect: "manual",
-          },
-        );
-        const location = meta.headers.get("location");
-        if (location) {
-          return new Response(null, {
-            status: 302,
-            headers: { ...CORS, Location: location },
-          });
-        }
-      } catch (_) {
-        // cai no streaming via gateway abaixo
-      }
-
-      const driveHeaders: Record<string, string> = {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": GDRIVE_KEY,
-      };
-      const range = req.headers.get("range");
-      if (range) driveHeaders["Range"] = range;
-
-      const upstream = await fetch(`${GDRIVE_GATEWAY_URL}/files/${driveFileId}?alt=media&supportsAllDrives=true`, {
-        method: req.method === "HEAD" ? "HEAD" : "GET",
-        headers: driveHeaders,
-        redirect: "follow",
+      // Redireciona direto pro Drive — browser faz Range requests nativos,
+      // começa a tocar imediatamente sem baixar o arquivo inteiro.
+      const directUrl = `https://drive.usercontent.google.com/download?id=${driveFileId}&export=download&authuser=0&confirm=t`;
+      return new Response(null, {
+        status: 302,
+        headers: { ...CORS, Location: directUrl, "Cache-Control": "no-store" },
       });
-
-      const respHeaders = new Headers();
-      upstream.headers.forEach((value, key) => {
-        if (!STRIP_HEADERS.includes(key.toLowerCase())) respHeaders.set(key, value);
-      });
-      Object.entries(CORS).forEach(([k, v]) => respHeaders.set(k, v));
-      if (!respHeaders.get("content-type")) respHeaders.set("content-type", "video/mp4");
-      return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
     }
 
     const fwdHeaders: Record<string, string> = {
