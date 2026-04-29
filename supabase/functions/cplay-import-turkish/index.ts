@@ -210,15 +210,8 @@ Deno.serve(async (req) => {
 
           totalSeries += 1;
 
+          // player_url já vem direto do <option> da página da série — não precisa buscar mais nada
           const limited = episodes.slice(0, maxEpisodesPerSeries);
-          // Resolve players p/ episódios sem iframe direto
-          if (fetchPlayers) {
-            for (const ep of limited) {
-              if (!ep.player_url && ep.source_url) {
-                ep.player_url = await extractPlayerFromEpisode(ep.source_url);
-              }
-            }
-          }
 
           if (limited.length) {
             const rows = limited.map((ep) => ({
