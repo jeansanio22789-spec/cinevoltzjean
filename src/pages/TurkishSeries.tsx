@@ -354,7 +354,6 @@ const TurkishSeries = () => {
               </div>
             )}
           </div>
-          )}
         </DialogContent>
       </Dialog>
 
