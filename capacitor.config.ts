@@ -10,6 +10,11 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
+  plugins: {
+    ScreenOrientation: {
+      orientation: "portrait",
+    },
+  },
   // server: {
   //   url: "https://4705526e-6b17-47e6-8c13-d2bb053eb366.lovableproject.com?forceHideBadge=true",
   //   cleartext: true,
