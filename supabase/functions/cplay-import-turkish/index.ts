@@ -92,43 +92,47 @@ const parseEpisodes = (html: string, seriesUrl: string): { description: string; 
   const episodes: EpisodeData[] = [];
   const seen = new Set<string>();
 
-  // Padrão 1: links internos para páginas de episódio (ex: /capitulo-1-...)
-  const linkRe = /<a[^>]+href="([^"]+)"[^>]*>([^<]{2,120})<\/a>/g;
-  let lm: RegExpExecArray | null;
-  let counter = 0;
-  while ((lm = linkRe.exec(content))) {
-    const href = lm[1];
-    const text = decode(lm[2]).trim();
-    if (!/cap[íi]tulo|epis[óo]dio|cap\.?\s*\d|ep\.?\s*\d|\bep\s*\d/i.test(text) &&
-        !/cap[íi]tulo|epis[óo]dio/i.test(href)) continue;
-    if (seen.has(href)) continue;
-    seen.add(href);
-    counter += 1;
-    const numMatch = text.match(/(\d{1,4})/) || href.match(/(\d{1,4})/);
+  // Padrão real do site: <select> com <option value="URL_DO_PLAYER">CAPITULO XX</option>
+  // O primeiro option costuma ser placeholder ("ASSISTIR AGORA" com value="#"), pulamos.
+  const optRe = /<option[^>]*value="([^"]+)"[^>]*>([^<]+)<\/option>/g;
+  let om: RegExpExecArray | null;
+  while ((om = optRe.exec(html))) {
+    const value = om[1].trim();
+    const text = decode(om[2]).trim();
+    if (!value || value === "#" || !value.startsWith("http")) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    const numMatch = text.match(/(\d{1,4})/);
+    const number = numMatch ? parseInt(numMatch[1], 10) : episodes.length + 1;
     episodes.push({
-      number: numMatch ? parseInt(numMatch[1], 10) : counter,
-      title: text || `Episódio ${counter}`,
-      source_url: href.startsWith("http") ? href : `${BASE}${href.startsWith("/") ? "" : "/"}${href}`,
-      player_url: null,
+      number,
+      title: text.replace(/^[^\w\d]+/, "").trim() || `Capítulo ${number}`,
+      source_url: seriesUrl,
+      player_url: value, // já é o iframe direto
     });
   }
 
-  // Padrão 2: iframes embutidos diretamente na página da série (1 episódio só)
+  // Fallback: iframes embutidos
   if (episodes.length === 0) {
     const iframeRe = /<iframe[^>]+src="([^"]+)"/g;
     let im: RegExpExecArray | null;
     let i = 0;
     while ((im = iframeRe.exec(content))) {
+      const src = im[1];
+      // ignora iframes de anúncio / redes sociais
+      if (/googletag|doubleclick|facebook|twitter|disqus|adsystem/i.test(src)) continue;
       i += 1;
       episodes.push({
         number: i,
         title: `Episódio ${i}`,
         source_url: seriesUrl,
-        player_url: im[1],
+        player_url: src,
       });
     }
   }
 
+  // Ordena por número
+  episodes.sort((a, b) => a.number - b.number);
   return { description, episodes };
 };
 
@@ -206,15 +210,8 @@ Deno.serve(async (req) => {
 
           totalSeries += 1;
 
+          // player_url já vem direto do <option> da página da série — não precisa buscar mais nada
           const limited = episodes.slice(0, maxEpisodesPerSeries);
-          // Resolve players p/ episódios sem iframe direto
-          if (fetchPlayers) {
-            for (const ep of limited) {
-              if (!ep.player_url && ep.source_url) {
-                ep.player_url = await extractPlayerFromEpisode(ep.source_url);
-              }
-            }
-          }
 
           if (limited.length) {
             const rows = limited.map((ep) => ({
