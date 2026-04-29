@@ -54,7 +54,14 @@ export default function AdminGoogleDriveImport() {
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [hideImported, setHideImported] = useState(true);
+  const didAutoLoad = useRef(false);
 
+  useEffect(() => {
+    if (didAutoLoad.current) return;
+    didAutoLoad.current = true;
+    loadFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const uploadCover = async (fileId: string, file: File) => {
     setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
