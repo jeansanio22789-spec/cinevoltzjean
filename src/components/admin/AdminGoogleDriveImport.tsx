@@ -53,7 +53,7 @@ export default function AdminGoogleDriveImport() {
   const [imported, setImported] = useState<Map<string, string>>(new Map());
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
   const [titles, setTitles] = useState<Record<string, string>>({});
-  const [hideImported, setHideImported] = useState(false);
+  const [hideImported, setHideImported] = useState(true);
   const didAutoLoad = useRef(false);
 
   useEffect(() => {
