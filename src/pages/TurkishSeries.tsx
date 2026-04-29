@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Lock, PlayCircle } from "lucide-react";
+import { Loader2, Lock, Play, PlayCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,6 @@ interface Episode {
   id: string;
   episode_number: number;
   title: string;
-  player_url: string | null;
-  source_url: string | null;
 }
 
 const TurkishSeries = () => {
@@ -38,31 +36,12 @@ const TurkishSeries = () => {
   const [openSeries, setOpenSeries] = useState<Series | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [playingEp, setPlayingEp] = useState<Episode | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [showPlay, setShowPlay] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    document.title = "Novelas Turcas";
-  }, []);
-
-  // Bloqueia popups e redirecionamentos top-level forçados pelos players (anúncios)
-  useEffect(() => {
-    if (!playingEp) return;
-    const origOpen = window.open;
-    window.open = () => null as any;
-    const blockUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
-    // Bloqueia clicks que tentem abrir nova aba a partir do iframe
-    const onClick = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (t?.tagName === "A" && (t as HTMLAnchorElement).target === "_blank") {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener("click", onClick, true);
-    return () => {
-      window.open = origOpen;
-      window.removeEventListener("click", onClick, true);
-      window.removeEventListener("beforeunload", blockUnload);
-    };
-  }, [playingEp]);
+  useEffect(() => { document.title = "Novelas Turcas"; }, []);
 
   // Carrega séries
   useEffect(() => {
@@ -77,7 +56,7 @@ const TurkishSeries = () => {
     })();
   }, []);
 
-  // Verifica assinatura ativa (paywall)
+  // Verifica assinatura ativa
   useEffect(() => {
     if (!user) { setHasAccess(false); return; }
     (async () => {
@@ -107,10 +86,46 @@ const TurkishSeries = () => {
     setEpisodes([]);
     const { data } = await supabase
       .from("turkish_episodes")
-      .select("id, episode_number, title, player_url, source_url")
+      .select("id, episode_number, title")
       .eq("series_id", s.id)
       .order("episode_number", { ascending: true });
     setEpisodes((data as Episode[]) ?? []);
+  };
+
+  const startEpisode = async (ep: Episode) => {
+    setPlayingEp(ep);
+    setVideoUrl(null);
+    setShowPlay(true);
+    setResolving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("turkish-resolve", {
+        body: { episode_id: ep.id },
+      });
+      if (error || !data?.url) {
+        toast.error("Não foi possível carregar este episódio.");
+        setResolving(false);
+        return;
+      }
+      setVideoUrl(data.url);
+    } catch {
+      toast.error("Erro ao carregar vídeo");
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const handlePlay = () => {
+    setShowPlay(false);
+    videoRef.current?.play().catch(() => {
+      // Autoplay bloqueado — mantém botão
+      setShowPlay(true);
+    });
+  };
+
+  const closePlayer = () => {
+    setPlayingEp(null);
+    setVideoUrl(null);
+    setShowPlay(true);
   };
 
   return (
@@ -120,9 +135,7 @@ const TurkishSeries = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold">Novelas Turcas</h1>
-            <p className="text-muted-foreground text-sm">
-              Catálogo dublado e legendado importado de cplay2.live
-            </p>
+            <p className="text-muted-foreground text-sm">Catálogo dublado e legendado</p>
           </div>
           <Input
             placeholder="Buscar novela..."
@@ -138,7 +151,7 @@ const TurkishSeries = () => {
           </div>
         ) : filtered.length === 0 ? (
           <p className="text-center text-muted-foreground py-20">
-            Nenhuma novela importada ainda. O admin precisa rodar a importação no painel.
+            Nenhuma novela disponível ainda.
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -171,7 +184,7 @@ const TurkishSeries = () => {
       </div>
 
       {/* Modal de episódios */}
-      <Dialog open={!!openSeries} onOpenChange={(o) => { if (!o) { setOpenSeries(null); setPlayingEp(null); } }}>
+      <Dialog open={!!openSeries} onOpenChange={(o) => { if (!o) { setOpenSeries(null); closePlayer(); } }}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{openSeries?.title}</DialogTitle>
@@ -182,26 +195,39 @@ const TurkishSeries = () => {
 
           {playingEp ? (
             <div className="space-y-2">
-              <Button variant="outline" size="sm" onClick={() => setPlayingEp(null)}>← Voltar à lista</Button>
-              <div className="aspect-video w-full bg-black rounded overflow-hidden">
-                {playingEp.player_url ? (
-                  <iframe
-                    src={playingEp.player_url}
-                    allowFullScreen
-                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                    sandbox="allow-same-origin allow-scripts allow-presentation"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-sm text-white/70">
-                    Player indisponível.{" "}
-                    {playingEp.source_url && (
-                      <a href={playingEp.source_url} target="_blank" rel="noreferrer" className="underline ml-1">
-                        Abrir origem
-                      </a>
-                    )}
+              <Button variant="outline" size="sm" onClick={closePlayer}>← Voltar à lista</Button>
+              <div className="relative aspect-video w-full bg-black rounded overflow-hidden">
+                {resolving && (
+                  <div className="absolute inset-0 flex items-center justify-center text-white">
+                    <Loader2 className="w-8 h-8 animate-spin" />
                   </div>
+                )}
+                {videoUrl && (
+                  <>
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      controls
+                      playsInline
+                      className="w-full h-full"
+                      controlsList="nodownload noremoteplayback"
+                      disablePictureInPicture={false}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      {/* Legenda em português, se disponível na origem */}
+                    </video>
+                    {showPlay && (
+                      <button
+                        onClick={handlePlay}
+                        aria-label="Reproduzir"
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/30 transition"
+                      >
+                        <div className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center shadow-2xl">
+                          <Play className="w-10 h-10 text-primary-foreground fill-current ml-1" />
+                        </div>
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               <p className="text-sm font-semibold">{playingEp.title}</p>
@@ -213,7 +239,7 @@ const TurkishSeries = () => {
               ) : episodes.map((ep) => (
                 <button
                   key={ep.id}
-                  onClick={() => setPlayingEp(ep)}
+                  onClick={() => startEpisode(ep)}
                   className="flex items-center gap-2 p-2 rounded border border-border hover:bg-muted text-left"
                 >
                   <PlayCircle className="w-5 h-5 text-primary shrink-0" />
