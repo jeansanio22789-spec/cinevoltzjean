@@ -43,6 +43,27 @@ const TurkishSeries = () => {
     document.title = "Novelas Turcas";
   }, []);
 
+  // Bloqueia popups e redirecionamentos top-level forçados pelos players (anúncios)
+  useEffect(() => {
+    if (!playingEp) return;
+    const origOpen = window.open;
+    window.open = () => null as any;
+    const blockUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    // Bloqueia clicks que tentem abrir nova aba a partir do iframe
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t?.tagName === "A" && (t as HTMLAnchorElement).target === "_blank") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.open = origOpen;
+      window.removeEventListener("click", onClick, true);
+      window.removeEventListener("beforeunload", blockUnload);
+    };
+  }, [playingEp]);
+
   // Carrega séries
   useEffect(() => {
     (async () => {
