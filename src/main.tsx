@@ -21,4 +21,18 @@ if ((isPreviewHost || isInIframe) && "serviceWorker" in navigator) {
   });
 }
 
+// Trava a orientação em retrato (celular em pé) sempre que o navegador
+// permitir. Funciona em PWA instalado em Android/Chrome; iOS Safari ignora
+// silenciosamente — nesse caso o lock acontece via manifest/Capacitor.
+const lockPortrait = () => {
+  try {
+    const so: any = (screen as any).orientation;
+    if (so && typeof so.lock === "function") {
+      so.lock("portrait").catch(() => { /* ignora se não suportado */ });
+    }
+  } catch { /* ignore */ }
+};
+lockPortrait();
+window.addEventListener("orientationchange", lockPortrait);
+
 createRoot(document.getElementById("root")!).render(<App />);
