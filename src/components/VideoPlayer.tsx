@@ -240,6 +240,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     const onTime = () => setCurrent(v.currentTime);
     const onMeta = () => {
       setDuration(v.duration || 0);
+      setLoadProblem(false);
       // Detecta resolução nativa do arquivo (para MP4 popular menu de qualidade)
       if (v.videoHeight) setNativeHeight(v.videoHeight);
     };
@@ -270,7 +271,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     v.addEventListener("playing", onPlaying);
     v.addEventListener("canplay", onPlaying);
     v.addEventListener("error", onError);
-    v.addEventListener("stalled", onError);
+    v.addEventListener("stalled", onWait);
     v.addEventListener("progress", onProgress);
     v.addEventListener("volumechange", onVol);
     return () => {
@@ -282,7 +283,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("canplay", onPlaying);
       v.removeEventListener("error", onError);
-      v.removeEventListener("stalled", onError);
+      v.removeEventListener("stalled", onWait);
       v.removeEventListener("progress", onProgress);
       v.removeEventListener("volumechange", onVol);
     };
