@@ -440,11 +440,29 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     };
   }, [src, isHls]);
 
-  // ---- Fullscreen ----
+  // ---- Fullscreen + trava de rotação (só paisagem normal, nunca de cabeça pra baixo) ----
   useEffect(() => {
-    const onFs = () => setFs(!!document.fullscreenElement);
+    const onFs = () => {
+      const isFull = !!document.fullscreenElement;
+      setFs(isFull);
+      const orientation = (screen as any).orientation;
+      try {
+        if (isFull) {
+          orientation?.lock?.("landscape-primary").catch(() => {
+            orientation?.lock?.("landscape").catch(() => {});
+          });
+        } else {
+          orientation?.unlock?.();
+        }
+      } catch {
+        // navegadores que não suportam screen.orientation.lock — ignora
+      }
+    };
     document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      try { (screen as any).orientation?.unlock?.(); } catch { /* ignore */ }
+    };
   }, []);
 
   const toggleFs = useCallback(async () => {
