@@ -583,6 +583,23 @@ const AdminMovies = () => {
                   <option value="published">Publicado</option>
                 </select>
               </div>
+
+              <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-border bg-background/50 cursor-pointer hover:border-primary/40 transition-colors">
+                <div className="flex-1">
+                  <div className="text-sm font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" /> Marcar como Estreia
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Filmes marcados aparecem na seção <span className="text-primary font-semibold">🎬 Estreias</span> da home.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={form.is_premiere}
+                  onChange={(e) => setForm({ ...form, is_premiere: e.target.checked })}
+                  className="w-5 h-5 accent-primary cursor-pointer"
+                />
+              </label>
             </div>
 
             <div className="flex gap-3 mt-6">
