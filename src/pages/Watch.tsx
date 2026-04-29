@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Loader2, Lock, Play } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveVideoSource } from "@/lib/videoUrl";
@@ -228,16 +228,6 @@ const Watch = () => {
         {!source || source.kind === "unknown" ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-6 text-white gap-4">
             <p>Este filme ainda não tem vídeo disponível.</p>
-            {source?.url && (
-              <a
-                href={source.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-primary px-5 py-2.5 rounded text-sm font-semibold"
-              >
-                <ExternalLink className="w-4 h-4" /> Abrir link externo
-              </a>
-            )}
             <button
               onClick={() => navigate(-1)}
               className="flex items-center gap-2 text-white/80 text-sm hover:text-white"
