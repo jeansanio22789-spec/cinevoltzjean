@@ -183,81 +183,177 @@ const TurkishSeries = () => {
         )}
       </div>
 
-      {/* Modal de episódios */}
+      {/* Modal de série/episódios */}
       <Dialog open={!!openSeries} onOpenChange={(o) => { if (!o) { setOpenSeries(null); closePlayer(); } }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{openSeries?.title}</DialogTitle>
-          </DialogHeader>
-          {openSeries?.description && (
-            <p className="text-sm text-muted-foreground">{openSeries.description}</p>
-          )}
+        <DialogContent className="max-w-5xl p-0 gap-0 overflow-hidden border-border/50 bg-background max-h-[92vh] overflow-y-auto">
+          {/* Hero com backdrop */}
+          <div className="relative">
+            <div className="relative h-48 sm:h-64 w-full overflow-hidden">
+              {openSeries?.thumbnail_url && (
+                <>
+                  <img
+                    src={openSeries.thumbnail_url}
+                    alt={openSeries.title}
+                    className="w-full h-full object-cover blur-sm scale-110 opacity-60"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
+                </>
+              )}
+              <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 flex items-end gap-4">
+                {openSeries?.thumbnail_url && (
+                  <img
+                    src={openSeries.thumbnail_url}
+                    alt={openSeries.title}
+                    className="w-20 sm:w-28 aspect-[2/3] object-cover rounded-md shadow-2xl border border-border/50 flex-shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0 pb-1">
+                  <DialogHeader className="text-left space-y-1">
+                    <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight line-clamp-2">
+                      {openSeries?.title}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    {openSeries?.language && (
+                      <span className="px-2 py-0.5 rounded-sm bg-secondary text-secondary-foreground font-medium">
+                        {openSeries.language}
+                      </span>
+                    )}
+                    <span>{episodes.length || openSeries?.episodes_count || 0} episódios</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-          {playingEp ? (
-            <div className="space-y-2">
-              <Button variant="outline" size="sm" onClick={closePlayer}>← Voltar à lista</Button>
-              <div className="relative aspect-video w-full bg-black rounded overflow-hidden">
-                {resolving && (
-                  <div className="absolute inset-0 flex items-center justify-center text-white">
-                    <Loader2 className="w-8 h-8 animate-spin" />
+          <div className="px-4 sm:px-6 pb-6 space-y-5">
+            {openSeries?.description && !playingEp && (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {openSeries.description}
+              </p>
+            )}
+
+            {playingEp ? (
+              <div className="space-y-4">
+                {/* Player */}
+                <div className="relative aspect-video w-full bg-black rounded-lg overflow-hidden shadow-2xl ring-1 ring-border/50">
+                  {resolving && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-2 bg-black">
+                      <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                      <p className="text-xs text-white/70">Carregando episódio...</p>
+                    </div>
+                  )}
+                  {videoUrl && (
+                    <>
+                      <video
+                        ref={videoRef}
+                        src={videoUrl}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="w-full h-full"
+                        controlsList="nodownload noremoteplayback"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onPlay={() => setShowPlay(false)}
+                        onEnded={() => {
+                          const idx = episodes.findIndex((e) => e.id === playingEp?.id);
+                          const next = idx >= 0 ? episodes[idx + 1] : null;
+                          if (next) {
+                            toast.success(`Próximo: ${next.title}`);
+                            startEpisode(next);
+                          } else {
+                            toast.info("Você assistiu o último episódio disponível.");
+                          }
+                        }}
+                      />
+                      {showPlay && (
+                        <button
+                          onClick={handlePlay}
+                          aria-label="Reproduzir"
+                          className="absolute inset-0 flex items-center justify-center bg-gradient-to-t from-black/70 via-black/20 to-black/40 hover:from-black/60 hover:to-black/30 transition group"
+                        >
+                          <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
+                            <Play className="w-10 h-10 text-primary-foreground fill-current ml-1" />
+                          </div>
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Header do episódio + ações */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Reproduzindo</p>
+                    <h3 className="text-lg font-bold truncate">{playingEp.title}</h3>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={closePlayer} className="flex-shrink-0">
+                    ← Lista
+                  </Button>
+                </div>
+
+                {/* Próximos episódios */}
+                {episodes.length > 1 && (
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-foreground/90">Continue assistindo</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {episodes
+                        .filter((e) => e.id !== playingEp.id)
+                        .slice(0, 8)
+                        .map((ep) => (
+                          <button
+                            key={ep.id}
+                            onClick={() => startEpisode(ep)}
+                            className="group relative aspect-video rounded-md overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition"
+                          >
+                            {openSeries?.thumbnail_url && (
+                              <img src={openSeries.thumbnail_url} alt="" className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition" />
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex flex-col justify-end p-2">
+                              <p className="text-[11px] font-bold text-white truncate">{ep.title}</p>
+                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                              <PlayCircle className="w-8 h-8 text-white drop-shadow-lg" />
+                            </div>
+                          </button>
+                        ))}
+                    </div>
                   </div>
                 )}
-                {videoUrl && (
-                  <>
-                    <video
-                      ref={videoRef}
-                      src={videoUrl}
-                      controls
-                      autoPlay
-                      playsInline
-                      className="w-full h-full"
-                      controlsList="nodownload noremoteplayback"
-                      disablePictureInPicture={false}
-                      onContextMenu={(e) => e.preventDefault()}
-                      onEnded={() => {
-                        const idx = episodes.findIndex((e) => e.id === playingEp?.id);
-                        const next = idx >= 0 ? episodes[idx + 1] : null;
-                        if (next) {
-                          toast.success(`Próximo: ${next.title}`);
-                          startEpisode(next);
-                        } else {
-                          toast.info("Você assistiu o último episódio disponível.");
-                        }
-                      }}
-                    >
-                      {/* Legenda em português, se disponível na origem */}
-                    </video>
-                    {showPlay && (
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-foreground/90 flex items-center gap-2">
+                  <PlayCircle className="w-4 h-4 text-primary" />
+                  Episódios
+                </h3>
+                {episodes.length === 0 ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {episodes.map((ep, idx) => (
                       <button
-                        onClick={handlePlay}
-                        aria-label="Reproduzir"
-                        className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/30 transition"
+                        key={ep.id}
+                        onClick={() => startEpisode(ep)}
+                        className="group flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card/40 hover:bg-card hover:border-primary/60 transition text-left"
                       >
-                        <div className="w-20 h-20 rounded-full bg-primary/90 flex items-center justify-center shadow-2xl">
-                          <Play className="w-10 h-10 text-primary-foreground fill-current ml-1" />
+                        <div className="w-10 h-10 rounded-md bg-primary/10 group-hover:bg-primary text-primary group-hover:text-primary-foreground flex items-center justify-center font-bold text-sm flex-shrink-0 transition">
+                          {idx + 1}
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{ep.title}</p>
+                          <p className="text-[11px] text-muted-foreground">Episódio {ep.episode_number || idx + 1}</p>
+                        </div>
+                        <Play className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:fill-current flex-shrink-0 transition" />
                       </button>
-                    )}
-                  </>
+                    ))}
+                  </div>
                 )}
               </div>
-              <p className="text-sm font-semibold">{playingEp.title}</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {episodes.length === 0 ? (
-                <p className="text-sm text-muted-foreground col-span-2">Carregando episódios...</p>
-              ) : episodes.map((ep) => (
-                <button
-                  key={ep.id}
-                  onClick={() => startEpisode(ep)}
-                  className="flex items-center gap-2 p-2 rounded border border-border hover:bg-muted text-left"
-                >
-                  <PlayCircle className="w-5 h-5 text-primary shrink-0" />
-                  <span className="text-sm truncate">{ep.title}</span>
-                </button>
-              ))}
-            </div>
+            )}
+          </div>
           )}
         </DialogContent>
       </Dialog>
