@@ -13,7 +13,8 @@
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+  "Access-Control-Expose-Headers": "content-length, content-range, accept-ranges, content-type",
 };
 
 const BROWSER_UA =
@@ -88,6 +89,16 @@ function extractDriveFileId(rawUrl: string): string | null {
     if (match?.[1]) return match[1];
   }
   return null;
+}
+
+function parseRange(range: string | null, size: number, chunkSize = 4 * 1024 * 1024): string {
+  if (!size || !Number.isFinite(size)) return range || `bytes=0-${chunkSize - 1}`;
+  const match = range?.match(/bytes=(\d*)-(\d*)/i);
+  const rawStart = match?.[1] ? Number(match[1]) : 0;
+  const start = Math.max(0, Number.isFinite(rawStart) ? rawStart : 0);
+  const requestedEnd = match?.[2] ? Number(match[2]) : start + chunkSize - 1;
+  const end = Math.min(size - 1, Number.isFinite(requestedEnd) ? requestedEnd : start + chunkSize - 1, start + chunkSize - 1);
+  return `bytes=${start}-${Math.max(start, end)}`;
 }
 
 Deno.serve(async (req) => {
@@ -165,12 +176,66 @@ Deno.serve(async (req) => {
 
     const driveFileId = isDrive ? extractDriveFileId(remote.toString()) : null;
     if (driveFileId) {
-      // Redireciona direto pro Drive — browser faz Range requests nativos,
-      // começa a tocar imediatamente sem baixar o arquivo inteiro.
-      const directUrl = `https://drive.usercontent.google.com/download?id=${driveFileId}&export=download&authuser=0&confirm=t`;
-      return new Response(null, {
-        status: 302,
-        headers: { ...CORS, Location: directUrl, "Cache-Control": "no-store" },
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const GDRIVE_KEY = Deno.env.get("GOOGLE_DRIVE_API_KEY");
+      if (!LOVABLE_API_KEY || !GDRIVE_KEY) {
+        return new Response(JSON.stringify({ error: "drive_connector_missing" }), {
+          status: 500,
+          headers: { ...CORS, "content-type": "application/json" },
+        });
+      }
+
+      const metaResp = await fetch(
+        `${GDRIVE_GATEWAY_URL}/files/${driveFileId}?fields=id,name,mimeType,size&supportsAllDrives=true`,
+        {
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "X-Connection-Api-Key": GDRIVE_KEY,
+          },
+        },
+      );
+      const meta = metaResp.ok ? await metaResp.json() : null;
+      const fileSize = Number(meta?.size || 0);
+      const contentType = meta?.mimeType || "video/mp4";
+
+      if (req.method === "HEAD") {
+        return new Response(null, {
+          status: 200,
+          headers: {
+            ...CORS,
+            "content-type": contentType,
+            "content-length": fileSize ? String(fileSize) : "0",
+            "accept-ranges": "bytes",
+            "cache-control": "public, max-age=300",
+          },
+        });
+      }
+
+      const safeRange = parseRange(req.headers.get("range"), fileSize);
+      const upstream = await fetch(
+        `${GDRIVE_GATEWAY_URL}/files/${driveFileId}?alt=media&supportsAllDrives=true`,
+        {
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "X-Connection-Api-Key": GDRIVE_KEY,
+            Range: safeRange,
+          },
+          redirect: "follow",
+        },
+      );
+
+      const respHeaders = new Headers();
+      upstream.headers.forEach((value, key) => {
+        if (!STRIP_HEADERS.includes(key.toLowerCase())) respHeaders.set(key, value);
+      });
+      Object.entries(CORS).forEach(([k, v]) => respHeaders.set(k, v));
+      respHeaders.set("content-type", upstream.headers.get("content-type") || contentType);
+      respHeaders.set("accept-ranges", "bytes");
+      respHeaders.set("cache-control", "public, max-age=300");
+
+      return new Response(upstream.body, {
+        status: upstream.status === 200 ? 206 : upstream.status,
+        headers: respHeaders,
       });
     }
 
