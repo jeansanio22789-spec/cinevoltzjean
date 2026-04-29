@@ -50,10 +50,10 @@ export default function AdminGoogleDriveImport() {
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
-  const [imported, setImported] = useState<Set<string>>(new Set());
+  const [imported, setImported] = useState<Map<string, string>>(new Map());
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
   const [titles, setTitles] = useState<Record<string, string>>({});
-  const [hideImported, setHideImported] = useState(true);
+  const [hideImported, setHideImported] = useState(false);
   const didAutoLoad = useRef(false);
 
   useEffect(() => {
@@ -90,16 +90,16 @@ export default function AdminGoogleDriveImport() {
   const loadFiles = async () => {
     setLoading(true);
     try {
-      // Busca os já importados primeiro pra marcar/filtrar
+      // Busca os já importados (id do Drive -> título salvo) pra marcar/bloquear
       const { data: existing } = await supabase
         .from("movies")
-        .select("video_url");
-      const existingIds = new Set<string>();
+        .select("title, video_url");
+      const existingMap = new Map<string, string>();
       (existing || []).forEach((mv) => {
         const m = String(mv.video_url || "").match(/\/file\/d\/([\w-]+)/);
-        if (m) existingIds.add(m[1]);
+        if (m) existingMap.set(m[1], mv.title || "");
       });
-      setImported(existingIds);
+      setImported(existingMap);
 
       const { data, error } = await supabase.functions.invoke("gdrive-list", {
         body: {
@@ -149,7 +149,7 @@ export default function AdminGoogleDriveImport() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setImported((s) => new Set(s).add(file.id));
+      setImported((m) => new Map(m).set(file.id, data.movie.title));
       toast({
         title: "Filme adicionado!",
         description: `"${data.movie.title}" entrou no catálogo.`,
@@ -255,12 +255,19 @@ export default function AdminGoogleDriveImport() {
                   <div className="min-w-0 flex-1">
                     <input
                       type="text"
-                      value={titles[f.id] ?? cleanTitleFromFilename(f.name)}
+                      value={isDone ? (imported.get(f.id) || cleanTitleFromFilename(f.name)) : (titles[f.id] ?? cleanTitleFromFilename(f.name))}
                       onChange={(e) => setTitles((t) => ({ ...t, [f.id]: e.target.value }))}
-                      className="w-full bg-transparent text-sm font-medium outline-none border-b border-transparent hover:border-border focus:border-primary py-0.5"
-                      title={`Arquivo: ${f.name}`}
+                      readOnly={isDone}
+                      disabled={isDone}
+                      className={`w-full bg-transparent text-sm font-medium outline-none border-b border-transparent py-0.5 ${
+                        isDone
+                          ? "text-muted-foreground cursor-not-allowed"
+                          : "hover:border-border focus:border-primary"
+                      }`}
+                      title={isDone ? `Já no app: ${imported.get(f.id)}` : `Arquivo: ${f.name}`}
                     />
                     <div className="text-xs text-muted-foreground">
+                      {isDone && <span className="text-primary font-medium">✓ já enviado · </span>}
                       {formatSize(f.size)}
                       {f.videoMediaMetadata?.durationMillis && (
                         <> · {Math.round(Number(f.videoMediaMetadata.durationMillis) / 60000)} min</>
