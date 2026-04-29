@@ -45,7 +45,6 @@ interface SubtitleTrack {
 
 interface VideoPlayerProps {
   src: string;
-  externalUrl?: string | null;
   poster?: string | null;
   title?: string;
   onBack?: () => void;
