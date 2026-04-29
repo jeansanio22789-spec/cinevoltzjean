@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2, Send, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Film, Link as LinkIcon, Save, Loader2, Upload, Image, Share2, Send, Users, Sparkles } from "lucide-react";
 import MovieAccessManager from "./MovieAccessManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
