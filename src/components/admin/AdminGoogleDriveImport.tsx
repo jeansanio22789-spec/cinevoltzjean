@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,8 @@ const cleanTitleFromFilename = (raw: string): string => {
 
 export default function AdminGoogleDriveImport() {
   const { toast } = useToast();
-  const [folderId, setFolderId] = useState("");
+  const DEFAULT_FOLDER = "https://drive.google.com/drive/folders/19JeT2X039qZNrkYuHyKIXL7Bg02cl_tS";
+  const [folderId, setFolderId] = useState(DEFAULT_FOLDER);
   const [search, setSearch] = useState("");
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,7 +54,14 @@ export default function AdminGoogleDriveImport() {
   const [covers, setCovers] = useState<Record<string, { url: string; uploading?: boolean }>>({});
   const [titles, setTitles] = useState<Record<string, string>>({});
   const [hideImported, setHideImported] = useState(true);
+  const didAutoLoad = useRef(false);
 
+  useEffect(() => {
+    if (didAutoLoad.current) return;
+    didAutoLoad.current = true;
+    loadFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const uploadCover = async (fileId: string, file: File) => {
     setCovers((c) => ({ ...c, [fileId]: { url: c[fileId]?.url || "", uploading: true } }));
