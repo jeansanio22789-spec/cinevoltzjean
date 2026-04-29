@@ -19,6 +19,8 @@ const CORS = {
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36";
 
+const GDRIVE_GATEWAY_URL = "https://connector-gateway.lovable.dev/google_drive/drive/v3";
+
 const STRIP_HEADERS = [
   "x-frame-options",
   "content-security-policy",
@@ -71,6 +73,21 @@ function rewriteM3u8(text: string, baseRemote: string, proxyBase: string): strin
       return rewriteUrl(trimmed, baseRemote, proxyBase);
     })
     .join("\n");
+}
+
+function extractDriveFileId(rawUrl: string): string | null {
+  const patterns = [
+    /drive\.google\.com\/file\/d\/([\w-]{10,})/,
+    /drive\.google\.com\/(?:open|uc)\?(?:[^#]*&)?id=([\w-]{10,})/,
+    /drive\.usercontent\.google\.com\/(?:download|uc)\?(?:[^#]*&)?id=([\w-]{10,})/,
+    /docs\.google\.com\/uc\?(?:[^#]*&)?id=([\w-]{10,})/,
+    /drive\.google\.com\/.*[?&]id=([\w-]{10,})/,
+  ];
+  for (const re of patterns) {
+    const match = rawUrl.match(re);
+    if (match?.[1]) return match[1];
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
