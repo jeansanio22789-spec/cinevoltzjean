@@ -56,6 +56,16 @@ Deno.serve(async (req) => {
     if (folderId) {
       const m = folderId.match(/\/folders\/([\w-]+)/);
       if (m) folderId = m[1];
+      // Valida que é um ID válido do Drive (letras/números/_/-, mín 10 chars)
+      // Evita enviar "." ou lixo que faz a API retornar "File not found: ."
+      if (!/^[\w-]{10,}$/.test(folderId)) {
+        return new Response(
+          JSON.stringify({
+            error: `folderId inválido: "${folderId}". Cole o link completo da pasta do Drive (ex: https://drive.google.com/drive/folders/ABC123...) ou deixe vazio.`,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     // Filtro: vídeos + opcional pasta + opcional busca
