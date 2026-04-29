@@ -165,30 +165,6 @@ export default function AdminGoogleDriveImport() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 p-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <div>
-              <div className="text-sm font-semibold">Detecção automática de estreias</div>
-              <div className="text-xs text-muted-foreground">
-                Verifica o Drive e cria filmes publicados automaticamente (capa + nome).
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Switch id="auto-watch" checked={autoWatch} onCheckedChange={setAutoWatch} />
-              <Label htmlFor="auto-watch" className="text-xs flex items-center gap-1 cursor-pointer">
-                <Radio className={`h-3 w-3 ${autoWatch ? "text-primary animate-pulse" : ""}`} />
-                Monitorar
-              </Label>
-            </div>
-            <Button size="sm" onClick={() => autoDetect(false)} disabled={autoDetecting}>
-              {autoDetecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              <span className="ml-2">Detectar agora</span>
-            </Button>
-          </div>
-        </div>
       </Card>
 
       {files.length > 0 && (
