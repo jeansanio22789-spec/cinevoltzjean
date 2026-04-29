@@ -44,7 +44,8 @@ const cleanTitleFromFilename = (raw: string): string => {
 
 export default function AdminGoogleDriveImport() {
   const { toast } = useToast();
-  const [folderId, setFolderId] = useState("");
+  const DEFAULT_FOLDER = "https://drive.google.com/drive/folders/19JeT2X039qZNrkYuHyKIXL7Bg02cl_tS";
+  const [folderId, setFolderId] = useState(DEFAULT_FOLDER);
   const [search, setSearch] = useState("");
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(false);
