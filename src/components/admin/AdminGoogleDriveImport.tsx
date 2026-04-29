@@ -99,8 +99,17 @@ export default function AdminGoogleDriveImport() {
           q: search.trim() || undefined,
         },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(JSON.stringify(data.error));
+      if (error) {
+        // Tenta extrair mensagem clara do erro do edge function
+        const ctx = (error as any).context;
+        let msg = error.message;
+        try {
+          const body = ctx && typeof ctx.json === "function" ? await ctx.json() : null;
+          if (body?.error) msg = typeof body.error === "string" ? body.error : JSON.stringify(body.error);
+        } catch (_) { /* ignora */ }
+        throw new Error(msg);
+      }
+      if (data?.error) throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
       setFiles(data?.files || []);
       if (!data?.files?.length) {
         toast({ title: "Nenhum vídeo encontrado", description: "Confira a pasta ou os termos de busca." });
