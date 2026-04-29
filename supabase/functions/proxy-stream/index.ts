@@ -163,6 +163,39 @@ Deno.serve(async (req) => {
     const isDrive = /(^|\.)google(usercontent)?\.com$/.test(remote.hostname) ||
       remote.hostname.endsWith("googleusercontent.com");
 
+    const driveFileId = isDrive ? extractDriveFileId(remote.toString()) : null;
+    if (driveFileId) {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const GDRIVE_KEY = Deno.env.get("GOOGLE_DRIVE_API_KEY");
+      if (!LOVABLE_API_KEY || !GDRIVE_KEY) {
+        return new Response(JSON.stringify({ error: "drive_connector_missing" }), {
+          status: 500,
+          headers: { ...CORS, "content-type": "application/json" },
+        });
+      }
+
+      const driveHeaders: Record<string, string> = {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": GDRIVE_KEY,
+      };
+      const range = req.headers.get("range");
+      if (range) driveHeaders["Range"] = range;
+
+      const upstream = await fetch(`${GDRIVE_GATEWAY_URL}/files/${driveFileId}?alt=media&supportsAllDrives=true`, {
+        method: req.method === "HEAD" ? "HEAD" : "GET",
+        headers: driveHeaders,
+        redirect: "follow",
+      });
+
+      const respHeaders = new Headers();
+      upstream.headers.forEach((value, key) => {
+        if (!STRIP_HEADERS.includes(key.toLowerCase())) respHeaders.set(key, value);
+      });
+      Object.entries(CORS).forEach(([k, v]) => respHeaders.set(k, v));
+      if (!respHeaders.get("content-type")) respHeaders.set("content-type", "video/mp4");
+      return new Response(upstream.body, { status: upstream.status, headers: respHeaders });
+    }
+
     const fwdHeaders: Record<string, string> = {
       "User-Agent": BROWSER_UA,
       Accept: req.headers.get("accept") || "*/*",
