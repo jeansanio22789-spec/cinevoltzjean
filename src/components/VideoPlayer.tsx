@@ -294,6 +294,7 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    setLoadProblem(false);
     const prefs = getPlayerPrefs();
     if (typeof prefs.volume === "number") v.volume = prefs.volume;
     if (typeof prefs.muted === "boolean") v.muted = prefs.muted;
@@ -554,6 +555,7 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
 
   const pct = duration ? (current / duration) * 100 : 0;
   const bufPct = duration ? (buffered / duration) * 100 : 0;
+  const forceOpenUrl = externalUrl || src;
 
   return (
     <div
@@ -592,6 +594,22 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
       {waiting && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <Loader2 className="w-14 h-14 text-white animate-spin drop-shadow-lg" />
+        </div>
+      )}
+
+      {loadProblem && forceOpenUrl && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 px-6 text-center text-white">
+          <p className="max-w-sm text-sm text-white/80">
+            O vídeo não carregou aqui. Abra direto no Drive para assistir.
+          </p>
+          <a
+            href={forceOpenUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
+          >
+            <ExternalLink className="h-4 w-4" /> Forçar abrir vídeo
+          </a>
         </div>
       )}
 
