@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Captions,
-  ExternalLink,
   Languages,
   Loader2,
   Maximize,
