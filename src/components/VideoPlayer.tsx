@@ -161,7 +161,7 @@ const SettingsList = <T extends string | number>({
 );
 
 
-const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerProps) => {
+const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<number | null>(null);
