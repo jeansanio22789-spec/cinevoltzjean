@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Captions,
+  ExternalLink,
   Languages,
   Loader2,
   Maximize,
@@ -45,6 +46,7 @@ interface SubtitleTrack {
 
 interface VideoPlayerProps {
   src: string;
+  externalUrl?: string | null;
   poster?: string | null;
   title?: string;
   onBack?: () => void;
@@ -159,7 +161,7 @@ const SettingsList = <T extends string | number>({
 );
 
 
-const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
+const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -180,6 +182,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [speed, setSpeed] = useState(() => getPlayerPrefs().speed ?? 1);
   const [seeking, setSeeking] = useState(false);
   const [centerHint, setCenterHint] = useState<null | "play" | "pause" | "back" | "forward">(null);
+  const [loadProblem, setLoadProblem] = useState(false);
 
   // ---- HLS / qualidade / áudio / legendas ----
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
@@ -243,7 +246,11 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       if (v.videoHeight) setNativeHeight(v.videoHeight);
     };
     const onWait = () => setWaiting(true);
-    const onPlaying = () => setWaiting(false);
+    const onPlaying = () => {
+      setWaiting(false);
+      setLoadProblem(false);
+    };
+    const onError = () => setLoadProblem(true);
     const onProgress = () => {
       if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1));
     };
@@ -264,6 +271,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     v.addEventListener("waiting", onWait);
     v.addEventListener("playing", onPlaying);
     v.addEventListener("canplay", onPlaying);
+    v.addEventListener("error", onError);
+    v.addEventListener("stalled", onError);
     v.addEventListener("progress", onProgress);
     v.addEventListener("volumechange", onVol);
     return () => {
@@ -274,6 +283,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("waiting", onWait);
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("canplay", onPlaying);
+      v.removeEventListener("error", onError);
+      v.removeEventListener("stalled", onError);
       v.removeEventListener("progress", onProgress);
       v.removeEventListener("volumechange", onVol);
     };
