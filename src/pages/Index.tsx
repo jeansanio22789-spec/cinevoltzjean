@@ -97,6 +97,7 @@ const Index = () => {
             {continueWatching.length > 0 && (
               <ContentRail title="Continuar assistindo" movies={continueWatching} />
             )}
+            {premieres.length > 0 && <ContentRail title="🎬 Estreias" movies={premieres} />}
             {trending.length > 0 && <ContentRail title="🔥 Em alta" movies={trending} />}
             {forYou.length > 0 && <ContentRail title="Para você" movies={forYou} />}
             {recent.length > 0 && <ContentRail title="Adicionados recentemente" movies={recent} />}
