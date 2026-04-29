@@ -163,6 +163,8 @@ const Navbar = () => {
         >
         </button>
       </div>
+      </div>
+
 
       {/* Barra de categorias visível no celular em pé (scroll horizontal) */}
       <div className="md:hidden border-t border-border/40 bg-background/80 backdrop-blur-md">
