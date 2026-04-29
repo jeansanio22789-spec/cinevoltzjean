@@ -14,6 +14,7 @@ export interface DbMovie {
   video_url: string | null;
   telegram_url: string | null;
   price?: number | null;
+  is_premiere?: boolean | null;
 }
 
 export const useMovies = () => {
