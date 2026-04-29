@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     const listPage = async (q: string, pageToken?: string | null) => {
       const params = new URLSearchParams();
       params.set("q", q);
-      params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime,parents)");
+      params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime,parents,shortcutDetails)");
       params.set("pageSize", "1000");
       params.set("orderBy", "modifiedTime desc");
       params.set("supportsAllDrives", "true");
