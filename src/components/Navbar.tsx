@@ -29,15 +29,22 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isAdmin } = useIsAdmin();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const brand = useBranding();
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Você saiu da sua conta");
+    navigate("/login");
+  };
 
   return (
     <nav
