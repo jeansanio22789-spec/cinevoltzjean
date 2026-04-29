@@ -596,19 +596,22 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
         </div>
       )}
 
-      {loadProblem && forceOpenUrl && (
+      {loadProblem && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 px-6 text-center text-white">
           <p className="max-w-sm text-sm text-white/80">
-            O vídeo não carregou aqui. Abra direto no Drive para assistir.
+            Não foi possível carregar o vídeo agora. Verifique sua conexão e tente novamente.
           </p>
-          <a
-            href={forceOpenUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => {
+              setLoadProblem(false);
+              videoRef.current?.load();
+              videoRef.current?.play().catch(() => {});
+            }}
             className="inline-flex items-center gap-2 rounded bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
           >
-            <ExternalLink className="h-4 w-4" /> Forçar abrir vídeo
-          </a>
+            Tentar novamente
+          </button>
         </div>
       )}
 
