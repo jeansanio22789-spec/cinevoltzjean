@@ -25,6 +25,7 @@ const Watch = lazy(() => import("./pages/Watch.tsx"));
 const ExternalView = lazy(() => import("./pages/ExternalView.tsx"));
 const TestChannels = lazy(() => import("./pages/TestChannels.tsx"));
 const ChannelView = lazy(() => import("./pages/ChannelView.tsx"));
+const TurkishSeries = lazy(() => import("./pages/TurkishSeries.tsx"));
 const InstallAppPrompt = lazy(() => import("@/components/InstallAppPrompt"));
 const UploadFloatingIndicator = lazy(
   () => import("@/components/UploadFloatingIndicator"),
@@ -93,6 +94,7 @@ const App = () => {
                     }
                   />
                   <Route path="/c/:slug" element={<ChannelView />} />
+                  <Route path="/novelas-turcas" element={<TurkishSeries />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

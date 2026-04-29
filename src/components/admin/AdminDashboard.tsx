@@ -6,6 +6,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import LivePreview from "./LivePreview";
 import BuildStatusCard from "./BuildStatusCard";
+import AdminTurkishImport from "./AdminTurkishImport";
 
 interface Transaction {
   amount: number;
@@ -164,6 +165,8 @@ const AdminDashboard = () => {
       {/* Status de publicação: compara preview x app público */}
       <BuildStatusCard />
 
+      {/* Importador de novelas turcas (cplay2) */}
+      <AdminTurkishImport />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 admin-card p-6">

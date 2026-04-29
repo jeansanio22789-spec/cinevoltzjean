@@ -763,6 +763,95 @@ export type Database = {
         }
         Relationships: []
       }
+      turkish_episodes: {
+        Row: {
+          created_at: string
+          episode_number: number
+          id: string
+          player_url: string | null
+          series_id: string
+          source_url: string | null
+          thumbnail_url: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          episode_number?: number
+          id?: string
+          player_url?: string | null
+          series_id: string
+          source_url?: string | null
+          thumbnail_url?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          episode_number?: number
+          id?: string
+          player_url?: string | null
+          series_id?: string
+          source_url?: string | null
+          thumbnail_url?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turkish_episodes_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "turkish_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turkish_series: {
+        Row: {
+          created_at: string
+          description: string | null
+          episodes_count: number
+          genre: string | null
+          id: string
+          is_active: boolean
+          language: string | null
+          slug: string
+          sort_order: number
+          source_url: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          episodes_count?: number
+          genre?: string | null
+          id?: string
+          is_active?: boolean
+          language?: string | null
+          slug: string
+          sort_order?: number
+          source_url: string
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          episodes_count?: number
+          genre?: string | null
+          id?: string
+          is_active?: boolean
+          language?: string | null
+          slug?: string
+          sort_order?: number
+          source_url?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       upload_jobs: {
         Row: {
           created_at: string
