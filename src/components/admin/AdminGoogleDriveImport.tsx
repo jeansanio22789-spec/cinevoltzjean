@@ -149,7 +149,7 @@ export default function AdminGoogleDriveImport() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setImported((s) => new Set(s).add(file.id));
+      setImported((m) => new Map(m).set(file.id, data.movie.title));
       toast({
         title: "Filme adicionado!",
         description: `"${data.movie.title}" entrou no catálogo.`,
