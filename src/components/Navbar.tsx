@@ -97,13 +97,64 @@ const Navbar = () => {
             Painel Admin
           </Link>
         )}
-        <Link
-          to={user ? "/minha-conta" : "/login"}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-          aria-label={user ? "Minha conta" : "Entrar"}
-        >
-          <User className="w-5 h-5" />
-        </Link>
+        {user ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                aria-label="Minha conta"
+              >
+                <User className="w-5 h-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60 bg-popover border-border z-[60]">
+              <DropdownMenuLabel className="flex flex-col gap-0.5">
+                <span className="text-sm font-semibold truncate">{user.email}</span>
+                <span className="text-[11px] text-muted-foreground font-normal">
+                  {isAdmin ? "Administrador" : "Assinante"}
+                </span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link to="/minha-conta" className="flex items-center gap-2">
+                  <UserCircle className="w-4 h-4" /> Minha Conta
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link to="/minha-conta" className="flex items-center gap-2">
+                  <Info className="w-4 h-4" /> Informações da conta
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link to="/planos" className="flex items-center gap-2">
+                  <Crown className="w-4 h-4" /> Meu plano
+                </Link>
+              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link to="/admin" className="flex items-center gap-2">
+                    <Shield className="w-4 h-4" /> Painel Admin
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="cursor-pointer text-destructive focus:text-destructive flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" /> Sair da conta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Link
+            to="/login"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Entrar"
+          >
+            <User className="w-5 h-5" />
+          </Link>
+        )}
         <button
           className="md:hidden text-muted-foreground hover:text-foreground"
           onClick={() => setMobileOpen(!mobileOpen)}
