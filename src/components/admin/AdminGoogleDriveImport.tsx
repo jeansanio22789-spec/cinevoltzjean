@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Loader2, FolderOpen, Search, Download, CheckCircle2, ExternalLink, ImagePlus, X } from "lucide-react";
+import DirectVideoUploader from "./DirectVideoUploader";
 
 interface DriveFile {
   id: string;
