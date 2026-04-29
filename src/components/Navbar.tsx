@@ -161,8 +161,29 @@ const Navbar = () => {
           className="md:hidden text-muted-foreground hover:text-foreground"
           onClick={() => setMobileOpen(!mobileOpen)}
         >
-          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
+      </div>
+
+      {/* Barra de categorias visível no celular em pé (scroll horizontal) */}
+      <div className="md:hidden border-t border-border/40 bg-background/80 backdrop-blur-md">
+        <div className="flex items-center gap-1 px-3 py-2 overflow-x-auto no-scrollbar">
+          {navLinks.map((link) => {
+            const active = location.pathname === link.path;
+            return (
+              <Link
+                key={link.label}
+                to={link.path}
+                className={`whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-full transition-colors shrink-0 ${
+                  active
+                    ? "bg-primary/20 text-primary border border-primary/40"
+                    : "text-muted-foreground hover:text-foreground bg-muted/40 border border-transparent"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       {mobileOpen && (
