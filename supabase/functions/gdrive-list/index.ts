@@ -68,38 +68,78 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Filtro: vídeos + opcional pasta + opcional busca
-    const queryParts: string[] = [
-      "mimeType contains 'video/'",
-      "trashed = false",
-    ];
-    if (folderId) queryParts.push(`'${folderId.replace(/'/g, "\\'")}' in parents`);
-    if (search) queryParts.push(`name contains '${search.replace(/'/g, "\\'")}'`);
+    // Helper: lista arquivos do Drive com query montada
+    const listPage = async (q: string, pageToken?: string | null) => {
+      const params = new URLSearchParams();
+      params.set("q", q);
+      params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime,parents)");
+      params.set("pageSize", "1000");
+      params.set("orderBy", "modifiedTime desc");
+      params.set("supportsAllDrives", "true");
+      params.set("includeItemsFromAllDrives", "true");
+      if (pageToken && pageToken.trim()) params.set("pageToken", pageToken);
 
-    const params = new URLSearchParams();
-    params.set("q", queryParts.join(" and "));
-    params.set("fields", "nextPageToken,files(id,name,mimeType,size,thumbnailLink,videoMediaMetadata,createdTime)");
-    params.set("pageSize", "50");
-    params.set("orderBy", "modifiedTime desc");
-    params.set("supportsAllDrives", "true");
-    params.set("includeItemsFromAllDrives", "true");
-    if (pageToken && pageToken.trim()) params.set("pageToken", pageToken);
-
-    const resp = await fetch(`${GATEWAY_URL}/files?${params}`, {
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": GDRIVE_KEY,
-      },
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      return new Response(JSON.stringify({ error: data }), {
-        status: resp.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const resp = await fetch(`${GATEWAY_URL}/files?${params}`, {
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "X-Connection-Api-Key": GDRIVE_KEY,
+        },
       });
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(`Drive list: ${JSON.stringify(json)}`);
+      return json as { files?: any[]; nextPageToken?: string };
+    };
+
+    // Lista TUDO de uma pasta (paginando)
+    const listAllInParent = async (parent: string) => {
+      const results: any[] = [];
+      let token: string | null = null;
+      do {
+        const escaped = parent.replace(/'/g, "\\'");
+        const q = `'${escaped}' in parents and trashed = false`;
+        const page = await listPage(q, token);
+        results.push(...(page.files || []));
+        token = page.nextPageToken || null;
+      } while (token);
+      return results;
+    };
+
+    let allFiles: any[] = [];
+
+    if (folderId) {
+      // Walk recursivo: pasta principal + subpastas
+      const visited = new Set<string>();
+      const stack: string[] = [folderId];
+      while (stack.length) {
+        const current = stack.pop()!;
+        if (visited.has(current)) continue;
+        visited.add(current);
+        const items = await listAllInParent(current);
+        for (const f of items) {
+          if (f.mimeType === "application/vnd.google-apps.folder") {
+            stack.push(f.id);
+          } else if (typeof f.mimeType === "string" && f.mimeType.startsWith("video/")) {
+            allFiles.push(f);
+          }
+        }
+        // Limite de segurança pra não estourar tempo de execução
+        if (visited.size > 200) break;
+      }
+
+      // Aplica filtro de busca por nome (client-side, case-insensitive)
+      if (search) {
+        const needle = search.toLowerCase();
+        allFiles = allFiles.filter((f) => String(f.name || "").toLowerCase().includes(needle));
+      }
+    } else {
+      // Sem pasta: usa query global de vídeos
+      const queryParts = ["mimeType contains 'video/'", "trashed = false"];
+      if (search) queryParts.push(`name contains '${search.replace(/'/g, "\\'")}'`);
+      const page = await listPage(queryParts.join(" and "), pageToken);
+      allFiles = page.files || [];
     }
 
-    return new Response(JSON.stringify(data), {
+    return new Response(JSON.stringify({ files: allFiles }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
