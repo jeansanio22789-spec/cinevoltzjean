@@ -1,10 +1,19 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Search, User, Menu, X, Play, Star } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Search, User, Menu, X, Play, Star, LogOut, UserCircle, Info, Crown, Shield } from "lucide-react";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranding } from "@/hooks/useBranding";
 import NotificationBell from "@/components/NotificationBell";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 const navLinks = [
   { label: "Início", path: "/" },
