@@ -283,7 +283,6 @@ const Watch = () => {
           ) : (
             <VideoPlayer
               src={localBlobUrl}
-              externalUrl={movie.video_url}
               poster={movie.thumbnail_url}
               title={movie.title}
               onBack={() => navigate(-1)}
@@ -292,7 +291,6 @@ const Watch = () => {
         ) : (
           <VideoPlayer
             src={source.url}
-            externalUrl={movie.video_url}
             poster={movie.thumbnail_url}
             title={movie.title}
             onBack={() => navigate(-1)}

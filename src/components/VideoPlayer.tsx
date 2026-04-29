@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Captions,
-  ExternalLink,
   Languages,
   Loader2,
   Maximize,
@@ -161,7 +160,7 @@ const SettingsList = <T extends string | number>({
 );
 
 
-const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerProps) => {
+const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -555,7 +554,6 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
 
   const pct = duration ? (current / duration) * 100 : 0;
   const bufPct = duration ? (buffered / duration) * 100 : 0;
-  const forceOpenUrl = externalUrl || src;
 
   return (
     <div
@@ -597,19 +595,22 @@ const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerPro
         </div>
       )}
 
-      {loadProblem && forceOpenUrl && (
+      {loadProblem && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 px-6 text-center text-white">
           <p className="max-w-sm text-sm text-white/80">
-            O vídeo não carregou aqui. Abra direto no Drive para assistir.
+            Não foi possível carregar o vídeo agora. Verifique sua conexão e tente novamente.
           </p>
-          <a
-            href={forceOpenUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => {
+              setLoadProblem(false);
+              videoRef.current?.load();
+              videoRef.current?.play().catch(() => {});
+            }}
             className="inline-flex items-center gap-2 rounded bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
           >
-            <ExternalLink className="h-4 w-4" /> Forçar abrir vídeo
-          </a>
+            Tentar novamente
+          </button>
         </div>
       )}
 
