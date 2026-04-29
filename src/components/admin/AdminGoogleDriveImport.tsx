@@ -82,6 +82,17 @@ export default function AdminGoogleDriveImport() {
   const loadFiles = async () => {
     setLoading(true);
     try {
+      // Busca os já importados primeiro pra marcar/filtrar
+      const { data: existing } = await supabase
+        .from("movies")
+        .select("video_url");
+      const existingIds = new Set<string>();
+      (existing || []).forEach((mv) => {
+        const m = String(mv.video_url || "").match(/\/file\/d\/([\w-]+)/);
+        if (m) existingIds.add(m[1]);
+      });
+      setImported(existingIds);
+
       const { data, error } = await supabase.functions.invoke("gdrive-list", {
         body: {
           folderId: folderId.trim() ? extractFolderId(folderId) : undefined,
