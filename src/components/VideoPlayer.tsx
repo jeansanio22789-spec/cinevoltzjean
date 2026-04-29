@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Captions,
+  ExternalLink,
   Languages,
   Loader2,
   Maximize,
@@ -45,6 +46,7 @@ interface SubtitleTrack {
 
 interface VideoPlayerProps {
   src: string;
+  externalUrl?: string | null;
   poster?: string | null;
   title?: string;
   onBack?: () => void;
@@ -159,7 +161,7 @@ const SettingsList = <T extends string | number>({
 );
 
 
-const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
+const VideoPlayer = ({ src, externalUrl, poster, title, onBack }: VideoPlayerProps) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -180,6 +182,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   const [speed, setSpeed] = useState(() => getPlayerPrefs().speed ?? 1);
   const [seeking, setSeeking] = useState(false);
   const [centerHint, setCenterHint] = useState<null | "play" | "pause" | "back" | "forward">(null);
+  const [loadProblem, setLoadProblem] = useState(false);
 
   // ---- HLS / qualidade / áudio / legendas ----
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
@@ -243,7 +246,11 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       if (v.videoHeight) setNativeHeight(v.videoHeight);
     };
     const onWait = () => setWaiting(true);
-    const onPlaying = () => setWaiting(false);
+    const onPlaying = () => {
+      setWaiting(false);
+      setLoadProblem(false);
+    };
+    const onError = () => setLoadProblem(true);
     const onProgress = () => {
       if (v.buffered.length > 0) setBuffered(v.buffered.end(v.buffered.length - 1));
     };
@@ -264,6 +271,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
     v.addEventListener("waiting", onWait);
     v.addEventListener("playing", onPlaying);
     v.addEventListener("canplay", onPlaying);
+    v.addEventListener("error", onError);
+    v.addEventListener("stalled", onError);
     v.addEventListener("progress", onProgress);
     v.addEventListener("volumechange", onVol);
     return () => {
@@ -274,6 +283,8 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       v.removeEventListener("waiting", onWait);
       v.removeEventListener("playing", onPlaying);
       v.removeEventListener("canplay", onPlaying);
+      v.removeEventListener("error", onError);
+      v.removeEventListener("stalled", onError);
       v.removeEventListener("progress", onProgress);
       v.removeEventListener("volumechange", onVol);
     };
@@ -283,6 +294,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    setLoadProblem(false);
     const prefs = getPlayerPrefs();
     if (typeof prefs.volume === "number") v.volume = prefs.volume;
     if (typeof prefs.muted === "boolean") v.muted = prefs.muted;
@@ -543,6 +555,7 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
 
   const pct = duration ? (current / duration) * 100 : 0;
   const bufPct = duration ? (buffered / duration) * 100 : 0;
+  const forceOpenUrl = externalUrl || src;
 
   return (
     <div
@@ -581,6 +594,22 @@ const VideoPlayer = ({ src, poster, title, onBack }: VideoPlayerProps) => {
       {waiting && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <Loader2 className="w-14 h-14 text-white animate-spin drop-shadow-lg" />
+        </div>
+      )}
+
+      {loadProblem && forceOpenUrl && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/80 px-6 text-center text-white">
+          <p className="max-w-sm text-sm text-white/80">
+            O vídeo não carregou aqui. Abra direto no Drive para assistir.
+          </p>
+          <a
+            href={forceOpenUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded bg-primary px-5 py-3 text-sm font-bold text-primary-foreground"
+          >
+            <ExternalLink className="h-4 w-4" /> Forçar abrir vídeo
+          </a>
         </div>
       )}
 
